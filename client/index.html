@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zombie Extraction</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; color: #eee; }
+      canvas { display: block; }
+      .hud { position: fixed; pointer-events: none; text-shadow: 0 1px 2px #000; }
+      #crosshair { left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+      #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; opacity: .85; }
+      #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+      #crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+      #crosshair.hit::before, #crosshair.hit::after { background: #f33; }
+      #hp { left: 24px; bottom: 24px; font-size: 28px; font-weight: 700; }
+      #info { right: 24px; top: 20px; text-align: right; font-size: 14px; line-height: 1.5; }
+      #feed { left: 24px; top: 20px; font-size: 14px; line-height: 1.5; }
+      #extract { left: 50%; top: 62%; width: 260px; margin-left: -130px; display: none; text-align: center; font-size: 13px; }
+      #extract .bar { height: 8px; background: #fff3; margin-top: 4px; border-radius: 4px; overflow: hidden; }
+      #extract .fill { height: 100%; width: 0; background: #4f8; }
+      #toast { left: 0; right: 0; top: 30%; text-align: center; font-size: 36px; font-weight: 800; opacity: 0; transition: opacity .4s; }
+      #damage { inset: 0; background: radial-gradient(transparent 50%, #c00a); opacity: 0; transition: opacity .3s; }
+      #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000b; }
+      #overlay h1 { margin: 0; font-size: 48px; letter-spacing: 2px; color: #9f6; }
+      #overlay input { font: inherit; padding: 8px 12px; border-radius: 6px; border: 1px solid #555; background: #111; color: #eee; text-align: center; }
+      #overlay button { font: inherit; font-weight: 700; padding: 10px 28px; border-radius: 6px; border: 0; background: #9f6; color: #000; cursor: pointer; }
+      #overlay p { margin: 0; color: #aaa; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="damage" class="hud"></div>
+    <div id="crosshair" class="hud"></div>
+    <div id="hp" class="hud">100</div>
+    <div id="info" class="hud"></div>
+    <div id="feed" class="hud"></div>
+    <div id="extract" class="hud">EXTRACTING<div class="bar"><div class="fill"></div></div></div>
+    <div id="toast" class="hud"></div>
+    <div id="overlay">
+      <h1>ZOMBIE EXTRACTION</h1>
+      <input id="name" maxlength="20" placeholder="Your name" />
+      <button id="play">PLAY</button>
+      <p>WASD move · Shift sprint · Space jump · Mouse shoot · Reach the green beam to extract</p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
