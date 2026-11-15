@@ -4,6 +4,8 @@ extends Node
 ## Command-line options (after `--`), handy for testing:
 ##   --host                 host immediately
 ##   --map=corridor         host on the test corridor instead of the shelter (shelter is the default); --map=city for Joinville
+##   --mission=mirante      a city mission (terminal, hospital, prefeitura, batalhao, mirante): with --host start it,
+##                          without it just pick it on the menu map (for screenshots of the menu)
 ##   --city-plan=C:/dir     save city_plan.png and city_on_reference.png (what part of Joinville the city map covers) and exit
 ##   --join=192.168.1.7     join immediately
 ##   --name=Bob             player name
@@ -40,12 +42,15 @@ func _ready() -> void:
 
 	menu = Menu.new()
 	menu.host_pressed.connect(_host)
+	menu.mission_pressed.connect(func(id: String): _host("city", id))
 	menu.join_pressed.connect(_join)
 	add_child(menu)
 	Net.join_failed.connect(func(): _to_menu("Couldn't connect. Check the IP, that the host is running, and the firewall."))
 	Net.host_lost.connect(func(): _to_menu("Lost connection to the host."))
 	Net.joined.connect(_on_joined)
 	menu.open()
+	if _args.has("mission"):
+		menu.select(_args.mission)
 
 	if _args.has("screenshot"):
 		for t in str(_args.get("shot-at", "5")).split(","): # e.g. --shot-at=2,4,6 saves x_0.png, x_1.png...
@@ -53,15 +58,16 @@ func _ready() -> void:
 	if _args.has("quit-after"):
 		get_tree().create_timer(float(_args["quit-after"])).timeout.connect(_quit_with_summary)
 	if _args.has("host"):
-		_host()
+		_host("city" if _args.has("mission") else _args.get("map", "shelter"), _args.get("mission", ""))
 	elif _args.has("join"):
 		_join(_args.join)
 
 
-func _new_game() -> Game:
+func _new_game(map_name := "shelter", mission := "") -> Game:
 	game = Game.new()
 	game.bot = _args.has("bot")
-	game.map_name = _args.get("map", "shelter")
+	game.map_name = map_name
+	game.mission = mission
 	if _args.has("demo") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.bot_fires = not _args.has("no-fire")
@@ -72,12 +78,13 @@ func _new_game() -> Game:
 	return game
 
 
-func _host() -> void:
+## Free play on the training ground by default; the menu's Start hosts ("city", mission).
+func _host(map_name := "shelter", mission := "") -> void:
 	var err := Net.host()
 	if err != OK:
 		menu.open("Couldn't host on port %d (already in use?)." % Config.PORT)
 		return
-	_new_game().start_host(Net.player_name)
+	_new_game(map_name, mission).start_host(Net.player_name)
 	if _args.has("no-hordes"):
 		game.director.enabled = false
 	if _args.has("spawn"):

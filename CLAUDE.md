@@ -10,6 +10,8 @@ Everything is code: no editor-made scenes, no imported assets. Models are built 
 - `tools\play2.ps1` — two windows on one PC, host + guest, to test multiplayer alone.
 - Other options after `--` (see top of `scripts/main.gd`): `--join=IP`, `--bot`, `--bot-aim=head|legs|arms`, `--no-fire`, `--spawn=N`, `--no-hordes`, `--quit-after=S`, `--screenshot=PATH --shot-at=2,4`, `--weapon=1..9`, `--pose=aim|sprint|reload`, `--gun-rack` (all nine gun models side on), `--zombie-rack=1` / `=2` (one still zombie of every outfit, half at a time; add `--back`).
 - `tools\godot.ps1 -- --host --map=city` — play on the Joinville city map. From a PowerShell one-liner pass the args as an array (`$a = @('--headless','--','--city-plan=C:/dir'); tools\godot.ps1 @a`) to redraw `references/city_plan.png` and `city_on_reference.png` (which part of the city the map covers).
+- `tools\godot.ps1 -- --host --mission=mirante` — start a city mission at its POI (terminal, hospital, prefeitura, batalhao, mirante). Without `--host`, `--mission=` just picks that pin on the menu map (for menu screenshots).
+- `python tools/poi_sketches.py references/poi_sketches.html` — redraw the isometric sketches of the five mission maps.
 - **Seeing the game without a human:** run windowed with `--bot --screenshot=... --quit-after=...` and read the PNGs. Use this to check anything visual (poses, gore, lighting) before saying it works.
 
 ## Test-driven workflow (required)
@@ -31,9 +33,10 @@ Everything is code: no editor-made scenes, no imported assets. Models are built 
 - `scripts/models/humanoid.gd` — jointed rig + procedural animation. `characters.gd` — looks: zombie outfits (civilian, worker, nurse, doctor, cop, soldier, firefighter, office, prisoner; leapers are feral) and the survivor. `mesh_kit.gd` — box/cylinder builder (one mesh per body part).
 - `scripts/fx/gore.gd`, `ragdoll.gd` — blood, stains, spurts, gibs, chunks, ragdolls, corpses. All capped.
 - `scripts/world/` — `corridor_map.gd` (geometry + navigation), `interactable.gd`, `door.gd`, `lootbox.gd`.
-- `scripts/world/city_data.gd` — Joinville as data: the five POIs, streets, river, hill and squares, traced in pixels of `references/joinville.png`. `city_map.gd` — builds it: the edge is the convex hull of the POI lots plus `Config.CITY_MARGIN`; a 4 m cell grid (OUT / BLOCK / STREET / WATER / FOREST / PARK / LOT / BUILT) is both the layout and the navigation. Flat ground and placeholder POI buildings for now. To move or add a street, edit `CityData.STREETS` and redraw the plan.
+- `scripts/world/city_data.gd` — Joinville as data: the five POIs, streets, river, hill and squares, traced in pixels of `references/joinville.png`. `city_map.gd` — builds it: the edge is the convex hull of the POI lots plus `Config.CITY_MARGIN`; a 4 m cell grid (OUT / BLOCK / STREET / WATER / FOREST / PARK / LOT / BUILT) is both the layout and the navigation. Flat ground and placeholder POI buildings for now. To move or add a street, edit `CityData.STREETS` and redraw the plan. `joinville.png` cuts off Morro da Boa Vista: the Mirante and its road come from `joinville_topography.png` (same scale, `CityData.TOPO_OFFSET_PX`), and `EDGE_EXTRA` keeps the road's hairpin inside the edge.
+- `scripts/missions.gd` — the five missions (title, kind, brief), one per POI. `Game.mission` / `GameMap.mission` pick where everyone starts; clients get it in `welcome`.
 - `scripts/net.gd` (autoload `Net`) — host/join by IP, LAN discovery. `zombie_wire.gd` — binary zombie snapshots.
-- `scripts/player.gd`, `remote_player.gd`, `hud.gd`, `menu.gd`, `controls.gd` (key bindings), `main.gd` (entry + command-line options).
+- `scripts/player.gd`, `remote_player.gd`, `hud.gd`, `menu.gd` (the city map with a clickable pin per mission, Start, training ground, join, quit; drawn by `CityMap.menu_picture()`), `controls.gd` (key bindings), `main.gd` (entry + command-line options).
 
 ## Rules that keep it working
 - **Authority:** the host decides everything that matters (zombie HP, limbs, deaths, doors, loot, player HP). Clients send position, shots, right-clicks. Hooks run on the host only.

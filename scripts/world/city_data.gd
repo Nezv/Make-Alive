@@ -8,6 +8,9 @@ class_name CityData
 const REF_IMAGE := "res://references/joinville.png"
 const M_PER_PX := 200.0 / 89.0             ## the picture's scale bar: 200 m is 89 px
 const ORIGIN_PX := Vector2(1035, 504)      ## Terminal Central
+## joinville_topography.png has the same scale, shifted: topography pixel + this = joinville.png pixel.
+## Matched on the Rio do Engenho park pond, which both pictures show.
+const TOPO_OFFSET_PX := Vector2(183, -477)
 
 const AVENUE := 16.0 ## street widths in metres, kerb to kerb plus sidewalks
 const STREET := 12.0
@@ -25,10 +28,16 @@ const POIS := {
 		"lot": [Vector2(1174, 195), Vector2(1226, 195), Vector2(1226, 235), Vector2(1174, 235)] },
 	"batalhao": { "name": "62º BATALHÃO DE INFANTARIA", "at": Vector2(665, 840), "gate": Vector2(700, 786),
 		"lot": [Vector2(578, 795), Vector2(640, 765), Vector2(775, 880), Vector2(745, 900), Vector2(620, 892), Vector2(568, 842)] },
-	"mirante": { "name": "MIRANTE DE JOINVILLE", "at": Vector2(1868, 37), "gate": Vector2(1850, 30),
-		"lot": [Vector2(1882, 37), Vector2(1878, 47), Vector2(1868, 51), Vector2(1858, 47), Vector2(1854, 37),
-			Vector2(1858, 27), Vector2(1868, 23), Vector2(1878, 27)] },
+	# On the 230 m summit of Morro da Boa Vista, where the road ends. joinville.png shows only the tip
+	# of the hill under its zoom buttons; this and the road up come from joinville_topography.png.
+	"mirante": { "name": "MIRANTE DE JOINVILLE", "at": Vector2(1866, 45), "gate": Vector2(1848, 43),
+		"lot": [Vector2(1880, 45), Vector2(1876, 55), Vector2(1866, 59), Vector2(1856, 55), Vector2(1852, 45),
+			Vector2(1856, 35), Vector2(1866, 31), Vector2(1876, 35)] },
 }
+
+## Points the map's edge must also enclose: the hairpin of the road up to the Mirante, which
+## swings north of the summit (the edge is the hull of the POI lots plus these, grown by CITY_MARGIN).
+const EDGE_EXTRA := [Vector2(1808, -92), Vector2(1773, -37)]
 
 ## Rio Cachoeira, north to south.
 const RIVER := [Vector2(1128, -90), Vector2(1130, 150), Vector2(1150, 220), Vector2(1154, 330), Vector2(1153, 440),
@@ -91,8 +100,13 @@ const STREETS := [
 	["Rua General Valgas Neves", STREET, Vector2(522, 770), Vector2(545, 850), Vector2(580, 895), Vector2(660, 960)],
 	# Up the hill
 	["Rua Otto Eduardo Lepper", LANE, Vector2(1169, 262), Vector2(1230, 285), Vector2(1290, 315), Vector2(1380, 272), Vector2(1480, 265), Vector2(1560, 290), Vector2(1600, 285)],
-	["Rua Pastor Guilherme Rau", LANE, Vector2(1600, 285), Vector2(1640, 298), Vector2(1672, 262), Vector2(1682, 200), Vector2(1690, 120),
-		Vector2(1730, 62), Vector2(1800, 22), Vector2(1850, 30), Vector2(1868, 37)],
+	# Traced on joinville_topography.png (pixel + TOPO_OFFSET_PX): two S-bends up the west slope, a
+	# hairpin north of the summit, then back south-east onto the top. Negative y is above joinville.png.
+	["Rua Pastor Guilherme Rau", LANE, Vector2(1600, 285), Vector2(1628, 302), Vector2(1648, 283), Vector2(1665, 253),
+		Vector2(1678, 218), Vector2(1680, 188), Vector2(1698, 168), Vector2(1700, 148), Vector2(1688, 118), Vector2(1688, 88),
+		Vector2(1668, 53), Vector2(1668, 33), Vector2(1683, 15), Vector2(1708, 10), Vector2(1733, -2), Vector2(1773, -37),
+		Vector2(1798, -77), Vector2(1808, -92), Vector2(1818, -87), Vector2(1825, -57), Vector2(1818, -27), Vector2(1813, 8),
+		Vector2(1823, 33), Vector2(1848, 43), Vector2(1866, 45)],
 ]
 
 

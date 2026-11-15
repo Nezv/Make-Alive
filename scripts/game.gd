@@ -18,6 +18,7 @@ var bot := false
 var bot_fires := true
 var bot_aim := "chest" ## chest | head | legs | arms
 var map_name := "corridor" ## set before start_host; clients get it in `welcome`
+var mission := ""          ## a city POI id ("mirante"...) or "" for free play; clients get it in `welcome`
 var map: GameMap
 var world: Node3D
 var door: Door
@@ -87,6 +88,7 @@ func start_client(player_name_: String) -> void:
 
 func _build_world() -> void:
 	map = GameMap.create(map_name)
+	map.mission = mission
 	world = map.root
 	add_child(world)
 	door = map.door
@@ -153,7 +155,7 @@ func request_join(player_name_: String) -> void:
 	var states := {}
 	for iid: int in interactables:
 		states[iid] = (interactables[iid] as Interactable).get_state()
-	welcome.rpc_id(id, map_name, states)
+	welcome.rpc_id(id, map_name, mission, states)
 	_add_player(id, player_name_)
 
 
@@ -183,10 +185,11 @@ func client_interact(iid: int) -> void:
 # --- RPCs: host -> clients ------------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
-func welcome(map_name_: String, interactable_states: Dictionary) -> void:
+func welcome(map_name_: String, mission_: String, interactable_states: Dictionary) -> void:
 	if not GameMap.NAMES.has(map_name_):
 		return
 	map_name = map_name_
+	mission = mission_
 	_build_world()
 	for iid: int in interactable_states:
 		if interactables.has(iid):

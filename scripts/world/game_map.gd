@@ -16,6 +16,7 @@ var lootbox: Lootbox = null
 var outdoor := false         ## night sky and thin fog instead of a black, foggy interior
 var all_weapons := true      ## players carry every gun (test maps) or must find them
 var nav_refresh := 0.0       ## seconds a zombie keeps its last waypoint (0 = ask every tick)
+var mission := ""            ## which mission is being played on this map ("" = free play); set right after create
 
 
 static func create(map_name: String) -> GameMap:

@@ -36,7 +36,7 @@ Legend: [x] exists, [ ] not built.
 
 ## Menus and UI
 
-- [ ] **Main menu**: All in one map screen: Play Button (Host / Join), missions to select in the map, Settings, Quit.
+- [x] **Main menu**: All in one map screen: missions to select in the map, Start, training ground, Join, Quit. Settings still missing.
 - [ ] **Mission select**: five Joinville missions with brief, difficulty and best time.
 - [ ] **Pause menu** (Resume, Settings, Leave match). Does not pause the host's world in multiplayer.
 - [ ] **Settings**: key bindings (`controls.gd`), mouse sensitivity, FOV, volume sliders, graphics quality, fps cap, show draws.

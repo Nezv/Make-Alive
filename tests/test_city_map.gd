@@ -106,6 +106,36 @@ func test_the_hill_is_forest_with_one_road_up() -> void:
 	assert_true(m.nav.is_blocked(_px(1500, 330)))
 
 
+## joinville.png cuts the hill off at its top edge; the road up was re-traced from
+## joinville_topography.png (same scale, shifted by TOPO_OFFSET_PX).
+func test_the_mirante_road_climbs_the_real_hairpins_to_the_summit() -> void:
+	var m := _map()
+	var summit := _px(1866, 45) # the 230 m trig point, where Rua Pastor Guilherme Rau ends
+	assert_lt(m.poi_pos("mirante").distance_to(summit), 12.0, "the tower stands on the summit")
+	for bend: Vector2 in [Vector2(1648, 283), Vector2(1700, 148), Vector2(1668, 40), Vector2(1808, -90), Vector2(1823, -50)]:
+		var p := _px(bend.x, bend.y)
+		assert_true(m.contains(p), "bend %s is inside the map" % bend)
+		assert_eq(m.type_at(p), CityMap.STREET, "the road passes the bend at %s" % bend)
+	assert_eq(m.type_at(_px(1760, 100)), CityMap.FOREST, "no shortcut straight up the slope")
+	assert_true(m.nav.reachable(m.poi_pos("terminal"), m.poi_pos("mirante")))
+
+
+func test_a_mission_starts_players_at_its_poi() -> void:
+	for id: String in POIS:
+		var m := _map()
+		m.mission = id
+		assert_lt(m.player_spawn().distance_to(m.poi_pos(id)), 3.0, "%s mission starts at %s" % [id, id])
+		assert_false(m.nav.is_blocked(m.player_spawn()))
+	_map().mission = ""
+	assert_lt(_map().player_spawn().distance_to(_map().poi_pos("terminal")), 3.0, "no mission: the bus terminal")
+
+
+func test_game_passes_the_mission_to_the_map() -> void:
+	var g := await new_game("city", "mirante")
+	assert_eq(g.map.mission, "mirante")
+	assert_lt(g.local_player.global_position.distance_to(g.map.poi_pos("mirante")), 4.0, "player starts at the Mirante")
+
+
 func test_it_stays_cheap_to_draw() -> void:
 	var m := _map()
 	assert_lt(_count(m.root, "MeshInstance3D"), 12, "the whole city is a handful of merged meshes")

@@ -30,6 +30,10 @@ const BUILT := 7
 
 const PLAN_COLORS := [Color("0c0d0f"), Color("6e675d"), Color("2c2e32"), Color("27506e"), Color("1f3d24"),
 	Color("3f6a3a"), Color("b0a070"), Color("f0e8d0")]
+## The menu's night-map look, by cell type (OUT is see-through).
+const MENU_COLORS := [Color(0, 0, 0, 0), Color("2e3136"), Color("101215"), Color("1d4a66"), Color("17301c"),
+	Color("2c4a2a"), Color("6b6250"), Color("d8cfb4")]
+const MENU_EDGE := Color("99ff66", 0.55)
 const GROUND_COLORS := { OUT: Color("0d0e0f"), WATER: Color("0e1c26"), FOREST: Color("18261a"),
 	PARK: Color("26361f"), LOT: Color("4a4b4d") }
 const FACADES := [Color("7b7469"), Color("6d7078"), Color("8a8377"), Color("5f5a55"), Color("77706a"),
@@ -58,7 +62,9 @@ var _body := StaticBody3D.new()
 var _rng := RandomNumberGenerator.new()
 
 
-func _init() -> void:
+## `full` false lays the city out (grid, building heights, POI footprints) without the ground,
+## trees, navigation or any node but the empty root: enough for a picture of it.
+func _init(full := true) -> void:
 	name = "city"
 	outdoor = true
 	all_weapons = true
@@ -74,6 +80,8 @@ func _init() -> void:
 	_layout()
 	_buildings()
 	_pois()
+	if not full:
+		return
 	_navigation()
 	_ground()
 	_street_dressing()
@@ -88,8 +96,9 @@ func _init() -> void:
 
 # --- GameMap ------------------------------------------------------------------------
 
+## A mission starts at its POI; free play at the bus terminal.
 func player_spawn() -> Vector3:
-	return poi_pos("terminal") + Vector3(0, 0.1, 0)
+	return poi_pos(mission if CityData.POIS.has(mission) else "terminal") + Vector3(0, 0.1, 0)
 
 
 func player_spawn_point() -> Vector3:
@@ -183,6 +192,8 @@ func _edge() -> void:
 		var poi: Dictionary = CityData.POIS[id]
 		for p: Vector2 in poi.lot:
 			pts.append(CityData.to_plan(p))
+	for p: Vector2 in CityData.EDGE_EXTRA:
+		pts.append(CityData.to_plan(p))
 	var hull := Geometry2D.convex_hull(pts)
 	if hull.size() > 1 and hull[0] == hull[hull.size() - 1]:
 		hull.remove_at(hull.size() - 1)
@@ -695,6 +706,33 @@ func plan_image(scale := 2) -> Image:
 				_dot(img, at + Vector2i(k, d), 0, Color("ff3020"))
 	img.resize(gw * scale, gh * scale, Image.INTERPOLATE_NEAREST)
 	return img
+
+
+## The whole city for the main menu: `image` (RGBA, transparent outside the edge, which glows)
+## and `pois`, each POI's `at` as a 0..1 position on that image. Lays the city out and frees it.
+static func menu_picture(scale := 2) -> Dictionary:
+	var city := CityMap.new(false)
+	var img := Image.create(city.gw, city.gh, false, Image.FORMAT_RGBA8)
+	for r in city.gh:
+		for c in city.gw:
+			var i := r * city.gw + c
+			var t := city.grid[i]
+			var color: Color = MENU_COLORS[t]
+			if t == BLOCK:
+				color = color.lightened(minf(city._floors[i], 16.0) / 16.0 * 0.5)
+			elif t == OUT:
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n := Vector2i(c, r) + d
+					if n.x >= 0 and n.y >= 0 and n.x < city.gw and n.y < city.gh and city.grid[n.y * city.gw + n.x] != OUT:
+						color = MENU_EDGE
+			img.set_pixel(c, r, color)
+	img.resize(city.gw * scale, city.gh * scale, Image.INTERPOLATE_NEAREST)
+	var pois := {}
+	for id: String in CityData.POIS:
+		var p := city.poi_pos(id)
+		pois[id] = Vector2((p.x - city.lo.x) / (city.gw * city.cell), (p.z - city.lo.y) / (city.gh * city.cell))
+	city.root.free()
+	return { "image": img, "pois": pois }
 
 
 ## The reference map with everything outside the edge dimmed, the edge in red, the traced

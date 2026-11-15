@@ -83,9 +83,10 @@ func wait_until(cond: Callable, timeout := 3.0) -> bool:
 
 
 ## A real host Game running offline (no sockets), with automatic spawning turned off.
-func new_game(map_name := "corridor") -> Game:
+func new_game(map_name := "corridor", mission := "") -> Game:
 	var g := Game.new()
 	g.map_name = map_name
+	g.mission = mission
 	add_child(g)
 	g.start_host("Tester")
 	g.director.enabled = false
