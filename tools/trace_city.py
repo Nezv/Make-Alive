@@ -3,7 +3,8 @@
 Classes: 0 ground, 1 building, 2 street, 3 main road, 4 water, 5 green (forest, parks, cemetery).
 Map labels and icons are cut out and filled from what surrounds them. North and east of the
 picture's edges (around the Mirante's hill), joinville_topography.png fills in: it is tinted by
-height, so there only the forest is told apart.
+height, so there only the forest is told apart; the rest is the city mirrored across the edge, as a
+backdrop.
 
 Usage: python tools/trace_city.py [preview.png]
 """
@@ -18,7 +19,7 @@ OUT = "scripts/world/city_picture.gd"
 TOPO_OFFSET = (183, -477)        # CityData.TOPO_OFFSET_PX
 TOP = -180                       # first row, in joinville.png pixels (negative = above the picture)
 LEFT = 183                       # first column: where the topography picture starts, so the band has no seam
-RIGHT = 2000                     # last column + 1: past joinville.png's right edge, for the Mirante's side of the hill
+RIGHT = 2103                     # last column + 1: past joinville.png's right edge, for the Mirante's side of the hill
 UI = [(1878, 0, 1920, 365), (1845, 990, 1920, 1020), (0, 0, 345, 40)]   # zoom/layer buttons, credits, search box
 TOPO_UI = [(1855, 0, 1920, 500), (0, 0, 60, 190)]
 
@@ -93,6 +94,15 @@ def main():
                 out[y, x] = GREEN
     # joinville.png where it reaches.
     out[-TOP:-TOP + h, 0:w - LEFT] = cls[:, LEFT:w]
+    # Outside both pictures there is no data. So the menu has no holes, that ground (not the forest)
+    # gets the city mirrored across the picture's edge: a backdrop, not the real streets there.
+    for y in range(-TOP):
+        src = cls[min(h - 1, -TOP - y), LEFT:w]
+        row = out[y, 0:w - LEFT]
+        out[y, 0:w - LEFT] = np.where(row == GROUND, src, row)
+    for x in range(w - LEFT, cols):
+        src = out[:, max(0, 2 * (w - LEFT) - x - 1)]
+        out[:, x] = np.where(out[:, x] == GROUND, src, out[:, x])
     w = cols
 
     packed = base64.b64encode(zlib.compress(out.tobytes(), 9)).decode()

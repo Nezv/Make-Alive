@@ -12,6 +12,8 @@ signal mission_pressed(id: String)        ## host the city map, everyone at this
 signal join_pressed(ip: String)
 
 const PANEL_W := 400.0
+const SHOW_TOP := -110.0     ## first joinville.png row at the window's top (the Mirante's hairpin)
+const MIRANTE_GAP := 60.0    ## pixels between the Mirante pin and the panel
 const RED := Color("c4453a")
 const AMBER := Color("ffcc66")
 const BG := Color("0c0b0b")
@@ -40,15 +42,20 @@ float tree(vec2 uv) {
 	float trunk = step(abs(d.x), 0.8) * step(1.5, d.y) * step(d.y, 4.5);
 	return max(crown, trunk);
 }
+uniform vec2 uv_from = vec2(0.0);
+uniform vec2 uv_span = vec2(1.0);
 void fragment() {
+	// The rect is the whole window; uv_from/uv_span say which part of the picture it shows. Past
+	// the picture's edges it mirrors (a backdrop; the real city is inside).
+	vec2 uv = uv_from + UV * uv_span;
+	uv = 1.0 - abs(mod(uv, 2.0) - 1.0);
 	vec2 px = TEXTURE_PIXEL_SIZE * 0.25;
-	vec3 c = (class_colour(UV + vec2(-px.x, -px.y)) + class_colour(UV + vec2(px.x, -px.y))
-		+ class_colour(UV + vec2(-px.x, px.y)) + class_colour(UV + vec2(px.x, px.y))) * 0.25;
-	if (int(texture(classes, UV).r * 255.0 + 0.5) == 5) {
-		c = mix(c, vec3(0.27, 0.25, 0.24), tree(UV));
+	vec3 c = (class_colour(uv + vec2(-px.x, -px.y)) + class_colour(uv + vec2(px.x, -px.y))
+		+ class_colour(uv + vec2(-px.x, px.y)) + class_colour(uv + vec2(px.x, px.y))) * 0.25;
+	if (int(texture(classes, uv).r * 255.0 + 0.5) == 5) {
+		c = mix(c, vec3(0.27, 0.25, 0.24), tree(uv));
 	}
-	float fade = smoothstep(0.0, 0.12, UV.y) * smoothstep(0.0, 0.03, UV.x) * smoothstep(1.0, 0.97, UV.x) * smoothstep(1.0, 0.97, UV.y);
-	COLOR = vec4(c, fade);
+	COLOR = vec4(c, 1.0);
 }
 """
 
@@ -78,12 +85,11 @@ func _ready() -> void:
 
 	map_area = Control.new()
 	map_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	map_area.offset_right = -PANEL_W
 	add_child(map_area)
 	map_texture = TextureRect.new()
 	map_texture.texture = ImageTexture.create_from_image(CityPicture.image())
 	map_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	map_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	map_texture.stretch_mode = TextureRect.STRETCH_SCALE
 	map_texture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST # classes, not colours: never blend them
 	map_texture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var mat := ShaderMaterial.new()
@@ -196,16 +202,23 @@ func pin_point(id: String) -> Vector2:
 	return px_point(poi.at)
 
 
-## The part of map_area the picture actually covers (it keeps its aspect).
+## Where the whole picture lies on screen (bigger than the window). Scaled so joinville.png's rows
+## from SHOW_TOP down fill the window's height, shifted so the Mirante sits left of the panel.
 func map_rect() -> Rect2:
-	var box := Rect2(map_texture.position, map_texture.size)
-	var tex := map_texture.texture.get_size()
-	var s := minf(box.size.x / tex.x, box.size.y / tex.y)
-	var size := tex * s
-	return Rect2(box.position + (box.size - size) * 0.5, size)
+	var view := map_area.size
+	var rows := float(CityPicture.H) - (SHOW_TOP - CityPicture.TOP)
+	var s := view.y / rows
+	var mirante: Vector2 = CityData.POIS.mirante.at
+	var x := (view.x - PANEL_W - MIRANTE_GAP) - (mirante.x - CityPicture.LEFT) * s
+	x = minf(x, 0.0)
+	return Rect2(Vector2(x, -(SHOW_TOP - CityPicture.TOP) * s), Vector2(CityPicture.W, CityPicture.H) * s)
 
 
 func _relayout() -> void:
+	var r := map_rect()
+	var mat := map_texture.material as ShaderMaterial
+	mat.set_shader_parameter("uv_from", -r.position / r.size)
+	mat.set_shader_parameter("uv_span", map_area.size / r.size)
 	for id: String in pins:
 		var pin: PoiPin = pins[id]
 		pin.position = pin_point(id) - pin.anchor_point()
@@ -215,7 +228,7 @@ func _relayout() -> void:
 func _build_panel() -> void:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("110e0e", 0.97)
+	style.bg_color = Color("110e0e", 0.88) # the map runs on behind it
 	style.border_color = Color("3a2422")
 	style.border_width_left = 1
 	style.content_margin_left = 24
