@@ -71,6 +71,15 @@ class Builder:
 			_quad(t * (c - hu - hv), t * (c + hu - hv), t * (c + hu + hv), t * (c - hu + hv), wn, color)
 		return self
 
+	## A flat rectangle facing up, centred at `pos`; `size` is (x, z). A sixth of a box's cost,
+	## for ground paint that is only ever seen from above.
+	func flat(size: Vector2, pos: Vector3, color: Color) -> Builder:
+		var hx := size.x * 0.5
+		var hz := size.y * 0.5
+		_quad(pos + Vector3(-hx, 0, -hz), pos + Vector3(hx, 0, -hz), pos + Vector3(hx, 0, hz),
+			pos + Vector3(-hx, 0, hz), Vector3.UP, color)
+		return self
+
 	## Cylinder along local Y, centred at `pos`.
 	func cyl(radius: float, height: float, pos: Vector3, color: Color, segments := 8,
 			rot := Basis.IDENTITY, xf := Transform3D.IDENTITY) -> Builder:

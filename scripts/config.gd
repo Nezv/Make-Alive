@@ -73,6 +73,13 @@ const HORDE_GROWTH := 4       # extra zombies per wave
 const WEAPON_SPOTS_ACTIVE := 8 # how many of a map's weapon spots hold a gun each match
 const SPAWN_MIN_DIST := 18.0  # zombies never appear closer to a player than this (open maps)
 const DIRECT_CHECK_RANGE := 14.0 # open maps: beyond this a zombie just follows its path
+const CITY_MARGIN := 180.0    # metres of city kept around the outermost POIs
+const CITY_CELL := 4.0        # metres per cell of the city's layout / navigation grid
+const CITY_FLOOR_H := 3.2
+const CITY_WALL_H := 4.0      # the wall where the map ends
+const CITY_SPAWN_NEAR := 30.0 # city zombies appear between these distances from a player
+const CITY_SPAWN_FAR := 70.0
+const CITY_SPAWN_TRIES := 40
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
 

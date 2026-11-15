@@ -6,7 +6,7 @@ extends RefCounted
 ## Everything a map builds must be identical on every peer: fixed positions, fixed interactable
 ## ids, and only its own seeded RandomNumberGenerator (never randf) for scattered detail.
 
-const NAMES := ["corridor", "shelter"]
+const NAMES := ["corridor", "shelter", "city"]
 
 var name := ""
 var root: Node3D             ## all geometry, lights and interactables
@@ -22,6 +22,7 @@ static func create(map_name: String) -> GameMap:
 	match map_name:
 		"corridor": return CorridorGameMap.new()
 		"shelter": return ShelterMap.new()
+		"city": return CityMap.new()
 	return null
 
 

@@ -3,7 +3,8 @@ extends Node
 ##
 ## Command-line options (after `--`), handy for testing:
 ##   --host                 host immediately
-##   --map=corridor         host on the test corridor instead of the shelter (shelter is the default)
+##   --map=corridor         host on the test corridor instead of the shelter (shelter is the default); --map=city for Joinville
+##   --city-plan=C:/dir     save city_plan.png and city_on_reference.png (what part of Joinville the city map covers) and exit
 ##   --join=192.168.1.7     join immediately
 ##   --name=Bob             player name
 ##   --bot                  local player wanders and shoots by itself
@@ -33,6 +34,9 @@ func _ready() -> void:
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "true"
 	if _args.has("name"):
 		Net.player_name = _args.name
+	if _args.has("city-plan"):
+		_city_plan(_args["city-plan"])
+		return
 
 	menu = Menu.new()
 	menu.host_pressed.connect(_host)
@@ -193,6 +197,21 @@ func _zombie_rack() -> void:
 	game.add_child(lamp)
 
 
+## Draw which part of Joinville the city map covers, then quit. Works headless.
+func _city_plan(dir: String) -> void:
+	var t := Time.get_ticks_msec()
+	var city := CityMap.new()
+	print("[city] built in %d ms: %.2f km2, %d x %d cells of %.0f m, %d buildings" % [
+		Time.get_ticks_msec() - t, city.area_km2(), city.gw, city.gh, city.cell, city.building_count])
+	city.plan_image().save_png(dir.path_join("city_plan.png"))
+	var over := city.reference_overlay()
+	if over != null:
+		over.save_png(dir.path_join("city_on_reference.png"))
+	print("[city] saved city_plan.png and city_on_reference.png in ", dir)
+	city.root.free()
+	get_tree().quit()
+
+
 ## A fixed camera for looking at a map: "x,y,z,yaw,pitch" in metres and degrees.
 func _debug_camera(spec: String) -> void:
 	var v := spec.split_floats(",")
@@ -200,7 +219,7 @@ func _debug_camera(spec: String) -> void:
 		return
 	var cam := Camera3D.new()
 	cam.fov = 70
-	cam.far = 400
+	cam.far = maxf(400.0, v[1] * 6.0) # high overview cameras need to see the ground
 	game.add_child(cam)
 	cam.global_transform = Transform3D(Basis.from_euler(Vector3(deg_to_rad(v[4]), deg_to_rad(v[3]), 0)), Vector3(v[0], v[1], v[2]))
 	cam.make_current()

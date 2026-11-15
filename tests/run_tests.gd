@@ -52,6 +52,8 @@ func _ready() -> void:
 					print("        ", msg)
 			t.free()
 			await get_tree().physics_frame
+		if script.has_method("after_all"): # a static func that frees whatever the file's tests shared
+			script.call("after_all")
 
 	var secs := (Time.get_ticks_msec() - started) / 1000.0
 	print("\n%d passed, %d failed, %d asserts, %.1fs" % [passed, failed, total_asserts, secs])

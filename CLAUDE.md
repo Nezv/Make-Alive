@@ -9,6 +9,7 @@ Everything is code: no editor-made scenes, no imported assets. Models are built 
 - `tools\godot.ps1 -- --host --demo` — zombie line-up right in front of you, no hordes (for looking at animations).
 - `tools\play2.ps1` — two windows on one PC, host + guest, to test multiplayer alone.
 - Other options after `--` (see top of `scripts/main.gd`): `--join=IP`, `--bot`, `--bot-aim=head|legs|arms`, `--no-fire`, `--spawn=N`, `--no-hordes`, `--quit-after=S`, `--screenshot=PATH --shot-at=2,4`, `--weapon=1..9`, `--pose=aim|sprint|reload`, `--gun-rack` (all nine gun models side on), `--zombie-rack=1` / `=2` (one still zombie of every outfit, half at a time; add `--back`).
+- `tools\godot.ps1 -- --host --map=city` — play on the Joinville city map. From a PowerShell one-liner pass the args as an array (`$a = @('--headless','--','--city-plan=C:/dir'); tools\godot.ps1 @a`) to redraw `references/city_plan.png` and `city_on_reference.png` (which part of the city the map covers).
 - **Seeing the game without a human:** run windowed with `--bot --screenshot=... --quit-after=...` and read the PNGs. Use this to check anything visual (poses, gore, lighting) before saying it works.
 
 ## Test-driven workflow (required)
@@ -30,6 +31,7 @@ Everything is code: no editor-made scenes, no imported assets. Models are built 
 - `scripts/models/humanoid.gd` — jointed rig + procedural animation. `characters.gd` — looks: zombie outfits (civilian, worker, nurse, doctor, cop, soldier, firefighter, office, prisoner; leapers are feral) and the survivor. `mesh_kit.gd` — box/cylinder builder (one mesh per body part).
 - `scripts/fx/gore.gd`, `ragdoll.gd` — blood, stains, spurts, gibs, chunks, ragdolls, corpses. All capped.
 - `scripts/world/` — `corridor_map.gd` (geometry + navigation), `interactable.gd`, `door.gd`, `lootbox.gd`.
+- `scripts/world/city_data.gd` — Joinville as data: the five POIs, streets, river, hill and squares, traced in pixels of `references/joinville.png`. `city_map.gd` — builds it: the edge is the convex hull of the POI lots plus `Config.CITY_MARGIN`; a 4 m cell grid (OUT / BLOCK / STREET / WATER / FOREST / PARK / LOT / BUILT) is both the layout and the navigation. Flat ground and placeholder POI buildings for now. To move or add a street, edit `CityData.STREETS` and redraw the plan.
 - `scripts/net.gd` (autoload `Net`) — host/join by IP, LAN discovery. `zombie_wire.gd` — binary zombie snapshots.
 - `scripts/player.gd`, `remote_player.gd`, `hud.gd`, `menu.gd`, `controls.gd` (key bindings), `main.gd` (entry + command-line options).
 
