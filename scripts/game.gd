@@ -89,6 +89,7 @@ func start_client(player_name_: String) -> void:
 func _build_world() -> void:
 	map = GameMap.create(map_name)
 	map.mission = mission
+	gore.ground = map.ground_y
 	world = map.root
 	add_child(world)
 	door = map.door

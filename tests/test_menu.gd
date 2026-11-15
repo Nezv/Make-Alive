@@ -28,6 +28,28 @@ func test_the_city_map_fills_the_menu() -> void:
 	m.free()
 
 
+func test_the_whole_city_is_drawn_not_just_the_play_area() -> void:
+	var m := await _menu()
+	var tex := m.map_texture.texture.get_size()
+	assert_eq(tex, Vector2(CityPicture.W, CityPicture.H), "every pixel of the city picture")
+	var shown := m.map_rect()
+	for p: Vector2 in CityMap.edge_polygon():
+		var px := p / CityData.M_PER_PX + CityData.ORIGIN_PX
+		assert_true(shown.grow(1.0).has_point(m.px_point(px)), "the play area's edge at %s is on screen" % px)
+	m.free()
+
+
+func test_every_traced_street_is_drawn_over_the_city() -> void:
+	var m := await _menu()
+	var lines := m.street_lines()
+	assert_eq(lines.size(), CityData.STREETS.size(), "one red line per street the game builds, the hill road too")
+	var shown := m.map_rect().grow(2.0)
+	for line: PackedVector2Array in lines:
+		for p in line:
+			assert_true(shown.has_point(p), "street point %s is on the map" % p)
+	m.free()
+
+
 func test_every_mission_has_a_pin_where_its_poi_is() -> void:
 	var m := await _menu()
 	assert_eq(m.pins.size(), Missions.ORDER.size())

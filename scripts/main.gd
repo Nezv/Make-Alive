@@ -3,7 +3,7 @@ extends Node
 ##
 ## Command-line options (after `--`), handy for testing:
 ##   --host                 host immediately
-##   --map=corridor         host on the test corridor instead of the shelter (shelter is the default); --map=city for Joinville
+##   --map=corridor         host on the test corridor instead of the city (the default)
 ##   --mission=mirante      a city mission (terminal, hospital, prefeitura, batalhao, mirante): with --host start it,
 ##                          without it just pick it on the menu map (for screenshots of the menu)
 ##   --city-plan=C:/dir     save city_plan.png and city_on_reference.png (what part of Joinville the city map covers) and exit
@@ -41,7 +41,7 @@ func _ready() -> void:
 		return
 
 	menu = Menu.new()
-	menu.host_pressed.connect(_host)
+	menu.host_pressed.connect(func(): _host("corridor"))
 	menu.mission_pressed.connect(func(id: String): _host("city", id))
 	menu.join_pressed.connect(_join)
 	add_child(menu)
@@ -58,12 +58,12 @@ func _ready() -> void:
 	if _args.has("quit-after"):
 		get_tree().create_timer(float(_args["quit-after"])).timeout.connect(_quit_with_summary)
 	if _args.has("host"):
-		_host("city" if _args.has("mission") else _args.get("map", "shelter"), _args.get("mission", ""))
+		_host("city" if _args.has("mission") else _args.get("map", "city"), _args.get("mission", ""))
 	elif _args.has("join"):
 		_join(_args.join)
 
 
-func _new_game(map_name := "shelter", mission := "") -> Game:
+func _new_game(map_name := "city", mission := "") -> Game:
 	game = Game.new()
 	game.bot = _args.has("bot")
 	game.map_name = map_name
@@ -78,8 +78,8 @@ func _new_game(map_name := "shelter", mission := "") -> Game:
 	return game
 
 
-## Free play on the training ground by default; the menu's Start hosts ("city", mission).
-func _host(map_name := "shelter", mission := "") -> void:
+## Free play in the city by default; the menu's Start hosts ("city", mission), training is the corridor.
+func _host(map_name := "city", mission := "") -> void:
 	var err := Net.host()
 	if err != OK:
 		menu.open("Couldn't host on port %d (already in use?)." % Config.PORT)

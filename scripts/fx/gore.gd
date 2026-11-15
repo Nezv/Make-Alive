@@ -13,6 +13,7 @@ const RAGDOLL_SIM_TIME := 5.0
 ## Counters (tests read these; handy for debugging too).
 var stats := { "bursts": 0, "splats": 0, "gibs": 0, "ragdolls": 0, "chunks": 0 }
 
+var ground := Callable() ## map.ground_y: where stains lie (unset: y = 0)
 var _splats: MultiMesh
 var _splat_i := 0
 var _gibs: Array[RigidBody3D] = []
@@ -86,14 +87,19 @@ func _later(delay: float, node: Node, fn: Callable) -> void:
 
 # --- Blood ----------------------------------------------------------------------
 
-## A blob of blood on the floor at `pos` (y is ignored), stretched along `dir`.
+## Height of the floor under `pos`, where stains go.
+func floor_at(pos: Vector3) -> float:
+	return ground.call(pos) if ground.is_valid() else 0.0
+
+
+## A blob of blood on the floor under `pos` (on the ground, whatever `pos.y`), stretched along `dir`.
 func splat(pos: Vector3, dir := Vector3.ZERO, size := 0.5) -> void:
 	var yaw := atan2(dir.x, dir.z) if dir.length_squared() > 0.001 else randf() * TAU
 	var stretch := randf_range(1.0, 2.2) if dir.length_squared() > 0.001 else randf_range(0.8, 1.3)
 	var b := Basis(Vector3.UP, yaw + randf_range(-0.4, 0.4)).scaled_local(Vector3(size, 1.0, size * stretch))
 	var i := _splat_i % MAX_SPLATS
 	# Tiny per-splat height offset stops overlapping stains from flickering.
-	_splats.set_instance_transform(i, Transform3D(b, Vector3(pos.x, 0.012 + i * 0.00002, pos.z)))
+	_splats.set_instance_transform(i, Transform3D(b, Vector3(pos.x, floor_at(pos) + 0.012 + i * 0.00002, pos.z)))
 	var shade := randf_range(0.28, 0.5)
 	_splats.set_instance_color(i, Color(shade, shade * 0.06, shade * 0.05))
 	_splat_i += 1
@@ -172,7 +178,7 @@ func _track_gib(body: RigidBody3D) -> void:
 	# Leave a blood trail where it lands and slides.
 	for delay in [0.45, 0.9, 1.6]:
 		_later(delay, body, func(b: RigidBody3D):
-			if b.global_position.y < 0.6:
+			if b.global_position.y < floor_at(b.global_position) + 0.6:
 				splat(b.global_position, b.linear_velocity, randf_range(0.25, 0.6)))
 
 

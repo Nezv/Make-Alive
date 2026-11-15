@@ -45,7 +45,7 @@ const RIVER := [Vector2(1128, -90), Vector2(1130, 150), Vector2(1150, 220), Vect
 
 ## Morro da Boa Vista: forest, crossed only by the road up to the Mirante.
 const FOREST := [Vector2(1205, 265), Vector2(1290, 215), Vector2(1400, 200), Vector2(1410, 130), Vector2(1560, 110),
-	Vector2(1620, 60), Vector2(1640, -130), Vector2(2100, -130), Vector2(2100, 420), Vector2(1620, 440),
+	Vector2(1620, 60), Vector2(1625, -330), Vector2(2110, -330), Vector2(2100, 420), Vector2(1620, 440),
 	Vector2(1480, 600), Vector2(1340, 720), Vector2(1260, 600), Vector2(1215, 520), Vector2(1200, 420)]
 
 ## Open green ground: the immigrants' cemetery and the squares.
@@ -53,6 +53,11 @@ const PARKS := [
 	[Vector2(668, 352), Vector2(735, 352), Vector2(735, 420), Vector2(690, 420), Vector2(668, 395)],
 	[Vector2(930, 545), Vector2(995, 545), Vector2(995, 600), Vector2(945, 600)],
 	[Vector2(1068, 490), Vector2(1148, 495), Vector2(1160, 528), Vector2(1068, 522)],
+]
+
+## Ways into squares the traced streets only pass near: [from, to], a LANE wide.
+const SQUARE_PATHS := [
+	[Vector2(962, 522), Vector2(962, 552)],  # Rua Nove de Março into the square south of it (the crash site)
 ]
 
 ## [name, width, points...]. Only what lies inside the map's edge is built.
@@ -99,10 +104,13 @@ const STREETS := [
 	["Rua Jacob Eisenhuth", STREET, Vector2(650, 750), Vector2(600, 742), Vector2(560, 720), Vector2(522, 770)],
 	["Rua General Valgas Neves", STREET, Vector2(522, 770), Vector2(545, 850), Vector2(580, 895), Vector2(660, 960)],
 	# Up the hill
-	["Rua Otto Eduardo Lepper", LANE, Vector2(1169, 262), Vector2(1230, 285), Vector2(1290, 315), Vector2(1380, 272), Vector2(1480, 265), Vector2(1560, 290), Vector2(1600, 285)],
 	# Traced on joinville_topography.png (pixel + TOPO_OFFSET_PX): two S-bends up the west slope, a
 	# hairpin north of the summit, then back south-east onto the top. Negative y is above joinville.png.
-	["Rua Pastor Guilherme Rau", LANE, Vector2(1600, 285), Vector2(1628, 302), Vector2(1648, 283), Vector2(1665, 253),
+	# The way up starts where Rua Saguaçu ends, along the south of the Rio do Engenho park. (Rua Otto
+	# Eduardo Lepper, west of it, is a dashed footpath on the map: not a road.)
+	["Rua Pastor Guilherme Rau", LANE, Vector2(1330, 165), Vector2(1385, 187), Vector2(1430, 198), Vector2(1470, 212),
+		Vector2(1500, 207), Vector2(1520, 212), Vector2(1535, 235), Vector2(1560, 255), Vector2(1590, 280), Vector2(1615, 297),
+		Vector2(1630, 300), Vector2(1648, 283), Vector2(1665, 253),
 		Vector2(1678, 218), Vector2(1680, 188), Vector2(1698, 168), Vector2(1700, 148), Vector2(1688, 118), Vector2(1688, 88),
 		Vector2(1668, 53), Vector2(1668, 33), Vector2(1683, 15), Vector2(1708, 10), Vector2(1733, -2), Vector2(1773, -37),
 		Vector2(1798, -77), Vector2(1808, -92), Vector2(1818, -87), Vector2(1825, -57), Vector2(1818, -27), Vector2(1813, 8),

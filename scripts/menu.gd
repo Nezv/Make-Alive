@@ -1,20 +1,48 @@
 class_name Menu
 extends CanvasLayer
-## Main menu: the whole Joinville city map with a pin on every mission POI. Click a pin to read
-## the mission, Start to host it. On the side: name, training ground (free play), join by IP
-## and a live list of LAN games, quit.
+## Main menu: all of central Joinville at night, every street of it, with the streets the game
+## builds glowing red and a pin on every mission POI. Click a pin to read the mission, Start to
+## host it. On the side: name, training (the test corridor), join by IP / LAN games, quit.
+##
+## The city is CityPicture (classified from the reference map by tools/trace_city.py), coloured by
+## a palette shader; outside the play area it is dimmed. Pins and red streets are drawn over it.
 
-signal host_pressed                       ## free play on the training ground (no mission)
+signal host_pressed                       ## free play on the training corridor (no mission)
 signal mission_pressed(id: String)        ## host the city map, everyone at this POI
 signal join_pressed(ip: String)
 
 const PANEL_W := 400.0
-const GREEN := Color("99ff66")
+const RED := Color("c4453a")
+const RED_DIM := Color("8a332c")
 const AMBER := Color("ffcc66")
-const KINDS := { "EXTRACTION": Color("66ccff"), "DEFEND": Color("ff8866"), "RUN": Color("ffcc66") }
+const BG := Color("0c0b0b")
+const KINDS := { "EXTRACTION": Color("e8d7c8"), "DEFEND": Color("ff8a5c"), "RUN": Color("ffcc66") }
+## Ground, building, street, main road, water, green: the dark city, a little red in it.
+const PALETTE := [Color("181515"), Color("2a2424"), Color("5a4848"), Color("6e423d"), Color("1c2a33"), Color("172219")]
+
+const SHADER := """
+shader_type canvas_item;
+uniform sampler2D classes : filter_nearest;
+uniform sampler2D inside_mask : filter_linear;
+uniform vec4 pal[6];
+vec3 class_colour(vec2 uv) {
+	int k = int(texture(classes, uv).r * 255.0 + 0.5);
+	return pal[clamp(k, 0, 5)].rgb;
+}
+void fragment() {
+	vec2 px = TEXTURE_PIXEL_SIZE * 0.25;
+	vec3 c = (class_colour(UV + vec2(-px.x, -px.y)) + class_colour(UV + vec2(px.x, -px.y))
+		+ class_colour(UV + vec2(-px.x, px.y)) + class_colour(UV + vec2(px.x, px.y))) * 0.25;
+	float inside = texture(inside_mask, UV).r;
+	c = mix(c * 0.45, c, inside);
+	float fade = smoothstep(0.0, 0.12, UV.y) * smoothstep(0.0, 0.03, UV.x) * smoothstep(1.0, 0.97, UV.x) * smoothstep(1.0, 0.97, UV.y);
+	COLOR = vec4(c, fade);
+}
+"""
 
 var map_area: Control
 var map_texture: TextureRect
+var lines_layer: Control
 var pins := {}                 ## id -> PoiPin
 var selected := ""
 var mission_title: Label
@@ -27,62 +55,183 @@ var name_edit: LineEdit
 var ip_edit: LineEdit
 var status: Label
 var lan_list: VBoxContainer
-var _pois := {}                ## id -> 0..1 position on the map picture
 var _lan_refresh := 0.0
 
 
 func _ready() -> void:
 	var bg := ColorRect.new()
-	bg.color = Color("0b0d10")
+	bg.color = BG
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var picture := CityMap.menu_picture()
-	_pois = picture.pois
 	map_area = Control.new()
 	map_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	map_area.offset_right = -PANEL_W
 	add_child(map_area)
 	map_texture = TextureRect.new()
-	map_texture.texture = ImageTexture.create_from_image(picture.image)
+	map_texture.texture = ImageTexture.create_from_image(CityPicture.image())
 	map_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	map_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	map_texture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	map_texture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST # classes, not colours: never blend them
 	map_texture.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	map_texture.offset_left = 24
-	map_texture.offset_top = 24
-	map_texture.offset_right = -24
-	map_texture.offset_bottom = -24
+	var mat := ShaderMaterial.new()
+	mat.shader = Shader.new()
+	mat.shader.code = SHADER
+	mat.set_shader_parameter("pal", PALETTE)
+	mat.set_shader_parameter("classes", map_texture.texture)
+	mat.set_shader_parameter("inside_mask", ImageTexture.create_from_image(_inside_mask()))
+	map_texture.material = mat
 	map_area.add_child(map_texture)
+
+	lines_layer = Control.new()
+	lines_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lines_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines_layer.draw.connect(_draw_lines)
+	map_area.add_child(lines_layer)
+
 	for id: String in Missions.ORDER:
-		var pin := PoiPin.new(id, Missions.INFO[id].title, KINDS[Missions.INFO[id].kind])
+		var poi: Dictionary = CityData.POIS[id]
+		var east: bool = poi.at.x > 1600.0 # far east, by the panel: name on the left of the pin
+		var pin := PoiPin.new(id, Missions.INFO[id].title, KINDS[Missions.INFO[id].kind], east)
 		pin.pressed.connect(select.bind(id))
 		map_area.add_child(pin)
 		pins[id] = pin
-	map_area.resized.connect(_place_pins)
+	map_area.resized.connect(_relayout)
 
 	var title := Label.new()
 	title.text = "ZOMBIE EXTRACTION"
 	title.add_theme_font_size_override("font_size", 40)
-	title.add_theme_color_override("font_color", GREEN)
-	title.position = Vector2(36, 28)
+	title.add_theme_color_override("font_color", RED)
+	title.add_theme_constant_override("outline_size", 10)
+	title.add_theme_color_override("font_outline_color", BG)
+	title.position = Vector2(36, 24)
 	map_area.add_child(title)
 	var sub := Label.new()
 	sub.text = "JOINVILLE · SANTA CATARINA  —  pick a mission on the map"
-	sub.modulate.a = 0.6
-	sub.position = Vector2(40, 80)
+	sub.modulate = Color(1, 0.85, 0.82, 0.6)
+	sub.add_theme_constant_override("outline_size", 6)
+	sub.add_theme_color_override("font_outline_color", BG)
+	sub.position = Vector2(40, 76)
 	map_area.add_child(sub)
 
 	_build_panel()
 	_show_mission()
-	_place_pins.call_deferred()
+	_relayout.call_deferred()
+
+
+## White inside the play area, black outside, one pixel per CityPicture pixel.
+func _inside_mask() -> Image:
+	var img := Image.create(CityPicture.W, CityPicture.H, false, Image.FORMAT_L8)
+	var edge := PackedVector2Array()
+	for p in CityMap.edge_polygon():
+		edge.append(p / CityData.M_PER_PX + CityData.ORIGIN_PX - Vector2(CityPicture.LEFT, CityPicture.TOP))
+	for y in CityPicture.H:
+		var xs: Array[float] = []
+		for i in edge.size():
+			var a := edge[i]
+			var b := edge[(i + 1) % edge.size()]
+			if (a.y <= y + 0.5) != (b.y <= y + 0.5):
+				xs.append(a.x + (y + 0.5 - a.y) / (b.y - a.y) * (b.x - a.x))
+		xs.sort()
+		for k in range(0, xs.size() - 1, 2):
+			var x0 := clampi(roundi(xs[k]), 0, CityPicture.W)
+			var x1 := clampi(roundi(xs[k + 1]), 0, CityPicture.W)
+			if x1 > x0:
+				img.fill_rect(Rect2i(x0, y, x1 - x0, 1), Color.WHITE)
+	return img
+
+
+## Every street the game builds, as screen polylines (CityData.STREETS order).
+func street_lines() -> Array:
+	var out := []
+	for street: Array in CityData.STREETS:
+		var line := PackedVector2Array()
+		for p: Vector2 in street.slice(2):
+			line.append(px_point(p))
+		out.append(line)
+	return out
+
+
+func _draw_lines() -> void:
+	var r := map_rect()
+	var scale := r.size.x / CityPicture.W / CityData.M_PER_PX # screen pixels per metre
+	var lines := street_lines()
+	for pass_i in 2: # a soft glow under, the line on top
+		for i in lines.size():
+			var width: float = CityData.STREETS[i][1]
+			var w := maxf(1.2, width * scale * (0.55 if width >= CityData.AVENUE else 0.4))
+			if pass_i == 0:
+				lines_layer.draw_polyline(lines[i], Color(RED, 0.16), w * 3.5, true)
+			else:
+				lines_layer.draw_polyline(lines[i], RED if width >= CityData.AVENUE else RED.darkened(0.15), w, true)
+	var edge := PackedVector2Array()
+	for p in CityMap.edge_polygon():
+		edge.append(px_point(p / CityData.M_PER_PX + CityData.ORIGIN_PX))
+	edge.append(edge[0])
+	lines_layer.draw_polyline(edge, Color(RED_DIM, 0.7), 1.5, true)
+
+
+## Pick a mission (a pin was clicked, or `--mission=` on the command line).
+func select(id: String) -> void:
+	if not Missions.INFO.has(id):
+		return
+	selected = id
+	for k: String in pins:
+		(pins[k] as PoiPin).set_pressed_no_signal(k == id)
+		(pins[k] as PoiPin).queue_redraw()
+	_show_mission()
+
+
+func _show_mission() -> void:
+	start_button.disabled = selected == ""
+	if selected == "":
+		mission_kind.text = "NO MISSION PICKED"
+		mission_kind.modulate = Color(1, 1, 1, 0.5)
+		mission_title.text = "Click a place on the map"
+		mission_brief.text = "Five places in central Joinville, each its own mission. Pick one to read its brief."
+		mission_route.text = ""
+		return
+	var info: Dictionary = Missions.INFO[selected]
+	mission_kind.text = "%s   %s" % [info.kind, "■".repeat(info.difficulty) + "□".repeat(5 - info.difficulty)]
+	mission_kind.modulate = KINDS[info.kind]
+	mission_title.text = info.title
+	mission_brief.text = info.brief
+	mission_route.text = "Start: %s\nGoal: %s" % [info.start, info.goal]
+
+
+## Where a joinville.png pixel is drawn on screen (inside map_area).
+func px_point(px: Vector2) -> Vector2:
+	var r := map_rect()
+	return r.position + (px - Vector2(CityPicture.LEFT, CityPicture.TOP)) / Vector2(CityPicture.W, CityPicture.H) * r.size
+
+
+## Where a POI is drawn on screen.
+func pin_point(id: String) -> Vector2:
+	var poi: Dictionary = CityData.POIS[id]
+	return px_point(poi.at)
+
+
+## The part of map_area the picture actually covers (it keeps its aspect).
+func map_rect() -> Rect2:
+	var box := Rect2(map_texture.position, map_texture.size)
+	var tex := map_texture.texture.get_size()
+	var s := minf(box.size.x / tex.x, box.size.y / tex.y)
+	var size := tex * s
+	return Rect2(box.position + (box.size - size) * 0.5, size)
+
+
+func _relayout() -> void:
+	for id: String in pins:
+		var pin: PoiPin = pins[id]
+		pin.position = pin_point(id) - pin.anchor_point()
+	lines_layer.queue_redraw()
 
 
 func _build_panel() -> void:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("101317", 0.96)
-	style.border_color = Color("2a3138")
+	style.bg_color = Color("110e0e", 0.97)
+	style.border_color = Color("3a2422")
 	style.border_width_left = 1
 	style.content_margin_left = 24
 	style.content_margin_right = 24
@@ -124,13 +273,13 @@ func _build_panel() -> void:
 	start_button.text = "START MISSION"
 	start_button.custom_minimum_size.y = 52
 	start_button.add_theme_font_size_override("font_size", 20)
-	start_button.add_theme_color_override("font_color", Color("0b0d10"))
-	start_button.add_theme_color_override("font_hover_color", Color("0b0d10"))
-	start_button.add_theme_color_override("font_pressed_color", Color("0b0d10"))
+	for c: String in ["font_color", "font_hover_color", "font_pressed_color"]:
+		start_button.add_theme_color_override(c, Color("fff1ec"))
+	start_button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.3))
 	for state: String in ["normal", "hover", "pressed", "disabled"]:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = {"normal": GREEN, "hover": GREEN.lightened(0.25), "pressed": GREEN.darkened(0.2),
-			"disabled": Color("2a3138")}[state]
+		sb.bg_color = {"normal": RED.darkened(0.1), "hover": RED.lightened(0.12), "pressed": RED.darkened(0.3),
+			"disabled": Color("2a2020")}[state]
 		sb.set_corner_radius_all(3)
 		start_button.add_theme_stylebox_override(state, sb)
 	start_button.pressed.connect(func():
@@ -147,7 +296,7 @@ func _build_panel() -> void:
 	v.add_child(HSeparator.new())
 
 	free_play_button = Button.new()
-	free_play_button.text = "Training ground (free play)"
+	free_play_button.text = "Training corridor (free play)"
 	free_play_button.pressed.connect(func(): _save_name(); host_pressed.emit())
 	v.add_child(free_play_button)
 
@@ -181,56 +330,6 @@ func _build_panel() -> void:
 	quit.text = "Quit"
 	quit.pressed.connect(func(): get_tree().quit())
 	v.add_child(quit)
-
-
-## Pick a mission (a pin was clicked, or `--mission=` on the command line).
-func select(id: String) -> void:
-	if not Missions.INFO.has(id):
-		return
-	selected = id
-	for k: String in pins:
-		(pins[k] as PoiPin).set_pressed_no_signal(k == id)
-		(pins[k] as PoiPin).queue_redraw()
-	_show_mission()
-
-
-func _show_mission() -> void:
-	start_button.disabled = selected == ""
-	if selected == "":
-		mission_kind.text = "NO MISSION PICKED"
-		mission_kind.modulate = Color(1, 1, 1, 0.5)
-		mission_title.text = "Click a place on the map"
-		mission_brief.text = "Five places in central Joinville, each its own mission. Pick one to read its brief."
-		mission_route.text = ""
-		return
-	var info: Dictionary = Missions.INFO[selected]
-	mission_kind.text = "%s   %s" % [info.kind, "■".repeat(info.difficulty) + "□".repeat(5 - info.difficulty)]
-	mission_kind.modulate = KINDS[info.kind]
-	mission_title.text = info.title
-	mission_brief.text = info.brief
-	mission_route.text = "Start: %s\nGoal: %s" % [info.start, info.goal]
-
-
-## Where a POI is drawn on screen (inside map_area).
-func pin_point(id: String) -> Vector2:
-	var r := map_rect()
-	var uv: Vector2 = _pois[id]
-	return r.position + uv * r.size
-
-
-## The part of map_area the picture actually covers (it keeps its aspect).
-func map_rect() -> Rect2:
-	var box := Rect2(map_texture.position, map_texture.size)
-	var tex := map_texture.texture.get_size()
-	var s := minf(box.size.x / tex.x, box.size.y / tex.y)
-	var size := tex * s
-	return Rect2(box.position + (box.size - size) * 0.5, size)
-
-
-func _place_pins() -> void:
-	for id: String in pins:
-		var pin: PoiPin = pins[id]
-		pin.position = pin_point(id) - pin.anchor_point()
 
 
 func open(message := "") -> void:
@@ -286,23 +385,25 @@ class PoiPin extends Button:
 	const R := 9.0
 	var id := ""
 	var tint := Color.WHITE
+	var name_left := false
 
-	func _init(id_: String, title: String, tint_: Color) -> void:
+	func _init(id_: String, title: String, tint_: Color, name_left_ := false) -> void:
 		id = id_
 		tint = tint_
+		name_left = name_left_
 		toggle_mode = true
 		flat = true
 		focus_mode = Control.FOCUS_NONE
 		text = title
-		alignment = HORIZONTAL_ALIGNMENT_LEFT
+		alignment = HORIZONTAL_ALIGNMENT_RIGHT if name_left else HORIZONTAL_ALIGNMENT_LEFT
 		add_theme_font_size_override("font_size", 15)
-		add_theme_constant_override("outline_size", 6)
-		add_theme_color_override("font_outline_color", Color("0b0d10"))
+		add_theme_constant_override("outline_size", 7)
+		add_theme_color_override("font_outline_color", Color("0c0b0b"))
 		for c: String in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
-			add_theme_color_override(c, Color.WHITE if c != "font_color" else Color(1, 1, 1, 0.85))
+			add_theme_color_override(c, Color.WHITE if c != "font_color" else Color(1, 0.95, 0.92, 0.85))
 		var pad := StyleBoxEmpty.new()
-		pad.content_margin_left = R * 2 + 10
-		pad.content_margin_right = 6
+		pad.content_margin_left = 6 if name_left else R * 2 + 10
+		pad.content_margin_right = R * 2 + 10 if name_left else 6
 		for s: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 			add_theme_stylebox_override(s, pad)
 		mouse_entered.connect(queue_redraw)
@@ -311,13 +412,13 @@ class PoiPin extends Button:
 
 	## The ring's centre, relative to the button: put this on the POI.
 	func anchor_point() -> Vector2:
-		return Vector2(R + 2, size.y * 0.5)
+		return Vector2(size.x - R - 2 if name_left else R + 2, size.y * 0.5)
 
 	func _draw() -> void:
 		var c := anchor_point()
 		var lit := button_pressed or is_hovered()
 		if button_pressed:
-			draw_circle(c, R * 2.2, Color(tint, 0.18))
-		draw_circle(c, R, Color("0b0d10", 0.85))
-		draw_arc(c, R, 0, TAU, 32, tint if lit else Color(tint, 0.75), 3.0 if lit else 2.0, true)
-		draw_circle(c, R * 0.35, tint)
+			draw_circle(c, R * 2.3, Color(Menu.RED, 0.28))
+		draw_circle(c, R, Color("0c0b0b", 0.9))
+		draw_arc(c, R, 0, TAU, 32, tint if lit else Color(tint, 0.8), 3.0 if lit else 2.0, true)
+		draw_circle(c, R * 0.35, Menu.RED if not lit else tint)

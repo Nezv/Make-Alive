@@ -80,6 +80,7 @@ const CITY_WALL_H := 4.0      # the wall where the map ends
 const CITY_SPAWN_NEAR := 30.0 # city zombies appear between these distances from a player
 const CITY_SPAWN_FAR := 70.0
 const CITY_SPAWN_TRIES := 40
+const CITY_HILL_FADE := 100.0  # metres over which Morro da Boa Vista rises from the flat city at the forest's edge
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
 

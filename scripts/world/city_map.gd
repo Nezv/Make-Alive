@@ -12,7 +12,9 @@ extends GameMap
 ##   STREET  roads, bridges, driveways       LOT     a POI's grounds;  BUILT  a POI's structures
 ##
 ## The same grid is the navigation grid, so what zombies think is open is exactly what is open.
-## The ground is flat for now: the hill has its road and its forest but no height.
+## The city is flat at y = 0. Morro da Boa Vista rises out of it: forest cells, and the road and
+## lot inside the forest, take their height from CityHeights (read off the topography map), eased
+## in over Config.CITY_HILL_FADE from the forest's edge. `ground_y` answers for any point.
 ## POI buildings are placeholders (solid shells, no interiors) standing where the real ones do.
 ##
 ## Everything is merged into four meshes (ground, buildings, trees, lit windows). Layout is
@@ -30,10 +32,6 @@ const BUILT := 7
 
 const PLAN_COLORS := [Color("0c0d0f"), Color("6e675d"), Color("2c2e32"), Color("27506e"), Color("1f3d24"),
 	Color("3f6a3a"), Color("b0a070"), Color("f0e8d0")]
-## The menu's night-map look, by cell type (OUT is see-through).
-const MENU_COLORS := [Color(0, 0, 0, 0), Color("2e3136"), Color("101215"), Color("1d4a66"), Color("17301c"),
-	Color("2c4a2a"), Color("6b6250"), Color("d8cfb4")]
-const MENU_EDGE := Color("99ff66", 0.55)
 const GROUND_COLORS := { OUT: Color("0d0e0f"), WATER: Color("0e1c26"), FOREST: Color("18261a"),
 	PARK: Color("26361f"), LOT: Color("4a4b4d") }
 const FACADES := [Color("7b7469"), Color("6d7078"), Color("8a8377"), Color("5f5a55"), Color("77706a"),
@@ -52,7 +50,10 @@ var cell := Config.CITY_CELL
 var boundary := PackedVector2Array() ## the map's edge, (x, z) in metres
 var building_count := 0
 var landmarks := {}
+var prop_counts := {}               ## set piece props by kind
 
+var heights := PackedFloat32Array()  ## ground height at every cell corner, (gw + 1) x (gh + 1)
+var _raised := PackedByteArray()     # 1 where any corner of the cell is above 0
 var _floors := PackedByteArray()     # storeys of the building on each BLOCK cell (for the plan)
 var _b := MeshKit.Builder.new()      # buildings, walls, POIs
 var _g := MeshKit.Builder.new()      # ground and paint
@@ -78,12 +79,15 @@ func _init(full := true) -> void:
 
 	_edge()
 	_layout()
+	_hill()
 	_buildings()
 	_pois()
 	if not full:
 		return
+	_scenery()
 	_navigation()
 	_ground()
+	_hill_ground()
 	_street_dressing()
 	_forest()
 	_edge_wall()
@@ -102,7 +106,9 @@ func player_spawn() -> Vector3:
 
 
 func player_spawn_point() -> Vector3:
-	return player_spawn() + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0))
+	var p := player_spawn() + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0))
+	p.y = ground_y(p) + 0.1
+	return p
 
 
 ## A street corner near a player, out of everyone's sight when there is one.
@@ -115,7 +121,8 @@ func zombie_spawn_point(avoid: Array) -> Vector3:
 		var p := around + Vector3(cos(a) * d, 0, sin(a) * d)
 		if nav.is_blocked(p):
 			continue
-		p = nav.center_of(nav.cell_of(p)) + Vector3(0, 0.1, 0)
+		p = nav.center_of(nav.cell_of(p))
+		p.y = ground_y(p) + 0.1
 		var hidden := true
 		var clear := true
 		for q: Vector3 in avoid:
@@ -130,7 +137,9 @@ func zombie_spawn_point(avoid: Array) -> Vector3:
 		fallback = p
 	if fallback != Vector3.INF:
 		return fallback
-	return nav.nearest_free(around + Vector3(Config.CITY_SPAWN_NEAR, 0.1, 0))
+	var last := nav.nearest_free(around + Vector3(Config.CITY_SPAWN_NEAR, 0, 0))
+	last.y = ground_y(last) + 0.1
+	return last
 
 
 func is_direct(from: Vector3, to: Vector3) -> bool:
@@ -146,7 +155,23 @@ func nav_target(from: Vector3, to: Vector3, lane := 0.0) -> Vector3:
 ## Where a player stands at a POI ("hospital", "terminal", "prefeitura", "batalhao", "mirante").
 func poi_pos(id: String) -> Vector3:
 	var poi: Dictionary = CityData.POIS[id]
-	return CityData.to_world(poi.at)
+	var p := CityData.to_world(poi.at)
+	p.y = ground_y(p)
+	return p
+
+
+## Bilinear between the four corners of the cell under `p`.
+func ground_y(p: Vector3) -> float:
+	if heights.is_empty():
+		return 0.0
+	var fx := clampf((p.x - lo.x) / cell, 0.0, gw - 0.001)
+	var fz := clampf((p.z - lo.y) / cell, 0.0, gh - 0.001)
+	var c := floori(fx)
+	var r := floori(fz)
+	var i := r * (gw + 1) + c
+	var top := lerpf(heights[i], heights[i + 1], fx - c)
+	var bottom := lerpf(heights[i + gw + 1], heights[i + gw + 2], fx - c)
+	return lerpf(top, bottom, fz - r)
 
 
 func contains(p: Vector3) -> bool:
@@ -162,7 +187,7 @@ func distance_to_edge(p: Vector3) -> float:
 
 
 func area_km2() -> float:
-	return _area(boundary) / 1.0e6
+	return _poly_area(boundary) / 1.0e6
 
 
 func type_at(p: Vector3) -> int:
@@ -179,14 +204,8 @@ func layout_hash() -> int:
 
 # --- The edge and the grid ------------------------------------------------------------
 
-func _area(poly: PackedVector2Array) -> float:
-	var a := 0.0
-	for i in poly.size():
-		a += poly[i].cross(poly[(i + 1) % poly.size()])
-	return absf(a) * 0.5
-
-
-func _edge() -> void:
+## The map's edge in (x, z) metres: the hull of the POI lots (and EDGE_EXTRA) grown by CITY_MARGIN.
+static func edge_polygon() -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	for id: String in CityData.POIS:
 		var poi: Dictionary = CityData.POIS[id]
@@ -198,10 +217,21 @@ func _edge() -> void:
 	if hull.size() > 1 and hull[0] == hull[hull.size() - 1]:
 		hull.remove_at(hull.size() - 1)
 	var grown: Array[PackedVector2Array] = Geometry2D.offset_polygon(hull, Config.CITY_MARGIN, Geometry2D.JOIN_ROUND)
-	if grown.is_empty() or _area(grown[0]) < _area(hull): # wound the other way: it shrank
+	if grown.is_empty() or _poly_area(grown[0]) < _poly_area(hull): # wound the other way: it shrank
 		hull.reverse()
 		grown = Geometry2D.offset_polygon(hull, Config.CITY_MARGIN, Geometry2D.JOIN_ROUND)
-	boundary = grown[0]
+	return grown[0]
+
+
+static func _poly_area(poly: PackedVector2Array) -> float:
+	var a := 0.0
+	for i in poly.size():
+		a += poly[i].cross(poly[(i + 1) % poly.size()])
+	return absf(a) * 0.5
+
+
+func _edge() -> void:
+	boundary = edge_polygon()
 
 	var hi := boundary[0]
 	lo = boundary[0]
@@ -284,10 +314,142 @@ func _layout() -> void:
 	_stamp(_plan(CityData.RIVER), CityData.RIVER_WIDTH, WATER, _mask([BLOCK, FOREST, PARK]))
 	for street: Array in CityData.STREETS:
 		_stamp(_plan(street.slice(2)), street[1], STREET, inside)
+	for path: Array in CityData.SQUARE_PATHS:
+		_stamp(_plan(path), CityData.LANE, STREET, _mask([BLOCK]))
 	for id: String in CityData.POIS:
 		var poi: Dictionary = CityData.POIS[id]
 		_fill(_plan(poi.lot), LOT, _mask([BLOCK, FOREST, PARK, WATER]))
 		_stamp(_plan([poi.at, poi.gate]), CityData.LANE, STREET, inside)
+
+
+# --- The hill -------------------------------------------------------------------------
+
+## Corner heights: CityHeights where the hill is (forest, and the road and lot inside it), eased
+## from 0 at the forest's edge to full height CITY_HILL_FADE metres in. Everything else stays 0.
+func _hill() -> void:
+	heights.resize((gw + 1) * (gh + 1))
+	_raised.resize(gw * gh)
+	var forest := _plan(CityData.FOREST)
+	var fade := maxi(1, ceili(Config.CITY_HILL_FADE / cell))
+	# Steps (in cells) from the nearest non-hill cell, up to `fade`.
+	var steps := PackedInt32Array()
+	steps.resize(gw * gh)
+	var queue := PackedInt32Array()
+	for r in gh:
+		for c in gw:
+			var i := r * gw + c
+			var t := grid[i]
+			var hill := t == FOREST or ((t == STREET or t == LOT) and Geometry2D.is_point_in_polygon(
+				Vector2(lo.x + (c + 0.5) * cell, lo.y + (r + 0.5) * cell), forest))
+			steps[i] = fade if hill else 0
+			if not hill:
+				queue.append(i)
+	var head := 0
+	while head < queue.size():
+		var i := queue[head]
+		head += 1
+		var r := i / gw
+		var c := i % gw
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nc := c + d.x
+			var nr := r + d.y
+			if nc < 0 or nr < 0 or nc >= gw or nr >= gh:
+				continue
+			var j := nr * gw + nc
+			if steps[j] > steps[i] + 1:
+				steps[j] = steps[i] + 1
+				queue.append(j)
+	for r in gh + 1:
+		for c in gw + 1:
+			var near := fade
+			for k: Vector2i in [Vector2i(c - 1, r - 1), Vector2i(c, r - 1), Vector2i(c - 1, r), Vector2i(c, r)]:
+				near = mini(near, steps[k.y * gw + k.x] if k.x >= 0 and k.y >= 0 and k.x < gw and k.y < gh else 0)
+			if near == 0:
+				continue
+			var at := lo + Vector2(c, r) * cell
+			var w := smoothstep(0.0, float(fade), float(near))
+			heights[r * (gw + 1) + c] = CityHeights.at_px(at / CityData.M_PER_PX + CityData.ORIGIN_PX) * w
+	for r in gh:
+		for c in gw:
+			var i := r * (gw + 1) + c
+			if heights[i] > 0.0 or heights[i + 1] > 0.0 or heights[i + gw + 1] > 0.0 or heights[i + gw + 2] > 0.0:
+				_raised[r * gw + c] = 1
+
+
+## Lowest and highest corner of a run of `n` cells starting at (c, r).
+func _span(r: int, c: int, n: int) -> Vector2:
+	var low := INF
+	var high := -INF
+	for k in n + 1:
+		for i: int in [r * (gw + 1) + c + k, (r + 1) * (gw + 1) + c + k]:
+			low = minf(low, heights[i])
+			high = maxf(high, heights[i])
+	return Vector2(low, high)
+
+
+func _corner(r: int, c: int) -> Vector3:
+	return Vector3(lo.x + c * cell, heights[r * (gw + 1) + c], lo.y + r * cell)
+
+
+## The raised ground as one mesh and one height-map collider. Whole 4 x 4 blocks of forest are one
+## quad (nobody walks there); roads and lots get a quad per cell.
+func _hill_ground() -> void:
+	var c0 := gw
+	var c1 := -1
+	var r0 := gh
+	var r1 := -1
+	for r in gh:
+		for c in gw:
+			if _raised[r * gw + c] == 1:
+				c0 = mini(c0, c)
+				c1 = maxi(c1, c)
+				r0 = mini(r0, r)
+				r1 = maxi(r1, r)
+	if c1 < 0:
+		return
+	var done := PackedByteArray()
+	done.resize(gw * gh)
+	const B := 4
+	for r in range(r0, r1 + 1, B):
+		for c in range(c0, c1 + 1, B):
+			if r + B > gh or c + B > gw:
+				continue
+			var all_forest := true
+			for rr in range(r, r + B):
+				for cc in range(c, c + B):
+					if grid[rr * gw + cc] != FOREST or _raised[rr * gw + cc] == 0:
+						all_forest = false
+			if not all_forest:
+				continue
+			_g.ground_quad(_corner(r, c), _corner(r, c + B), _corner(r + B, c + B), _corner(r + B, c), GROUND_COLORS[FOREST])
+			for rr in range(r, r + B):
+				for cc in range(c, c + B):
+					done[rr * gw + cc] = 1
+	for r in range(r0, r1 + 1):
+		for c in range(c0, c1 + 1):
+			var i := r * gw + c
+			if _raised[i] == 0 or done[i] == 1:
+				continue
+			var t := grid[i]
+			var color: Color = ASPHALT if t == STREET else GROUND_COLORS.get(t, GROUND_COLORS[LOT])
+			_g.ground_quad(_corner(r, c), _corner(r, c + 1), _corner(r + 1, c + 1), _corner(r + 1, c), color)
+	# One height-map collider over the raised area, scaled up from 1 m to one cell.
+	var w := c1 - c0 + 2
+	var d := r1 - r0 + 2
+	var data := PackedFloat32Array()
+	data.resize(w * d)
+	for z in d:
+		for x in w:
+			data[z * w + x] = heights[(r0 + z) * (gw + 1) + c0 + x] / cell
+	var shape := HeightMapShape3D.new()
+	shape.map_width = w
+	shape.map_depth = d
+	shape.map_data = data
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * cell),
+		Vector3(lo.x + (c0 + (w - 1) * 0.5) * cell, 0.0, lo.y + (r0 + (d - 1) * 0.5) * cell))
+	_body.add_child(cs)
 
 
 # --- City blocks ------------------------------------------------------------------------
@@ -587,6 +749,36 @@ func _mirante(c: Vector3) -> void:
 	_label(CityData.POIS.mirante.name, c + Vector3(10.4, 6.0, -12), 110, Color("2a2a2a"), -90)
 
 
+# --- Set pieces -------------------------------------------------------------------------------
+# From the Scenery kit: what's left of the army's last stand, in the squares and on the avenue by
+# the bus terminal, the way every mission starts out. Guns may lie in them (all_weapons aside).
+
+func _scenery() -> void:
+	var kit := Scenery.new(root, _body, _rng)
+	kit.blocker = _block_cells
+	kit.place(CityData.to_world(Vector2(950, 570)), 20).crash_site()
+	kit.place(CityData.to_world(Vector2(978, 566)), 0).triage_camp()
+	kit.place(CityData.to_world(Vector2(1110, 510)), 90).motor_pool()
+	kit.place(CityData.to_world(Vector2(700, 385)), 90).checkpoint()
+	kit.place(CityData.to_world(Vector2(960, 525)), -3).street_wrecks()
+	kit.finish()
+	spots = kit.spots
+	interactables.append_array(kit.spots)
+	prop_counts = kit.prop_counts
+
+
+## Close every cell whose centre a solid box (world centre, size, basis) covers.
+func _block_cells(center: Vector3, size: Vector3, basis: Basis) -> void:
+	var half := Vector2(absf(basis.x.x) * size.x + absf(basis.z.x) * size.z,
+		absf(basis.x.z) * size.x + absf(basis.z.z) * size.z) * 0.5
+	var inv := basis.inverse()
+	for r in range(maxi(0, floori((center.z - half.y - lo.y) / cell)), mini(gh - 1, floori((center.z + half.y - lo.y) / cell)) + 1):
+		for c in range(maxi(0, floori((center.x - half.x - lo.x) / cell)), mini(gw - 1, floori((center.x + half.x - lo.x) / cell)) + 1):
+			var local := inv * (Vector3(lo.x + (c + 0.5) * cell, center.y, lo.y + (r + 0.5) * cell) - center)
+			if absf(local.x) <= size.x * 0.5 + 0.3 and absf(local.z) <= size.z * 0.5 + 0.3 and grid[r * gw + c] != OUT:
+				grid[r * gw + c] = BUILT
+
+
 # --- Navigation and the ground ------------------------------------------------------------
 
 func _navigation() -> void:
@@ -613,11 +805,13 @@ func _ground() -> void:
 	_g.box(size, center, ASPHALT)
 	_collide(center, size)
 	_runs(func(r: int, c: int, n: int, t: int) -> void:
-		var mid := Vector3(lo.x + (c + n * 0.5) * cell, 0.02, lo.y + (r + 0.5) * cell)
-		if GROUND_COLORS.has(t):
-			_g.flat(Vector2(n * cell, cell), mid, GROUND_COLORS[t])
-		if t == WATER or t == FOREST: # nobody swims and the forest is too thick: closed to players too
-			_collide(mid + Vector3(0, 1.5, 0), Vector3(n * cell, 3.0, cell)))
+		# Split the run where it goes up the hill: raised cells are drawn by _hill_ground.
+		var start := c
+		for k in range(c + 1, c + n + 1):
+			if k < c + n and _raised[r * gw + k] == _raised[r * gw + start]:
+				continue
+			_ground_run(r, start, k - start, t, _raised[r * gw + start] == 1)
+			start = k)
 	# A parapet wherever the river meets ground you can stand on
 	for r in gh:
 		for c in gw:
@@ -628,6 +822,26 @@ func _ground() -> void:
 				if _open(c + side[0], r + side[1]):
 					_b.box(Vector3(cell if side[0] == 0 else 0.3, 1.0, 0.3 if side[0] == 0 else cell),
 						at + Vector3(side[0], 0, side[1]) * (cell * 0.5), Props.CONCRETE_DARK)
+
+
+func _ground_run(r: int, c: int, n: int, t: int, raised: bool) -> void:
+	var closed := t == WATER or t == FOREST # nobody swims and the forest is too thick: closed to players too
+	if not raised:
+		var mid := Vector3(lo.x + (c + n * 0.5) * cell, 0.02, lo.y + (r + 0.5) * cell)
+		if GROUND_COLORS.has(t):
+			_g.flat(Vector2(n * cell, cell), mid, GROUND_COLORS[t])
+		if closed:
+			_collide(mid + Vector3(0, 1.5, 0), Vector3(n * cell, 3.0, cell))
+		return
+	if not closed:
+		return
+	# On the slope, short boxes that hug the ground: a long one would stand up out of the hill
+	# and stop shots fired down from the top.
+	for k in range(c, c + n, 4):
+		var m := mini(4, c + n - k)
+		var span := _span(r, k, m)
+		_collide(Vector3(lo.x + (k + m * 0.5) * cell, (span.x + span.y) * 0.5 + 1.5, lo.y + (r + 0.5) * cell),
+			Vector3(m * cell, span.y - span.x + 3.0, cell))
 
 
 ## Centre lines on every street and lamp posts along the avenues.
@@ -649,17 +863,18 @@ func _street_dressing() -> void:
 				var p := a + dir * (next_dash - walked)
 				next_dash += 12.0
 				if width > CityData.LANE and type_at(Vector3(p.x, 0, p.y)) == STREET:
-					_g.box(Vector3(3.5, 0.02, 0.22), Vector3(p.x, 0.03, p.y), PAINT, basis)
+					_g.box(Vector3(3.5, 0.02, 0.22), Vector3(p.x, 0.03 + ground_y(Vector3(p.x, 0, p.y)), p.y), PAINT, basis)
 			while width >= CityData.AVENUE and next_lamp < walked + length:
 				var p := a + dir * (next_lamp - walked) + Vector2(-dir.y, dir.x) * (width * 0.5 - 1.0) * lamp_side
 				next_lamp += 48.0
 				lamp_side = -lamp_side
 				if type_at(Vector3(p.x, 0, p.y)) != STREET:
 					continue
-				_b.box(Vector3(0.2, 7.0, 0.2), Vector3(p.x, 3.5, p.y), Props.STEEL)
-				_collide(Vector3(p.x, 3.5, p.y), Vector3(0.2, 7.0, 0.2))
+				var y := ground_y(Vector3(p.x, 0, p.y))
+				_b.box(Vector3(0.2, 7.0, 0.2), Vector3(p.x, y + 3.5, p.y), Props.STEEL)
+				_collide(Vector3(p.x, y + 3.5, p.y), Vector3(0.2, 7.0, 0.2))
 				if _rng.randf() < 0.35: # most of the grid is down
-					_glow.box(Vector3(0.6, 0.2, 0.6), Vector3(p.x, 7.0, p.y), Color.WHITE)
+					_glow.box(Vector3(0.6, 0.2, 0.6), Vector3(p.x, y + 7.0, p.y), Color.WHITE)
 			walked += length
 
 
@@ -674,14 +889,37 @@ func _forest() -> void:
 				continue
 			var w := _rng.randf_range(3.5, 6.5)
 			var h := _rng.randf_range(7.0, 15.0)
-			var at := Vector3(lo.x + (c + _rng.randf_range(0.3, 0.7)) * cell, h * 0.5, lo.y + (r + _rng.randf_range(0.3, 0.7)) * cell)
+			var at := Vector3(lo.x + (c + _rng.randf_range(0.3, 0.7)) * cell, 0.0, lo.y + (r + _rng.randf_range(0.3, 0.7)) * cell)
+			at.y = ground_y(at) + h * 0.5 - 0.6
 			_trees.box(Vector3(w, h, w), at, LEAVES[_rng.randi() % LEAVES.size()], Basis(Vector3.UP, _rng.randf() * TAU))
 
 
 ## The wall where the map ends.
 func _edge_wall() -> void:
 	for i in boundary.size():
-		_wall(boundary[i], boundary[(i + 1) % boundary.size()], Config.CITY_WALL_H, Props.CONCRETE_DARK)
+		var a := boundary[i]
+		var b := boundary[(i + 1) % boundary.size()]
+		var pieces := 1
+		for f in [0.0, 0.25, 0.5, 0.75, 1.0]:
+			var q := a.lerp(b, f)
+			if ground_y(Vector3(q.x, 0, q.y)) > 0.0:
+				pieces = maxi(1, ceili(a.distance_to(b) / 8.0))
+		if pieces == 1:
+			_wall(a, b, Config.CITY_WALL_H, Props.CONCRETE_DARK)
+			continue
+		# Over the hill: short pieces, each standing on the ground where it is.
+		var dir := (b - a).normalized()
+		var basis := Basis(Vector3.UP, atan2(-dir.y, dir.x))
+		for k in pieces:
+			var p := a.lerp(b, float(k) / pieces)
+			var q := a.lerp(b, float(k + 1) / pieces)
+			var y0 := ground_y(Vector3(p.x, 0, p.y))
+			var y1 := ground_y(Vector3(q.x, 0, q.y))
+			var h := Config.CITY_WALL_H + absf(y1 - y0)
+			var mid := Vector3((p.x + q.x) * 0.5, minf(y0, y1) + h * 0.5 - 0.3, (p.y + q.y) * 0.5)
+			var size := Vector3(p.distance_to(q) + 0.5, h, 0.5)
+			_b.box(size, mid, Props.CONCRETE_DARK, basis)
+			_collide(mid, size, basis)
 
 
 # --- Pictures of the layout ----------------------------------------------------------------
@@ -706,33 +944,6 @@ func plan_image(scale := 2) -> Image:
 				_dot(img, at + Vector2i(k, d), 0, Color("ff3020"))
 	img.resize(gw * scale, gh * scale, Image.INTERPOLATE_NEAREST)
 	return img
-
-
-## The whole city for the main menu: `image` (RGBA, transparent outside the edge, which glows)
-## and `pois`, each POI's `at` as a 0..1 position on that image. Lays the city out and frees it.
-static func menu_picture(scale := 2) -> Dictionary:
-	var city := CityMap.new(false)
-	var img := Image.create(city.gw, city.gh, false, Image.FORMAT_RGBA8)
-	for r in city.gh:
-		for c in city.gw:
-			var i := r * city.gw + c
-			var t := city.grid[i]
-			var color: Color = MENU_COLORS[t]
-			if t == BLOCK:
-				color = color.lightened(minf(city._floors[i], 16.0) / 16.0 * 0.5)
-			elif t == OUT:
-				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-					var n := Vector2i(c, r) + d
-					if n.x >= 0 and n.y >= 0 and n.x < city.gw and n.y < city.gh and city.grid[n.y * city.gw + n.x] != OUT:
-						color = MENU_EDGE
-			img.set_pixel(c, r, color)
-	img.resize(city.gw * scale, city.gh * scale, Image.INTERPOLATE_NEAREST)
-	var pois := {}
-	for id: String in CityData.POIS:
-		var p := city.poi_pos(id)
-		pois[id] = Vector2((p.x - city.lo.x) / (city.gw * city.cell), (p.z - city.lo.y) / (city.gh * city.cell))
-	city.root.free()
-	return { "image": img, "pois": pois }
 
 
 ## The reference map with everything outside the edge dimmed, the edge in red, the traced

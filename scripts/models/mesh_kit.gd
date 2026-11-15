@@ -80,6 +80,15 @@ class Builder:
 			pos + Vector3(-hx, 0, hz), Vector3.UP, color)
 		return self
 
+	## Ground between four corners (any heights), lit by each triangle's own upward normal.
+	## Corners go round the quad: a (x0, z0), b (x1, z0), c (x1, z1), d (x0, z1).
+	func ground_quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color) -> Builder:
+		var n1 := (c - a).cross(b - a).normalized()
+		var n2 := (d - a).cross(c - a).normalized()
+		_tri(a, b, c, n1 if n1.y > 0.0 else -n1, color)
+		_tri(a, c, d, n2 if n2.y > 0.0 else -n2, color)
+		return self
+
 	## Cylinder along local Y, centred at `pos`.
 	func cyl(radius: float, height: float, pos: Vector3, color: Color, segments := 8,
 			rot := Basis.IDENTITY, xf := Transform3D.IDENTITY) -> Builder:

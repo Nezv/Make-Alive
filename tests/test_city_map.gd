@@ -111,13 +111,85 @@ func test_the_hill_is_forest_with_one_road_up() -> void:
 func test_the_mirante_road_climbs_the_real_hairpins_to_the_summit() -> void:
 	var m := _map()
 	var summit := _px(1866, 45) # the 230 m trig point, where Rua Pastor Guilherme Rau ends
-	assert_lt(m.poi_pos("mirante").distance_to(summit), 12.0, "the tower stands on the summit")
+	var top := m.poi_pos("mirante")
+	assert_lt(Vector2(top.x, top.z).distance_to(Vector2(summit.x, summit.z)), 12.0, "the tower stands on the summit")
 	for bend: Vector2 in [Vector2(1648, 283), Vector2(1700, 148), Vector2(1668, 40), Vector2(1808, -90), Vector2(1823, -50)]:
 		var p := _px(bend.x, bend.y)
 		assert_true(m.contains(p), "bend %s is inside the map" % bend)
 		assert_eq(m.type_at(p), CityMap.STREET, "the road passes the bend at %s" % bend)
 	assert_eq(m.type_at(_px(1760, 100)), CityMap.FOREST, "no shortcut straight up the slope")
 	assert_true(m.nav.reachable(m.poi_pos("terminal"), m.poi_pos("mirante")))
+
+
+func test_the_hill_rises_to_the_mirante_and_the_city_stays_flat() -> void:
+	var m := _map()
+	var top := m.poi_pos("mirante")
+	assert_gt(top.y, 180.0, "the Mirante stands on a hill (summit is 230 m, the city ~12 m)")
+	assert_near(m.ground_y(top), top.y, 0.01, "poi_pos is on the ground")
+	for flat: String in ["terminal", "hospital", "prefeitura", "batalhao"]:
+		assert_near(m.poi_pos(flat).y, 0.0, 0.01, "%s is down in the city" % flat)
+	for street: Vector3 in [_px(950, 523), _px(1139, 330), _px(1169, 262)]:
+		assert_near(m.ground_y(street), 0.0, 0.01, "city streets stay at 0")
+
+
+func test_the_hill_road_is_climbable_all_the_way() -> void:
+	var m := _map()
+	var road: Array = []
+	for street: Array in CityData.STREETS:
+		if street[0] == "Rua Pastor Guilherme Rau":
+			road.append_array(street.slice(2))
+	var prev := Vector3.INF
+	var steepest := 0.0
+	var where := Vector3.ZERO
+	for i in road.size() - 1:
+		var a := CityData.to_world(road[i])
+		var b := CityData.to_world(road[i + 1])
+		for k in 12:
+			var p := a.lerp(b, k / 12.0)
+			p.y = m.ground_y(p)
+			if prev != Vector3.INF and Vector2(p.x, p.z).distance_to(Vector2(prev.x, prev.z)) > 0.5:
+				var slope := absf(p.y - prev.y) / Vector2(p.x, p.z).distance_to(Vector2(prev.x, prev.z))
+				if slope > steepest:
+					steepest = slope
+					where = p
+			prev = p
+	assert_lt(rad_to_deg(atan(steepest)), 38.0, "no stretch of the road is steeper than a walker can climb (worst at %s, px %s)" % [where, CityData.to_px(where)])
+	assert_gt(m.ground_y(CityData.to_world(road[road.size() - 1])), 180.0, "and it ends up on the top")
+
+
+func test_players_stand_on_the_hill_and_zombies_climb_it() -> void:
+	var g := await new_game("city", "mirante")
+	await seconds(0.6)
+	var p := g.local_player
+	assert_near(p.global_position.y, g.map.ground_y(p.global_position), 0.3, "standing on the summit, not inside or above it")
+	assert_gt(p.global_position.y, 180.0)
+	# Up one stretch of the road: from a bend to the next one, ~60 m away and well above it.
+	var up := CityData.to_world(Vector2(1708, 10))
+	up.y = g.map.ground_y(up) + 0.1
+	p.teleport(up)
+	var below := CityData.to_world(Vector2(1683, 15))
+	below.y = g.map.ground_y(below) + 0.1
+	assert_gt(up.y - below.y, 10.0, "it is a climb")
+	var z := g.spawn_zombie(Zombie.Type.RUNNER, below)
+	z.hp = 100000
+	var got_there := await wait_until(func(): return z.global_position.distance_to(p.global_position) < 2.5, 16.0)
+	assert_true(got_there, "a runner climbs the road to the player (at %s, player at %s)" % [z.global_position, p.global_position])
+
+
+func test_zombies_spawn_on_the_ground_on_the_hill() -> void:
+	var m := _map()
+	var player := m.poi_pos("mirante")
+	for i in 10:
+		var p := m.zombie_spawn_point([player])
+		assert_near(p.y, m.ground_y(p) + 0.1, 0.05, "spawn %s sits on the ground" % p)
+
+
+func test_blood_lands_on_the_slope() -> void:
+	var g := await new_game("city", "mirante")
+	var at: Vector3 = g.map.poi_pos("mirante") + Vector3(3, 1.2, 3)
+	g.gore.splat(at)
+	assert_gt(g.map.ground_y(at), 150.0)
+	assert_near(g.gore.floor_at(at), g.map.ground_y(at), 0.01, "stains go on the hillside, not buried under it")
 
 
 func test_a_mission_starts_players_at_its_poi() -> void:

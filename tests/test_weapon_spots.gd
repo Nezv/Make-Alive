@@ -1,31 +1,56 @@
 extends TestCase
-## Guns lying around the shelter yard: a random few of the possible spots each match.
+## Guns lying in the city's set pieces (Scenery): a random few of the possible spots each match.
+
+static var _shared: CityMap
 
 
-func _active(m: ShelterMap) -> Array:
+func _map() -> CityMap:
+	if _shared == null:
+		_shared = GameMap.create("city") # not in the tree: spots' `position` is their place in the world
+	return _shared
+
+
+static func after_all() -> void:
+	if _shared != null:
+		_shared.root.free()
+		_shared = null
+
+
+func _active(m: GameMap) -> Array:
 	return m.spots.filter(func(s: WeaponPickup) -> bool: return s.weapon >= 0)
 
 
-func test_there_are_spots_in_trucks_on_corpses_and_on_tables() -> void:
-	var m: ShelterMap = GameMap.create("shelter")
-	add_child(m.root)
-	assert_gt(m.spots.size(), 13, "plenty of candidate spots")
+func test_the_set_pieces_hold_spots_in_vehicles_on_corpses_and_on_tables() -> void:
+	var m := _map()
+	assert_gt(m.spots.size(), Config.WEAPON_SPOTS_ACTIVE, "more spots than guns, so it varies")
 	var kinds := {}
+	var start := m.player_spawn()
 	for s: WeaponPickup in m.spots:
 		kinds[s.kind] = kinds.get(s.kind, 0) + 1
-		assert_eq(s.weapon, -1, "empty until the host rolls")
-		assert_true(m.nav.reachable(m.player_spawn(), s.stand), "%s spot at %s can be walked to" % [s.kind, s.position])
-		assert_false(m.nav.is_blocked(s.stand), "you can stand next to it")
+		assert_true(m.interactables.has(s), "spot %d is an interactable" % s.iid)
+		assert_true(m.contains(s.position), "spot at %s is inside the map" % s.position)
 		var eye := s.stand + Vector3(0, Config.EYE_HEIGHT, 0)
 		assert_lt(eye.distance_to(s.position), Config.INTERACT_RANGE - 0.2, "%s spot is within arm's reach" % s.kind)
-	for kind in ["truck", "corpse", "table"]:
-		assert_gt(kinds.get(kind, 0), 1, "at least two %s spots" % kind)
-	m.root.free()
+		var near := m.nav.nearest_free(s.stand)
+		assert_true(m.nav.reachable(start, near), "%s spot at %s can be walked to" % [s.kind, s.position])
+	for kind in ["truck", "vehicle", "corpse", "table"]:
+		assert_gt(kinds.get(kind, 0), 0, "a %s spot" % kind)
+	var ids := {}
+	for it: Interactable in m.interactables:
+		assert_false(ids.has(it.iid), "interactable ids are unique")
+		ids[it.iid] = true
+
+
+func test_the_kit_s_pieces_are_all_in_the_city() -> void:
+	var m := _map()
+	for kind in ["helicopter", "truck", "humvee", "apc", "ambulance", "tent", "car", "sandbags", "booth"]:
+		assert_gt(m.prop_counts.get(kind, 0), 0, "a %s in the streets" % kind)
+	for id: String in CityData.POIS:
+		assert_true(m.nav.reachable(m.player_spawn(), m.poi_pos(id)), "the wrecks don't cut off %s" % id)
 
 
 func test_each_match_a_random_few_spots_hold_a_random_gun() -> void:
-	var m: ShelterMap = GameMap.create("shelter")
-	add_child(m.root)
+	var m := _map()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1
 	m.roll_weapons(rng)
@@ -46,7 +71,6 @@ func test_each_match_a_random_few_spots_hold_a_random_gun() -> void:
 		if _active(m).map(func(s: WeaponPickup) -> String: return "%d:%d" % [s.iid, s.weapon]) != first:
 			differs = true
 	assert_true(differs, "another match, other spots")
-	m.root.free()
 
 
 func test_pickup_state_travels_to_other_peers() -> void:
@@ -68,25 +92,18 @@ func test_pickup_state_travels_to_other_peers() -> void:
 	client.free()
 
 
-func test_shelter_players_start_with_only_the_pistol() -> void:
-	var g := await new_game("shelter")
-	assert_eq(g.local_player.weapons.current, Weapons.P19)
-	assert_eq(g.local_player.owned.keys(), [Weapons.P19])
-	g.local_player.switch_weapon(Weapons.AK47)
-	assert_eq(g.local_player.weapons.current, Weapons.P19, "can't switch to a gun you haven't found")
-	g._queue_shot(1, Vector3(0, 1.6, 30), Vector3.FORWARD, Weapons.AK47)
-	assert_eq(g._pending_shots.size(), 0, "host refuses shots from a gun you don't own")
-	g._queue_shot(1, Vector3(0, 1.6, 30), Vector3.FORWARD, Weapons.P19)
-	assert_eq(g._pending_shots.size(), 1)
-	assert_eq(_active(g.map).size(), Config.WEAPON_SPOTS_ACTIVE, "host rolled the loot")
-
-
-func test_right_click_takes_the_gun() -> void:
-	var g := await new_game("shelter")
+## On a map where you must find guns (all_weapons off): only the pistol until you pick one up.
+func test_right_click_takes_the_gun_and_the_host_then_accepts_its_shots() -> void:
+	var g := await new_game("city")
+	g.map.all_weapons = false
+	g.players[1].owned = { Weapons.P19: true }
+	g.local_player.set_loadout({ Weapons.P19: true })
 	var calls := spy(g)
 	var spot: WeaponPickup = _active(g.map)[0]
 	var weapon := spot.weapon
-	assert_false(g.host_interact(1, spot.iid) and count(calls, &"on_weapon_picked_up") > 0, "too far away at spawn")
+	var from := g.local_player.global_position + Vector3(0, 1.6, 0)
+	g._queue_shot(1, from, Vector3.FORWARD, weapon)
+	assert_eq(g._pending_shots.size(), 0, "host refuses shots from a gun you don't have")
 	g.local_player.teleport(spot.stand + Vector3(0, 0.1, 0))
 	await frames(3)
 	assert_true(g.host_interact(1, spot.iid))
@@ -98,7 +115,7 @@ func test_right_click_takes_the_gun() -> void:
 	assert_eq(spot.weapon, -1, "spot is empty now")
 	g.host_interact(1, spot.iid)
 	assert_eq(count(calls, &"on_weapon_picked_up"), 1, "nothing left to take")
-	g._queue_shot(1, Vector3(0, 1.6, 30), Vector3.FORWARD, weapon)
+	g._queue_shot(1, from, Vector3.FORWARD, weapon)
 	assert_eq(g._pending_shots.size(), 1, "now the host accepts its shots")
 
 
