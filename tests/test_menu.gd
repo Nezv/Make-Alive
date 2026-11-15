@@ -22,6 +22,7 @@ func after_each() -> void:
 func test_the_city_map_fills_the_menu() -> void:
 	var m := await _menu()
 	assert_true(m.map_texture.texture != null, "the city is drawn")
+	assert_true(m.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "MAKE ALIVE"), "titled Make Alive")
 	var shown := m.map_rect()
 	var screen := m.get_viewport().get_visible_rect().size
 	assert_gt(shown.size.x * shown.size.y, screen.x * screen.y * 0.45, "and takes up most of the screen")

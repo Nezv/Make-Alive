@@ -5,7 +5,7 @@ extends CanvasLayer
 ## host it. On the side: name, training (the test corridor), join by IP / LAN games, quit.
 ##
 ## The city is CityPicture (classified from the reference map by tools/trace_city.py), coloured by
-## a palette shader; outside the play area it is dimmed. Pins and red streets are drawn over it.
+## a palette shader, forest and parks as scattered trees. Pins and red streets are drawn over it.
 
 signal host_pressed                       ## free play on the training corridor (no mission)
 signal mission_pressed(id: String)        ## host the city map, everyone at this POI
@@ -13,28 +13,40 @@ signal join_pressed(ip: String)
 
 const PANEL_W := 400.0
 const RED := Color("c4453a")
-const RED_DIM := Color("8a332c")
 const AMBER := Color("ffcc66")
 const BG := Color("0c0b0b")
 const KINDS := { "EXTRACTION": Color("e8d7c8"), "DEFEND": Color("ff8a5c"), "RUN": Color("ffcc66") }
 ## Ground, building, street, main road, water, green: the dark city, a little red in it.
-const PALETTE := [Color("181515"), Color("2a2424"), Color("5a4848"), Color("6e423d"), Color("1c2a33"), Color("172219")]
+const PALETTE := [Color("181515"), Color("2a2424"), Color("5a4848"), Color("6e423d"), Color("1c2a33"), Color("1d1a19")]
 
 const SHADER := """
 shader_type canvas_item;
 uniform sampler2D classes : filter_nearest;
-uniform sampler2D inside_mask : filter_linear;
+uniform vec2 size;
 uniform vec4 pal[6];
 vec3 class_colour(vec2 uv) {
 	int k = int(texture(classes, uv).r * 255.0 + 0.5);
 	return pal[clamp(k, 0, 5)].rgb;
 }
+// Forest and parks: the ground's grey with little trees scattered over it, one per cell at most.
+float tree(vec2 uv) {
+	vec2 p = uv * size / 16.0;
+	vec2 cell = floor(p);
+	float h = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+	if (h > 0.55) return 0.0;
+	vec2 at = cell + 0.25 + 0.5 * vec2(fract(h * 17.0), fract(h * 29.0));
+	vec2 d = (p - at) * 16.0;                        // texels from the tree's centre
+	float crown = step(length(d - vec2(0.0, -1.5)), 3.4);
+	float trunk = step(abs(d.x), 0.8) * step(1.5, d.y) * step(d.y, 4.5);
+	return max(crown, trunk);
+}
 void fragment() {
 	vec2 px = TEXTURE_PIXEL_SIZE * 0.25;
 	vec3 c = (class_colour(UV + vec2(-px.x, -px.y)) + class_colour(UV + vec2(px.x, -px.y))
 		+ class_colour(UV + vec2(-px.x, px.y)) + class_colour(UV + vec2(px.x, px.y))) * 0.25;
-	float inside = texture(inside_mask, UV).r;
-	c = mix(c * 0.45, c, inside);
+	if (int(texture(classes, UV).r * 255.0 + 0.5) == 5) {
+		c = mix(c, vec3(0.27, 0.25, 0.24), tree(UV));
+	}
 	float fade = smoothstep(0.0, 0.12, UV.y) * smoothstep(0.0, 0.03, UV.x) * smoothstep(1.0, 0.97, UV.x) * smoothstep(1.0, 0.97, UV.y);
 	COLOR = vec4(c, fade);
 }
@@ -79,7 +91,7 @@ func _ready() -> void:
 	mat.shader.code = SHADER
 	mat.set_shader_parameter("pal", PALETTE)
 	mat.set_shader_parameter("classes", map_texture.texture)
-	mat.set_shader_parameter("inside_mask", ImageTexture.create_from_image(_inside_mask()))
+	mat.set_shader_parameter("size", Vector2(CityPicture.W, CityPicture.H))
 	map_texture.material = mat
 	map_area.add_child(map_texture)
 
@@ -99,7 +111,7 @@ func _ready() -> void:
 	map_area.resized.connect(_relayout)
 
 	var title := Label.new()
-	title.text = "ZOMBIE EXTRACTION"
+	title.text = "MAKE ALIVE"
 	title.add_theme_font_size_override("font_size", 40)
 	title.add_theme_color_override("font_color", RED)
 	title.add_theme_constant_override("outline_size", 10)
@@ -117,28 +129,6 @@ func _ready() -> void:
 	_build_panel()
 	_show_mission()
 	_relayout.call_deferred()
-
-
-## White inside the play area, black outside, one pixel per CityPicture pixel.
-func _inside_mask() -> Image:
-	var img := Image.create(CityPicture.W, CityPicture.H, false, Image.FORMAT_L8)
-	var edge := PackedVector2Array()
-	for p in CityMap.edge_polygon():
-		edge.append(p / CityData.M_PER_PX + CityData.ORIGIN_PX - Vector2(CityPicture.LEFT, CityPicture.TOP))
-	for y in CityPicture.H:
-		var xs: Array[float] = []
-		for i in edge.size():
-			var a := edge[i]
-			var b := edge[(i + 1) % edge.size()]
-			if (a.y <= y + 0.5) != (b.y <= y + 0.5):
-				xs.append(a.x + (y + 0.5 - a.y) / (b.y - a.y) * (b.x - a.x))
-		xs.sort()
-		for k in range(0, xs.size() - 1, 2):
-			var x0 := clampi(roundi(xs[k]), 0, CityPicture.W)
-			var x1 := clampi(roundi(xs[k + 1]), 0, CityPicture.W)
-			if x1 > x0:
-				img.fill_rect(Rect2i(x0, y, x1 - x0, 1), Color.WHITE)
-	return img
 
 
 ## Every street the game builds, as screen polylines (CityData.STREETS order).
@@ -164,11 +154,6 @@ func _draw_lines() -> void:
 				lines_layer.draw_polyline(lines[i], Color(RED, 0.16), w * 3.5, true)
 			else:
 				lines_layer.draw_polyline(lines[i], RED if width >= CityData.AVENUE else RED.darkened(0.15), w, true)
-	var edge := PackedVector2Array()
-	for p in CityMap.edge_polygon():
-		edge.append(px_point(p / CityData.M_PER_PX + CityData.ORIGIN_PX))
-	edge.append(edge[0])
-	lines_layer.draw_polyline(edge, Color(RED_DIM, 0.7), 1.5, true)
 
 
 ## Pick a mission (a pin was clicked, or `--mission=` on the command line).

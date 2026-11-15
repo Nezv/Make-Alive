@@ -38,7 +38,7 @@ Everything is code: no editor-made scenes, no imported assets. Models are built 
 - `scripts/world/scenery.gd` — the set-piece kit (what the old shelter map was made of): building elements (`shelter_building`, `facade`, `entrance`, `blast_hole`, `fire_escape`) and pieces (`crash_site` with the fallen helicopter, `triage_camp`, `motor_pool` with trucks/humvee/APC, `checkpoint`, `gun_pits`, `street_wrecks`, `roadblock`), plus weapon `spot`s. `kit.place(at, yaw).crash_site()`, then `kit.finish()`. The vehicles and other single props are in `props.gd`. The city puts a few in its squares (`CityMap._scenery`).
 - `scripts/missions.gd` — the five missions (title, kind, brief), one per POI. `Game.mission` / `GameMap.mission` pick where everyone starts; clients get it in `welcome`.
 - `scripts/net.gd` (autoload `Net`) — host/join by IP, LAN discovery. `zombie_wire.gd` — binary zombie snapshots.
-- `scripts/player.gd`, `remote_player.gd`, `hud.gd`, `menu.gd` (all of central Joinville at night from `CityPicture`, the game's streets glowing red, a clickable pin per mission, Start, training corridor, join, quit), `controls.gd` (key bindings), `main.gd` (entry + command-line options).
+- `scripts/player.gd`, `remote_player.gd`, `hud.gd`, `menu.gd` (all of central Joinville at night from `CityPicture`, forest as little trees on grey, the game's streets glowing red, no play-area outline, a clickable pin per mission, Start, training corridor, join, quit), `controls.gd` (key bindings), `main.gd` (entry + command-line options).
 
 ## Rules that keep it working
 - **Authority:** the host decides everything that matters (zombie HP, limbs, deaths, doors, loot, player HP). Clients send position, shots, right-clicks. Hooks run on the host only.
