@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runs the test suite before every commit. Enable once per clone:
+#   git config core.hooksPath tools/hooks
+# Skip for a single commit (e.g. docs only): git commit --no-verify
+echo "Running tests before commit..."
+out=$(powershell -NoProfile -ExecutionPolicy Bypass -File tools/test.ps1 2>&1)
+status=$?
+echo "$out" | grep -E "^FAIL|^        |passed,"
+if [ $status -ne 0 ]; then
+  echo "Tests failed. Commit aborted. Run tools\\test.ps1 for the full output."
+  exit 1
+fi
+exit 0

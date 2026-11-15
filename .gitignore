@@ -1,5 +1,10 @@
-node_modules/
-dist/
+# Godot
+.godot/
+*.import
+export_presets.cfg
+build/
+
+# OS / misc
 *.log
 .DS_Store
-.env
+Thumbs.db

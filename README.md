@@ -1,23 +1,28 @@
 # Zombie Extraction
 
-A LAN multiplayer zombie extraction FPS. You play it in the browser.
+A LAN multiplayer zombie FPS made with Godot 4. Early development: one test corridor, hordes of zombies that lose limbs, ragdoll and bleed.
 
-## Play on your LAN
-```bash
-npm install
-npm run build
-npm start
+## Play
+Install [Godot 4.7](https://godotengine.org/download) (or `winget install GodotEngine.GodotEngine`), then from this folder:
+
+```powershell
+tools\godot.ps1
 ```
-The server prints `LAN: http://192.168.x.x:3000`. Everyone on the same network opens that URL. They don't install anything.
 
-On Windows, allow Node.js through the firewall on **Private networks** the first time it asks. If friends can't connect, check this first.
+- **Host game** on one PC. The top-left of the screen shows the IP to give your friends.
+- Everyone else types that IP and clicks **Join**, or just clicks the game when it appears under "Games on your network".
+- First time, allow Godot through the Windows firewall on **Private networks** (port 7777 UDP, plus 7778 for the game list).
+
+Controls: WASD move, Shift sprint, Space jump, left click shoot, **right click aim** (or **use** when looking at a door or lootbox), R reload, 1-9 or mouse wheel change gun, Esc menu.
+
+Guns: P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, Orsis T-5000, Dragunov.
+
+To try multiplayer alone, `tools\play2.ps1` opens a host and a guest on the same PC.
 
 ## Develop
-```bash
-npm run dev
+```powershell
+tools\test.ps1
 ```
-Then open http://localhost:5173. Edits hot-reload. To test multiplayer alone, run `npx tsx scripts/bots.ts 3`.
+runs the tests (about 12 seconds). Write the test first, then the code. See [CLAUDE.md](CLAUDE.md) for the workflow, the layout and the rules.
 
-Controls: WASD to move, Shift to sprint, Space to jump, hold left mouse to shoot, Esc for the menu.
-
-See [CLAUDE.md](CLAUDE.md) for the architecture and conventions.
+Gameplay reactions live in one file: [scripts/hooks.gd](scripts/hooks.gd) (`on_low_hp`, `on_right_click_door`, `on_zombie_killed`, ...). Tuning numbers live in [scripts/config.gd](scripts/config.gd).
