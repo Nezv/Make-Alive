@@ -10,6 +10,7 @@ extends Node
 
 signal leave_requested
 signal retry_requested ## the host wants the same match again (main.gd starts it)
+signal join_refused(message: String) ## this client's build and the host's do not match (main.gd goes back to the menu with it)
 
 enum GoreFx { HIT, SEVER, DIE }
 
@@ -56,6 +57,8 @@ var _pending_shots: Array = []
 var _next_zombie := 1
 var _step_t := 0.0       ## seconds since players were last checked for sprinting footsteps
 var _reviving := 0         ## the downed teammate the local player is holding use on
+var _snap_tick := 0         ## snapshots sent so far (the far zombies are sent in turn by it)
+var _zombie_seen := {}      ## client: zombie id -> when (msec) a snapshot last had it
 var _next_drop := 0      ## how many things have been dropped (their iids count up from Config.DROP_IID_BASE)
 var _snapshot_timer := 0.0
 var _now := 0.0
@@ -104,7 +107,7 @@ func start_host(player_name_: String) -> void:
 func start_client(player_name_: String) -> void:
 	is_host = false
 	my_id = multiplayer.get_unique_id()
-	request_join.rpc_id(1, player_name_)
+	request_join.rpc_id(1, player_name_, Config.PROTOCOL_VERSION)
 
 
 func _build_world() -> void:
@@ -183,10 +186,14 @@ func _build_world() -> void:
 # --- RPCs: client -> host -------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_join(player_name_: String) -> void:
+func request_join(player_name_: String, version := 0) -> void:
 	if not is_host:
 		return
 	var id := multiplayer.get_remote_sender_id()
+	var problem := version_problem(version)
+	if problem != "":
+		refuse_join.rpc_id(id, problem)
+		return
 	var states := {}
 	for iid: int in interactables:
 		states[iid] = (interactables[iid] as Interactable).get_state()
@@ -196,7 +203,15 @@ func request_join(player_name_: String) -> void:
 
 ## What a joining player must know about this match beyond the map: sent in `welcome`.
 func welcome_rules() -> Dictionary:
-	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty }
+	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION }
+
+
+## What is wrong when the other side runs build `theirs` ("" when it is the same as this one). A build that
+## sends no version at all is an older one.
+static func version_problem(theirs: int) -> String:
+	if theirs == Config.PROTOCOL_VERSION:
+		return ""
+	return "These two builds of the game do not match (this one is version %d, the other is version %d). Everyone has to run the same build." % [Config.PROTOCOL_VERSION, theirs]
 
 
 ## Are HUD markers shown on this level? (Nightmare: no.)
@@ -326,8 +341,18 @@ func client_use_item(item: String) -> void:
 
 # --- RPCs: host -> clients ------------------------------------------------------
 
+## The host will not have this client (a different build): the message says why.
+@rpc("authority", "call_remote", "reliable")
+func refuse_join(message: String) -> void:
+	join_refused.emit(message)
+
+
 @rpc("authority", "call_remote", "reliable")
 func welcome(map_name_: String, mission_: String, interactable_states: Dictionary, match_rules: Dictionary = {}) -> void:
+	var problem := version_problem(int(match_rules.get("version", 0)))
+	if problem != "":
+		join_refused.emit(problem)
+		return
 	if not GameMap.NAMES.has(map_name_):
 		return
 	map_name = map_name_
@@ -1456,7 +1481,14 @@ func _physics_process(delta: float) -> void:
 	if _snapshot_timer <= 0.0:
 		_snapshot_timer += 1.0 / Config.TICK_RATE
 		var snap := build_snapshot()
-		snapshot.rpc(PlayerWire.pack(snap[0]), ZombieWire.pack(snap[1]))
+		var player_bytes := PlayerWire.pack(snap[0])
+		if snap[1].size() <= Interest.budget(players.size()):
+			snapshot.rpc(player_bytes, ZombieWire.pack(snap[1])) # it all fits: one packet for everyone
+		else:
+			for peer: int in multiplayer.get_peers(): # too many zombies: each client gets the ones that matter to it
+				if players.has(peer):
+					snapshot.rpc_id(peer, player_bytes, zombie_bytes_for(peer, snap[1], _snap_tick))
+		_snap_tick += 1
 		_apply_snapshot(snap[0], snap[1])
 
 
@@ -1474,6 +1506,16 @@ func _action_bits(p: Dictionary) -> int:
 	return bits
 
 
+## The zombie block of the snapshot for client `peer`: all of `list` while it fits in the packet, otherwise
+## the nearest to that player every time and the far ones in turn (Interest).
+func zombie_bytes_for(peer: int, list: Array, tick: int) -> PackedByteArray:
+	var budget := Interest.budget(players.size())
+	if list.size() <= budget:
+		return ZombieWire.pack(list)
+	var at: Vector3 = players[peer].pos if players.has(peer) else Vector3.ZERO
+	return ZombieWire.pack(Interest.pick(list, at, tick, budget))
+
+
 ## Host: where everyone and everything is right now, as [players, zombies] (see PlayerWire and
 ## ZombieWire for what each entry holds). Sent Config.TICK_RATE times a second; must fit one packet.
 func build_snapshot() -> Array:
@@ -1484,7 +1526,7 @@ func build_snapshot() -> Array:
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
-			"type": z.type, "mask": z.rig.severed_mask })
+			"type": z.type, "mask": z.rig.severed_mask, "flags": ZombieWire.FLAG_CRAWLING if z.is_crawling() else 0 })
 	return [pd, zd]
 
 
@@ -1515,12 +1557,12 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 
 	if is_host:
 		return # the host's zombies are the real ones
-	var zseen := {}
+	var now := Time.get_ticks_msec()
 	for e: Dictionary in zombies_data:
 		var zid: int = e.zid
 		if _dead_zombies.has(zid):
 			continue
-		zseen[zid] = true
+		_zombie_seen[zid] = now
 		var z: Zombie = zombies.get(zid)
 		if z == null:
 			z = Zombie.create(zid, e.type, false, e.pos, e.mask)
@@ -1528,10 +1570,13 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 			add_child(z)
 		z.buffer.push(e.pos, e.yaw)
 		z.state = e.state
-	for zid: int in zombies.keys():
-		if not zseen.has(zid):
+	for zid: int in zombies.keys(): # one that has been missing from the snapshots for a while is gone
+		if now - int(_zombie_seen.get(zid, 0)) > Config.ZOMBIE_STALE * 1000.0:
 			(zombies[zid] as Node).queue_free()
 			zombies.erase(zid)
+	for zid: int in _zombie_seen.keys():
+		if not zombies.has(zid):
+			_zombie_seen.erase(zid)
 
 
 func _process(delta: float) -> void:

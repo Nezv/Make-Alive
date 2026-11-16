@@ -95,6 +95,7 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.bot_fires = not _args.has("no-fire")
 	game.bot_aim = _args.get("bot-aim", "chest")
 	game.leave_requested.connect(func(): _to_menu())
+	game.join_refused.connect(func(message: String): _to_menu(message))
 	game.retry_requested.connect(func():
 		var again := [game.map_name, game.mission]
 		_to_menu()

@@ -805,13 +805,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ## P07 · Zombies
 
-### [ ] S070 · Room on the wire
+### [x] S070 · Room on the wire
 > needs: none | size: M | test: `tests/test_zombie_wire.gd`
-- [ ] Type field widened to hold twelve types, state field to hold the new states, still 13 bytes
-- [ ] Flags packed into spare bits: burning, armoured parts left, climbing, crawling
-- [ ] Packet test at the zombie cap still passes
-- [ ] Version byte in `welcome` so a mismatched build is refused with a clear message
-- [ ] Interest management: when the count exceeds one packet, each client gets the nearest zombies every tick and the far ones every few ticks
+- [x] Type field widened to hold twelve types, state field to hold the new states, still 13 bytes
+  - 4 bits of type, 5 of state; the id is 24 bits now
+- [x] Flags packed into spare bits: burning, armoured parts left, climbing, crawling
+  - `ZombieWire.FLAG_*` and a 4-bit `armour`; the host sets only crawling so far, the rest wait for their steps
+- [x] Packet test at the zombie cap still passes
+- [x] Version byte in `welcome` so a mismatched build is refused with a clear message
+  - `Config.PROTOCOL_VERSION` (bump it with any change to what is on the wire), sent in `request_join` and `welcome`; `Game.join_refused` takes the client back to the menu with the message
+- [x] Interest management: when the count exceeds one packet, each client gets the nearest zombies every tick and the far ones every few ticks
+  - `Interest.pick`; today's cap of 60 fits in one packet with eight players, so it only starts to matter above `Interest.budget`. Clients keep a zombie that missed a packet for `Config.ZOMBIE_STALE` seconds
 
 ### [ ] S071 · Zombie animation pass
 > needs: S070 | size: L | test: `tests/test_rig.gd` | see: `--host --demo --shot-at=1,2,3`

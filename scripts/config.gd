@@ -227,6 +227,12 @@ const BUDGET := {
 	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 },
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
+const PROTOCOL_VERSION := 2    # bump when anything on the wire changes: a client of another build is refused with a message
+const PACKET_OVERHEAD := 64    # what the RPC itself and the player block's framing take of a snapshot packet
+const INTEREST_NEAR_SHARE := 0.7 # over budget: this share of the packet is the zombies nearest the client, every tick
+const INTEREST_FAR_TICKS := 6  # ...and the rest of them are sent in turn, each at least this often
+const INTEREST_RANGE := 160.0  # metres from the client beyond which a zombie is not sent (positions are 327 m around the first one)
+const ZOMBIE_STALE := 1.0      # seconds a client keeps a zombie that missed the snapshots before it takes it for gone
 const BUDGET_PACKET_BYTES := 1392  # a snapshot larger than this is split by the network and may stall
 
 # --- Effects (scripts/fx/fx.gd): every pool is made once at this size; the oldest entry is reused ---
