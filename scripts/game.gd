@@ -166,6 +166,7 @@ func _build_world() -> void:
 	local_player.bot = bot
 	local_player.set_loadout(_starting_loadout())
 	local_player.landed.connect(_on_local_landed)
+	local_player.shoved.connect(_on_local_shove)
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
@@ -213,6 +214,56 @@ func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
 	p.pos = pos
 	p.yaw = yaw
 	p.action = action
+
+
+## The sender swung a shove from `origin` along `dir`.
+@rpc("any_peer", "call_remote", "reliable")
+func client_shove(origin: Vector3, dir: Vector3) -> void:
+	if is_host:
+		host_shove(multiplayer.get_remote_sender_id(), origin, dir)
+
+
+## A shove connected at `pos`: every peer hears the thud and sees a puff; the shover's view jolts.
+@rpc("authority", "call_local", "reliable")
+func shove_landed(pos: Vector3, by: int) -> void:
+	Sfx.play("thud", pos, 0.08)
+	fx.burst(Fx.Layer.SMOKE, pos, Vector3.UP, 3, { "speed": 0.8, "spread": 0.6, "life": 0.5, "size": 0.08,
+		"size_end": 0.3, "color": Color(0.45, 0.04, 0.04, 0.6), "gravity": 1.0 })
+	if by == my_id and local_player != null:
+		local_player.kick_view(Config.SHOVE_NUDGE)
+
+
+func _on_local_shove(origin: Vector3, dir: Vector3) -> void:
+	if is_host:
+		host_shove(my_id, origin, dir)
+	else:
+		client_shove.rpc_id(1, origin, dir)
+
+
+## Host: player `id` shoves from `origin` along `dir`. Every zombie in reach and in front is
+## knocked back and staggered for a little damage, never a limb. Returns how many it hit.
+func host_shove(id: int, origin: Vector3, dir: Vector3) -> int:
+	if not players.has(id) or _now - float(players[id].last_shove) < Config.SHOVE_TIME * 0.8:
+		return 0
+	players[id].last_shove = _now
+	var flat := Vector3(dir.x, 0, dir.z).normalized()
+	if flat == Vector3.ZERO:
+		return 0
+	var hit := 0
+	var at := Vector3.ZERO
+	for z: Zombie in zombies.values().duplicate():
+		var to := z.global_position - origin
+		to.y = 0.0
+		if to.length() > Config.SHOVE_RANGE or flat.angle_to(to.normalized()) > Config.SHOVE_CONE:
+			continue
+		z.shove(flat * Config.SHOVE_PUSH)
+		at = z.global_position + Vector3(0, 1.1, 0)
+		hooks.on_zombie_shoved(z, id)
+		hit_zombie(id, z, Humanoid.Part.TORSO, at, flat, Config.SHOVE_DAMAGE) # the torso: never a limb
+		hit += 1
+	if hit > 0:
+		shove_landed.rpc(at, id)
+	return hit
 
 
 ## The sender came down after falling `height` metres.
@@ -454,7 +505,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "step_pos": map.player_spawn(),
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)

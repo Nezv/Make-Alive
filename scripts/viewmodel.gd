@@ -30,6 +30,7 @@ var lower := 0.0
 var kick_pos := 0.0        ## 1 right after a shot, decays to 0
 var kick_rot := Vector3.ZERO ## (climb, sideways, roll): the random part of the recoil
 var dry := 0.0             ## 1 right after a click on an empty gun, runs down to 0
+var shove_t := -1.0         ## seconds into a shove (-1 = none)
 var stow := 0.0            ## 0..1: the gun is down and out of the way (hands busy: vaulting)
 var stow_goal := 0.0       ## where `stow` is easing to; the player sets this, never the pose
 var bob := 0.0
@@ -104,6 +105,32 @@ func fire() -> void:
 	kick_rot = Vector3(1.0, _rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0))
 	var has_flash: bool = Weapons.def(weapon_id).flash
 	_flash_t = 0.05 if has_flash else 0.0
+
+
+## A shove: the gun is pulled back, driven forward with a roll and swings home past its rest.
+func shove() -> void:
+	shove_t = 0.0
+
+
+## Where the gun is pushed `t` seconds into a shove (camera space, added to the pose).
+func shove_pose(t: float) -> Vector3:
+	var z := 0.0
+	if t < 0.0 or t >= Config.SHOVE_TIME:
+		return Vector3.ZERO
+	if t < 0.08: # pull back
+		z = 0.06 * _ease(t / 0.08)
+	elif t < 0.18: # thrust
+		z = lerpf(0.06, -0.18, _ease((t - 0.08) / 0.1))
+	else: # recover, overshooting home, settled by the end
+		var u := t - 0.18
+		var span := Config.SHOVE_TIME - 0.18
+		z = -0.18 * exp(-12.0 * u) * cos(TAU * u / span) * (1.0 - u / span)
+	return Vector3(0.0, -z * 0.2, z)
+
+
+## How far the gun is rolled `t` seconds into a shove.
+func shove_roll(t: float) -> float:
+	return 0.5 * sin(PI * clampf((t - 0.04) / 0.2, 0.0, 1.0)) if t >= 0.0 else 0.0
 
 
 ## The trigger was pulled on an empty gun: a small twitch, no kick.
@@ -190,6 +217,12 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	var strength := clampf(recoil * 5.0, 0.03, 0.22) * (1.0 - 0.5 * aim)
 	pos.z += kick_pos * (0.03 + strength * 0.25)
 	rot += Vector3(kick_rot.x, kick_rot.y * 0.35, kick_rot.z * 0.5) * kick_pos * strength
+	if shove_t >= 0.0:
+		shove_t += delta
+		pos += shove_pose(shove_t)
+		rot.z += shove_roll(shove_t)
+		if shove_t >= Config.SHOVE_TIME:
+			shove_t = -1.0
 	dry = maxf(0.0, dry - delta / Config.DRY_FIRE_TIME)
 	rot += Vector3(-1.0, 0.0, 0.6) * Config.DRY_FIRE_TWITCH * sin(dry * PI) * (1.0 - 0.5 * aim)
 	bob += delta * move_speed * 1.6

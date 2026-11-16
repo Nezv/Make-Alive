@@ -287,7 +287,7 @@ func _build_pause() -> void:
 	leave.pressed.connect(func(): leave_pressed.emit())
 	v.add_child(leave)
 	var help := Label.new()
-	help.text = "WASD move · Shift sprint · Ctrl crouch · Space jump (sprint into low cover to vault it)\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · 1-9 or mouse wheel change gun · Q last gun · Esc menu"
+	help.text = "WASD move · Shift sprint · Ctrl crouch · Space jump (sprint into low cover to vault it)\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · V shove · 1-9 or mouse wheel change gun · Q last gun · Esc menu"
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.modulate.a = 0.7
 	v.add_child(help)

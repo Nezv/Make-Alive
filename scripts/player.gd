@@ -1,6 +1,7 @@
 class_name LocalPlayer
 extends CharacterBody3D
 
+signal shoved(origin: Vector3, dir: Vector3) ## a shove went out: the game tells the host
 signal landed(height: float) ## the feet came down after falling this far (the host decides if it hurt)
 ## The player you control: physics movement, mouse look, first-person camera and guns.
 ## Movement runs at the physics rate; the camera is placed every rendered frame from the
@@ -17,6 +18,7 @@ var capsule: CapsuleShape3D
 var body_shape: CollisionShape3D
 var debug_crouch := false # tests and screenshots: hold the crouch
 var _breath_t := 0.0
+var shove_left := 0.0 # > 0 while a shove is still being swung
 var loadout := Loadout.all() # the guns this player carries, by slot (the host keeps its own copy)
 var last_weapon := -1     # the gun held before this one (the last-weapon key goes back to it)
 var view: Viewmodel
@@ -128,6 +130,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		weapons.start_reload()
 	elif event.is_action_pressed("last_weapon"):
 		switch_last()
+	elif event.is_action_pressed("shove"):
+		try_shove()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		cycle_weapon(1)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -189,6 +193,18 @@ func _physics_process(delta: float) -> void:
 	capsule.height = move.height()
 	body_shape.position.y = capsule.height / 2.0
 	_breathe(delta)
+
+
+## Strike with the gun's stock or muzzle. False if a swing is still going, you are too tired, or
+## your hands are busy.
+func try_shove() -> bool:
+	if shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
+		return false
+	shove_left = Config.SHOVE_TIME
+	move.stamina -= Config.SHOVE_STAMINA
+	view.shove()
+	shoved.emit(camera.global_position, -camera.global_basis.z)
+	return true
 
 
 ## What others should see this body doing, as PlayerWire.ACTION_* bits.
@@ -268,6 +284,7 @@ func _vault_step(delta: float) -> void:
 func _process(delta: float) -> void:
 	var origin := get_global_transform_interpolated().origin + Vector3(0, move.eye_height(), 0)
 	weapons.step(delta)
+	shove_left = maxf(0.0, shove_left - delta)
 	fire_buffer -= delta
 	punch = punch.lerp(Vector2.ZERO, 1.0 - exp(-Config.RECOIL_RECOVER * delta))
 	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, 0)), origin)

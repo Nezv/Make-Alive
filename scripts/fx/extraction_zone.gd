@@ -79,8 +79,9 @@ func step(delta: float) -> void:
 	_puff_t -= delta
 	while _puff_t <= 0.0:
 		_puff_t += Config.EXTRACT_PUFF_EVERY
-		# Rises at about height / life; the wind pushes it sideways as it goes.
-		var rise := Config.EXTRACT_SMOKE_HEIGHT / Config.EXTRACT_SMOKE_LIFE
+		# Rises to about the column's height in a puff's life (Fx slows each particle to 60-100 % of
+		# the speed asked, 80 % on average, hence the 1.25); the wind pushes it sideways as it goes.
+		var rise := 1.25 * Config.EXTRACT_SMOKE_HEIGHT / Config.EXTRACT_SMOKE_LIFE
 		fx.burst(Fx.Layer.SMOKE, base + Vector3(0, 0.3, 0), Vector3.UP * rise + Config.EXTRACT_WIND, 1, {
 			"speed": (Vector3.UP * rise + Config.EXTRACT_WIND).length(), "spread": 0.06, "life": Config.EXTRACT_SMOKE_LIFE,
 			"size": 0.6, "size_end": 4.5, "color": Color(0.45, 0.9, 0.5, 0.55), "color_end": Color(0.6, 0.75, 0.62, 0.0),

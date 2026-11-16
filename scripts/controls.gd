@@ -4,7 +4,7 @@ class_name Controls
 
 const KEYS := {
 	"move_forward": KEY_W, "move_back": KEY_S, "move_left": KEY_A, "move_right": KEY_D,
-	"sprint": KEY_SHIFT, "jump": KEY_SPACE, "pause": KEY_ESCAPE, "reload": KEY_R, "last_weapon": KEY_Q, "crouch": KEY_CTRL,
+	"sprint": KEY_SHIFT, "jump": KEY_SPACE, "pause": KEY_ESCAPE, "reload": KEY_R, "last_weapon": KEY_Q, "crouch": KEY_CTRL, "shove": KEY_V,
 	"weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "weapon_4": KEY_4, "weapon_5": KEY_5,
 	"weapon_6": KEY_6, "weapon_7": KEY_7, "weapon_8": KEY_8, "weapon_9": KEY_9,
 }

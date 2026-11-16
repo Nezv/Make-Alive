@@ -36,6 +36,7 @@ func test_the_flare_smoke_rises_as_a_tall_leaning_column() -> void:
 	var g := await _extract_game()
 	g._process(0.0)
 	g.fx.clear()
+	g.fx._rng.seed = 4 # the kit's own scatter, pinned
 	for i in 60:
 		g.extraction.step(0.1)
 		g.fx.step(0.1)

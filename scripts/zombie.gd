@@ -35,6 +35,7 @@ var _attack_door: Door = null
 var _last_pos := Vector3.ZERO
 var _waypoint := Vector3.ZERO ## open maps: where the path says to walk, refreshed a few times a second
 var _waypoint_t := 0.0
+var push := Vector3.ZERO  ## a shove's knock-back, dying away
 var heard := Vector3.ZERO ## where the last noise it heard came from
 var heard_left := 0.0     ## seconds it still cares (0 = heard nothing)
 
@@ -79,6 +80,20 @@ static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, sev
 
 
 # --- Queries --------------------------------------------------------------------
+
+## Shoved by a player toward `away` (flat, metres a second): knocked back, a standing one
+## staggers, a leaper's wind-up is broken. The damage comes separately (Game.host_shove).
+func shove(away: Vector3) -> void:
+	if state == State.LEAP:
+		return
+	push = Vector3(away.x, 0, away.z)
+	if state == State.WINDUP or type == Type.LEAPER:
+		leap_cd = maxf(leap_cd, Config.SHOVE_LEAP_RESET)
+	if not is_crawling():
+		set_state(State.STAGGER)
+	elif state == State.WINDUP:
+		set_state(State.CHASE)
+
 
 ## A noise reached it: it will go and look, unless a player is close enough to go for instead.
 func hear(spot: Vector3) -> void:
@@ -183,8 +198,9 @@ func host_step(delta: float, game: Game) -> void:
 			elif target_id != 0:
 				move = _chase(game, target_id, target_pos, to_target)
 
-	velocity.x = move.x
-	velocity.z = move.z
+	push = push.move_toward(Vector3.ZERO, Config.SHOVE_PUSH_DECAY * delta)
+	velocity.x = move.x + push.x
+	velocity.z = move.z + push.z
 	if not is_on_floor():
 		velocity.y -= Config.GRAVITY * delta
 	elif state != State.LEAP or state_t > 0.15:

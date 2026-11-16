@@ -23,7 +23,7 @@ extends Node
 ##   --weapon=4             start holding gun 1-9 (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov)
 ##   --difficulty=hard      host: easy, normal (default), hard or nightmare (see scripts/difficulty.gd)
 ##   --limited-ammo         host: reloads take from a reserve (the map's starting_ammo) even on a test map
-##   --pose=aim             hold a gun pose for screenshots: aim, sprint or reload
+##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload or shove
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
 ##   --noise                host: draw an expanding ring wherever something made noise, out to where it is heard
@@ -216,6 +216,11 @@ func _pose(pose: String) -> void:
 	var p := game.local_player
 	p.debug_aim = pose == "aim"
 	p.debug_sprint = pose == "sprint"
+	if pose == "shove": # be at the end of the thrust when the first screenshot is taken
+		var at_s := float(str(_args.get("shot-at", "5")).split(",")[0])
+		get_tree().create_timer(maxf(0.5, at_s - 0.17)).timeout.connect(func():
+			if game:
+				game.local_player.view.shove())
 	if pose == "reload": # be 40% through a reload when the first screenshot is taken
 		var at := float(str(_args.get("shot-at", "5")).split(",")[0])
 		var t: float = p.weapons.def().reload

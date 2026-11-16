@@ -217,6 +217,11 @@ func on_zombie_killed(zombie: Zombie, by_player: int, headshot: bool) -> void:
 			game.drop_ammo_box(zombie.global_position, drop.ammo, drop.rounds)
 
 
+## A player's shove connected.
+func on_zombie_shoved(zombie: Zombie, by_player: int) -> void:
+	fired.emit(&"on_zombie_shoved", [zombie, by_player])
+
+
 ## A leaper finished its jump (it may or may not have hit anyone).
 func on_zombie_leap_landed(zombie: Zombie) -> void:
 	fired.emit(&"on_zombie_leap_landed", [zombie])

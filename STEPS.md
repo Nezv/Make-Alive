@@ -223,14 +223,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Remote players show crouch and jump
 - [x] HUD stamina bar that only appears while it is not full
 
-### [ ] S019 · Shove
+### [x] S019 · Shove
 > needs: S018 | size: M | test: `tests/test_shove.gd`
-- [ ] Melee key with any gun: stock or muzzle strike, 0.35 s, costs stamina
-- [ ] Viewmodel: gun pulls back 0.08 s, thrusts with a roll, recovers with overshoot
-- [ ] Cone hit on the host, pushes zombies back, staggers walkers, interrupts a leaper wind-up
-- [ ] Low damage, never severs
-- [ ] Shove a downed crawler away from a teammate
-- [ ] Impact: thud, small blood puff, camera nudge
+- [x] Melee key with any gun: stock or muzzle strike, 0.35 s, costs stamina
+- [x] Viewmodel: gun pulls back 0.08 s, thrusts with a roll, recovers with overshoot
+- [x] Cone hit on the host, pushes zombies back, staggers walkers, interrupts a leaper wind-up
+- [x] Low damage, never severs
+- [x] Shove a downed crawler away from a teammate
+- [x] Impact: thud, small blood puff, camera nudge
 
 ### [x] S020 · Noise
 > needs: S003 | size: M | test: `tests/test_noise.gd`

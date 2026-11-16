@@ -49,6 +49,8 @@ static func _builtin() -> void:
 		register("gunshot", "Guns", _gunshot)
 	if not _defs.has("dry_fire"):
 		register("dry_fire", "Guns", _dry_fire)
+	if not _defs.has("thud"):
+		register("thud", "World", _thud)
 	if not _defs.has("siren"):
 		register("siren", "World", _siren)
 	if not _defs.has("beep"):
@@ -119,6 +121,13 @@ static func _dry_fire() -> PackedFloat32Array:
 	var tick := exp_tail(high_pass(noise(0.05, Hiss.WHITE, 5), 2500.0), 140.0)
 	var ring := exp_tail(fm(0.05, 1900.0, 2730.0, 1.5), 90.0)
 	return soft_clip(mix([tick, ring], [0.9, 0.35]), 1.5)
+
+
+## A rifle stock into a body: a low, dull knock.
+static func _thud() -> PackedFloat32Array:
+	var body := exp_tail(sweep(0.18, 140.0, 60.0), 26.0)
+	var slap := exp_tail(low_pass(noise(0.08, Hiss.PINK, 31), 900.0), 60.0)
+	return soft_clip(mix([body, slap], [1.0, 0.7]), 1.6)
 
 
 ## An air-raid siren winding up, holding and winding down: a saw swept up and back, softened.
