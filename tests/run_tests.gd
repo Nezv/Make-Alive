@@ -3,6 +3,9 @@ extends Node
 ## and exits with code 1 if anything failed. Optional filter: `-- --filter=zombie`.
 
 func _ready() -> void:
+	Settings.path = "user://test_run_settings.cfg" # never read or write the player's own file
+	Settings.apply_to_engine = false
+	Settings.reset_to_defaults(false)
 	var filter := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--filter="):
@@ -20,7 +23,7 @@ func _ready() -> void:
 	var started := Time.get_ticks_msec()
 	for f in files:
 		var script: GDScript = load("res://tests/" + f)
-		if script == null:
+		if script == null or not script.can_instantiate(): # a parse error must fail the run, not hang it
 			print("FAIL  %s  (script failed to load)" % f)
 			failed += 1
 			continue

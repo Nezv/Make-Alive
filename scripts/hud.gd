@@ -4,6 +4,9 @@ extends CanvasLayer
 
 signal leave_pressed
 
+const GAIN_AT := Vector2(-420, -116)
+const GAIN_COLOR := Color("9be29b")
+
 var hp_label: Label
 var info_label: Label
 var perf_label: Label
@@ -11,6 +14,7 @@ var toast_label: Label
 var feed_box: VBoxContainer
 var prompt_label: Label
 var weapon_label: Label
+var gain_label: Label ## "+30" rising over the ammo count after a pickup
 var scope: ColorRect
 var damage: ColorRect
 var cross: Array[ColorRect] = []
@@ -19,6 +23,7 @@ var _last_hp := Config.PLAYER_HP
 var _hit_t := 0.0
 var _toast_t := 0.0
 var _dmg_t := 0.0
+var _gain_t := 0.0
 
 
 func _ready() -> void:
@@ -65,6 +70,10 @@ void fragment() {
 	weapon_label = _label(26, Control.PRESET_BOTTOM_RIGHT, Vector2(-420, -82))
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	weapon_label.size.x = 400
+	gain_label = _label(22, Control.PRESET_BOTTOM_RIGHT, GAIN_AT)
+	gain_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	gain_label.size.x = 400
+	gain_label.modulate = Color(GAIN_COLOR, 0.0)
 	info_label = _label(16, Control.PRESET_TOP_RIGHT, Vector2(-220, 20))
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	info_label.size.x = 200
@@ -145,9 +154,20 @@ func set_prompt(text: String) -> void:
 	prompt_label.text = text
 
 
-func set_weapon(gun_name: String, rounds: int, mag: int, reloading: bool) -> void:
-	weapon_label.text = "%s   %s" % [gun_name, "RELOADING" if reloading else "%d / %d" % [rounds, mag]]
-	weapon_label.modulate = Color("ff5555") if rounds == 0 and not reloading else Color.WHITE
+## Rounds in the magazine / rounds in reserve (`reserve` -1: no limit).
+func set_weapon(gun_name: String, rounds: int, reloading: bool, reserve := -1) -> void:
+	var left := "∞" if reserve < 0 else str(reserve)
+	weapon_label.text = "%s   %s / %s" % [gun_name, "RELOADING" if reloading else str(rounds), left]
+	var empty := rounds == 0 and not reloading
+	weapon_label.modulate = Color("ff5555") if empty else (Color("ffcc66") if reserve == 0 else Color.WHITE)
+
+
+## Something was picked up: `text` ("+30  7.62") rises over the ammo count and fades.
+func gain(text: String) -> void:
+	gain_label.text = text
+	gain_label.modulate = Color(GAIN_COLOR, 1.0)
+	gain_label.position = GAIN_AT
+	_gain_t = Config.PICKUP_GAIN_TIME
 
 
 ## Sights are up: the crosshair gets out of the way.
@@ -187,10 +207,16 @@ func _process(delta: float) -> void:
 	_toast_t -= delta
 	toast_label.modulate.a = clampf(_toast_t / 0.4, 0.0, 1.0)
 	_dmg_t -= delta
+	if _gain_t > 0.0:
+		_gain_t = maxf(0.0, _gain_t - delta)
+		var done := 1.0 - _gain_t / Config.PICKUP_GAIN_TIME
+		gain_label.position.y = GAIN_AT.y - Config.PICKUP_GAIN_RISE * (1.0 - (1.0 - done) * (1.0 - done))
+		gain_label.modulate.a = clampf(_gain_t / 0.35, 0.0, 1.0)
 	var low := _last_hp > 0 and float(_last_hp) <= Config.PLAYER_HP * Config.LOW_HP_FRACTION
 	var pulse := 0.12 + 0.08 * sin(Time.get_ticks_msec() * 0.008) if low else 0.0 # heartbeat when hurt
 	damage.color.a = maxf(clampf(_dmg_t, 0.0, 0.3), pulse)
 	pause_panel.visible = Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
+	perf_label.visible = Settings.get_value("show_draws")
 	perf_label.text = "%d fps · %d draws · ping %d ms" % [
 		Engine.get_frames_per_second(),
 		Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),

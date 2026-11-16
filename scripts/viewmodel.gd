@@ -28,6 +28,7 @@ var reload_w := 0.0
 var lower := 0.0
 var kick_pos := 0.0        ## 1 right after a shot, decays to 0
 var kick_rot := Vector3.ZERO ## (climb, sideways, roll): the random part of the recoil
+var dry := 0.0             ## 1 right after a click on an empty gun, runs down to 0
 var bob := 0.0
 var flash: MeshInstance3D
 var light: OmniLight3D
@@ -100,6 +101,11 @@ func fire() -> void:
 	kick_rot = Vector3(1.0, _rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0))
 	var has_flash: bool = Weapons.def(weapon_id).flash
 	_flash_t = 0.05 if has_flash else 0.0
+
+
+## The trigger was pulled on an empty gun: a small twitch, no kick.
+func dry_fire() -> void:
+	dry = 1.0
 
 
 static func _ease(x: float) -> float:
@@ -177,6 +183,8 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	var strength := clampf(recoil * 5.0, 0.03, 0.22) * (1.0 - 0.5 * aim)
 	pos.z += kick_pos * (0.03 + strength * 0.25)
 	rot += Vector3(kick_rot.x, kick_rot.y * 0.35, kick_rot.z * 0.5) * kick_pos * strength
+	dry = maxf(0.0, dry - delta / Config.DRY_FIRE_TIME)
+	rot += Vector3(-1.0, 0.0, 0.6) * Config.DRY_FIRE_TWITCH * sin(dry * PI) * (1.0 - 0.5 * aim)
 	bob += delta * move_speed * 1.6
 	var amount := minf(move_speed / 5.0, 1.6) * (1.0 - 0.85 * aim)
 	pos += Vector3(cos(bob) * 0.012, absf(sin(bob)) * 0.015, 0.0) * amount

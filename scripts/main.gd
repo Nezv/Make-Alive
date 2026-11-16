@@ -6,10 +6,13 @@ extends Node
 ##   --map=corridor         host on the test corridor instead of the city (the default)
 ##   --mission=mirante      a city mission (terminal, hospital, prefeitura, batalhao, mirante): with --host start it,
 ##                          without it just pick it on the menu map (for screenshots of the menu)
+##   --balance=C:/x.md      print the balance sheet (guns against zombie types), save it there and exit
 ##   --city-plan=C:/dir     save city_plan.png and city_on_reference.png (what part of Joinville the city map covers) and exit
 ##   --join=192.168.1.7     join immediately
 ##   --name=Bob             player name
 ##   --bot                  local player wanders and shoots by itself
+##   --bot-goal=exit        with --bot: walk into this zone of the map's data (see --zones)
+##   --perf=30              measure frame times and draw calls for N seconds, print them and exit (tools\\perf.ps1)
 ##   --quit-after=10        exit after N seconds (prints a summary)
 ##   --screenshot=C:/x.png  save a picture of the screen (with --shot-at=6 seconds, default 5)
 ##   --no-hordes            host without automatic zombie spawning
@@ -18,8 +21,12 @@ extends Node
 ##   --no-fire              with --bot: aim but don't shoot
 ##   --bot-aim=legs         with --bot: chest (default), head, legs or arms
 ##   --weapon=4             start holding gun 1-9 (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov)
+##   --limited-ammo         host: reloads take from a reserve (the map's starting_ammo) even on a test map
 ##   --pose=aim             hold a gun pose for screenshots: aim, sprint or reload
-##   --cam=x,y,z,yaw,pitch  look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
+##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --zones                draw the map data: zones, zombie closets (red), horde routes (orange), spawns (white)
+##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
 ##   --zombie-rack=1        stand one zombie of every outfit in front of you: =1 first half, =2 second half (add --back for their backs)
 
@@ -27,6 +34,10 @@ var menu: Menu
 var game: Game
 var _args := {}
 var _shots := 0
+var _perf_left := 0.0   # --perf: seconds still to measure
+var _perf_warmup := 0.0 # the first seconds are loading hitches, not the game
+var _perf_ms: Array[float] = []
+var _perf_draws: Array[int] = []
 
 
 func _ready() -> void:
@@ -34,8 +45,13 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "true"
+	if Settings.get_value("player_name") != "":
+		Net.player_name = Settings.get_value("player_name")
 	if _args.has("name"):
 		Net.player_name = _args.name
+	if _args.has("balance"):
+		_balance(_args.balance)
+		return
 	if _args.has("city-plan"):
 		_city_plan(_args["city-plan"])
 		return
@@ -68,8 +84,9 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.bot = _args.has("bot")
 	game.map_name = map_name
 	game.mission = mission
-	if _args.has("demo") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
+	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
+	game.limited_ammo = _args.has("limited-ammo")
 	game.bot_fires = not _args.has("no-fire")
 	game.bot_aim = _args.get("bot-aim", "chest")
 	game.leave_requested.connect(func(): _to_menu())
@@ -97,8 +114,20 @@ func _host(map_name := "city", mission := "") -> void:
 		_pose(_args.pose)
 	if _args.has("gun-rack"):
 		_gun_rack()
-	if _args.has("cam"):
-		_debug_camera(_args.cam)
+	if _args.has("fx-rack"):
+		_fx_rack()
+	if _args.has("zones"):
+		game.add_child(game.map.data.debug_node())
+	if _args.has("cam") or _args.has("shot-cam"):
+		_debug_camera(_args.get("cam", _args.get("shot-cam", "")))
+	if _args.has("poi-cam") and game.map is CityMap:
+		var poi := (game.map as CityMap).poi_pos(mission if mission != "" else "terminal")
+		_debug_camera("%f,%f,%f,0,-22" % [poi.x, poi.y + 38.0, poi.z + 80.0])
+	if _args.has("bot-goal") and game.brain != null and game.map.zones.has(_args["bot-goal"]):
+		game.brain.go_to_zone(_args["bot-goal"])
+	if _args.has("perf"):
+		_perf_left = float(_args.perf)
+		_perf_warmup = 2.0
 	if _args.has("zombie-rack"):
 		_zombie_rack()
 	var ips := ", ".join(Net.local_ips())
@@ -129,6 +158,38 @@ func _input(event: InputEvent) -> void:
 	if game and event is InputEventMouseButton and event.pressed \
 			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not game.hud.pause_panel.get_global_rect().has_point(event.position):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _process(delta: float) -> void:
+	if _perf_left <= 0.0:
+		return
+	if _perf_warmup > 0.0:
+		_perf_warmup -= delta
+		return
+	_perf_ms.append(delta * 1000.0)
+	_perf_draws.append(int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)))
+	_perf_left -= delta
+	if _perf_left <= 0.0:
+		_perf_report()
+
+
+## What --perf measured: average, 99th percentile and worst frame, and the draw calls.
+func _perf_report() -> void:
+	var sorted := _perf_ms.duplicate()
+	sorted.sort()
+	var sum := 0.0
+	for ms in _perf_ms:
+		sum += ms
+	var draws := 0
+	var most := 0
+	for d in _perf_draws:
+		draws += d
+		most = maxi(most, d)
+	var n := _perf_ms.size()
+	print("[perf] map=%s frames=%d  avg %.2f ms (%.0f fps)  99%% %.2f ms  worst %.2f ms  draws avg %d max %d  zombies %d" % [
+		game.map_name if game else "menu", n, sum / n, 1000.0 * n / sum, sorted[int(n * 0.99)], sorted[n - 1],
+		draws / n, most, game.zombies.size() if game else 0])
+	get_tree().quit()
 
 
 ## A line-up of every zombie type walking at you, for looking at animations.
@@ -172,6 +233,44 @@ func _gun_rack() -> void:
 	game.add_child(lamp)
 
 
+## Every effect in Fx.Kind in a row, each replayed every two seconds, with its name over it.
+func _fx_rack() -> void:
+	game.director.enabled = false
+	game.local_player.hide_view = true
+	var at := game.local_player.global_position
+	var n := Fx.Kind.size()
+	for kind in n:
+		var tag := Label3D.new()
+		tag.text = Fx.NAMES[kind]
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.no_depth_test = true
+		tag.font_size = 40
+		tag.pixel_size = 0.004
+		tag.outline_size = 10
+		tag.position = _fx_rack_spot(at, kind, n) + Vector3(0, 1.6, 0)
+		game.add_child(tag)
+	var timer := Timer.new()
+	timer.wait_time = 2.0
+	timer.autostart = true
+	timer.timeout.connect(_fx_rack_play)
+	game.add_child(timer) # dies with the game, so the timer never outlives it
+	_fx_rack_play()
+
+
+func _fx_rack_spot(at: Vector3, kind: int, n: int) -> Vector3:
+	return at + Vector3((kind - (n - 1) / 2.0) * 0.7, 0.0, -5.0)
+
+
+func _fx_rack_play() -> void:
+	var at := game.local_player.global_position
+	var n := Fx.Kind.size()
+	for kind in n:
+		var on_floor: bool = kind in [Fx.Kind.BLAST, Fx.Kind.SPLASH]
+		var spot := _fx_rack_spot(at, kind, n)
+		var decal: bool = kind in [Fx.Kind.HOLE, Fx.Kind.CRACK]
+		game.play_fx(kind, spot + Vector3(0, 0.0 if on_floor or decal else 0.9, 0), Vector3.UP, 0.3 if kind == Fx.Kind.BLAST else 1.0)
+
+
 ## Still zombies, one per outfit, half of them at a time so none hides another. Models only: no AI.
 func _zombie_rack() -> void:
 	game.director.enabled = false
@@ -202,6 +301,18 @@ func _zombie_rack() -> void:
 	lamp.light_energy = 0.8
 	lamp.position = at + Vector3(0, 2.4, -1.0)
 	game.add_child(lamp)
+
+
+## Print the balance sheet and save it as Markdown, then quit. Works headless (tools\balance.ps1).
+func _balance(path: String) -> void:
+	var text := Balance.sheet()
+	print(text)
+	if path != "true":
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		if f != null:
+			f.store_string(text)
+			print("[balance] saved ", path)
+	get_tree().quit()
 
 
 ## Draw which part of Joinville the city map covers, then quit. Works headless.

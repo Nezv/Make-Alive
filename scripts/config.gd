@@ -21,11 +21,32 @@ const GRAVITY := 22.0
 const MOUSE_SENS := 0.0022
 const INTERACT_RANGE := 3.0
 const MEDKIT_HEAL := 40
+const AMMO_BOX_PIPS := 5        # squares printed on a full carton (fewer as it empties)
+const AMMO_CRATE_USES := 6      # takes before a military crate is empty
+const AMMO_CRATE_BOXES := 2     # cartons' worth of the held gun's calibre per take
+const AMMO_CRATE_OPEN_TIME := 1.2 # seconds the lid stays up after a take
+const AMMO_DROP_CHANCE := 0.06  # share of dead zombies that leave a carton...
+const AMMO_DROP_CHANCE_ARMED := 0.3 # ...and of the ones that carried a gun in life
+## Outfit -> the calibres its dead carry (Weapons.Ammo). Outfits not listed drop any calibre, rarely.
+const AMMO_DROP_ARMED := {
+	Characters.Outfit.COP: [Weapons.Ammo.MM9, Weapons.Ammo.GAUGE12],
+	Characters.Outfit.SOLDIER: [Weapons.Ammo.MM762, Weapons.Ammo.MM58, Weapons.Ammo.MM9X39],
+}
+const AMMO_DROPS_MAX := 24      # dropped cartons lying around at once; the oldest goes first
+const DROP_IID_BASE := 100000   # interactable ids from here up are things dropped during the match
+const PICKUP_HOP_TIME := 0.15   # seconds a pickup takes to fly to the player who took it
+const PICKUP_HOP_HEIGHT := 1.1  # it flies to this height on the player (chest)
+const PICKUP_HOP_ARC := 0.25    # how high it rises on the way
+const PICKUP_GAIN_TIME := 1.2   # seconds the "+30" stays on the HUD
+const PICKUP_GAIN_RISE := 34.0  # pixels it climbs meanwhile
 
 # --- Weapons (per-gun numbers are in weapons.gd) ---
 const WEAPON_DAMAGE := 34    # damage of a hit when no gun is named (same as the AK47)
 const WEAPON_DRAW_TIME := 0.35 # seconds to swap guns
 const FIRE_BUFFER := 0.12    # a click this long before the gun is ready still fires (semi-autos)
+const DRY_FIRE_TIME := 0.14  # seconds the gun twitches after a click on an empty chamber
+const DRY_FIRE_TWITCH := 0.03 # how far it dips, radians
+const DRY_FIRE_VOLUME := -10.0 # dB
 const FOV := 75.0
 const ADS_TIME := 0.18       # seconds to bring the sights up
 const ADS_MOVE_MULT := 0.55  # walking speed while aiming
@@ -83,6 +104,43 @@ const CITY_SPAWN_TRIES := 40
 const CITY_HILL_FADE := 100.0  # metres over which Morro da Boa Vista rises from the flat city at the forest's edge
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
+
+# --- The test bot (scripts/bot.gd) ---
+const BOT_SIGHT := 25.0         # metres at which it notices and shoots a zombie
+const BOT_HOLD_DIST := 13.0     # a zombie closer than this: stop walking and shoot
+const BOT_RETREAT_DIST := 7.0  # closer than this: back away while shooting
+const BOT_ARRIVE_DIST := 1.0    # this close to a goal point counts as there
+const BOT_DOOR_RETRY := 1.0     # seconds between tries at a door in its way
+const BOT_STUCK_DIST := 0.5     # moving less than this...
+const BOT_STUCK_SECONDS := 5.0  # ...for this long while trying to walk means it is stuck
+const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than real time
+
+# --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
+const BUDGET := {
+	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 10 },
+	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 },
+}
+const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
+const BUDGET_PACKET_BYTES := 1392  # a snapshot larger than this is split by the network and may stall
+
+# --- Effects (scripts/fx/fx.gd): every pool is made once at this size; the oldest entry is reused ---
+const FX_MAX_CHIPS := 220    # lit debris boxes
+const FX_MAX_GLOWS := 260    # sparks and flashes
+const FX_MAX_SMOKE := 160    # smoke and dust puffs
+const FX_MAX_LIGHTS := 6     # short flashes of light, never shadowed
+const FX_MAX_DECALS := 256   # per kind: bullet holes, scorches, cracks, puddles
+const FX_MAX_TRAILS := 24
+const FX_TRAIL_POINTS := 16  # a ribbon is at most this many points long
+const FX_TIER_COUNT := { "low": 0.4, "medium": 0.7, "high": 1.0 } # share of a burst's particles drawn
+const FX_TIER_LIFE := { "low": 0.6, "medium": 0.85, "high": 1.0 } # how long they linger
+
+# --- Sound ---
+const SFX_VOICES := 24          # sounds in the world playing at once; the farthest gives way
+const SFX_UI_VOICES := 6        # sounds with no position: menus, your own gun
+const SFX_UNIT_SIZE := 6.0      # metres at which a sound is still at full volume
+const SFX_MAX_DISTANCE := 120.0 # beyond this a sound is silent
+const SFX_FAR_CUTOFF_HZ := 4000.0 # far sounds lose what is above this...
+const SFX_FAR_CUTOFF_DB := -18.0  # ...by up to this much
 
 # --- Physics layers (bit values) ---
 const LAYER_WORLD := 1     # floors, walls, closed doors

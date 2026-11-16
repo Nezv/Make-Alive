@@ -83,10 +83,12 @@ func wait_until(cond: Callable, timeout := 3.0) -> bool:
 
 
 ## A real host Game running offline (no sockets), with automatic spawning turned off.
-func new_game(map_name := "corridor", mission := "") -> Game:
+## `limited_ammo`: reloads take from a reserve even on a test map.
+func new_game(map_name := "corridor", mission := "", limited_ammo := false) -> Game:
 	var g := Game.new()
 	g.map_name = map_name
 	g.mission = mission
+	g.limited_ammo = limited_ammo
 	add_child(g)
 	g.start_host("Tester")
 	g.director.enabled = false

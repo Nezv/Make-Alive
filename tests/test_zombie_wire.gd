@@ -29,8 +29,20 @@ func test_full_horde_fits_in_one_packet() -> void:
 	for i in Config.ZOMBIE_MAX:
 		list.append({ "zid": 100000 + i, "pos": Vector3(i, 1, -i), "yaw": 1.0, "state": 0, "type": 0, "mask": 0 })
 	var bytes := ZombieWire.pack(list)
-	# Leave room for 8 players (~70 bytes each) and RPC overhead in the same packet.
-	assert_lt(bytes.size(), MTU - 8 * 70 - 40, "zombie block size")
+	# Leave room for 8 players and RPC overhead in the same packet.
+	assert_lt(bytes.size(), MTU - Config.MAX_PLAYERS * PlayerWire.BYTES_EACH - 40, "zombie block size")
+
+
+func test_positions_far_from_the_origin_survive() -> void:
+	# The city is kilometres wide: the hospital is 650 m west of the origin, the Mirante 1.8 km east
+	# and 230 m up. A horde there must not be squeezed back toward the middle of the map.
+	for at: Vector3 in [Vector3(-658.4, 0.1, -222.5), Vector3(1867.2, 230.6, -1031.9)]:
+		var out := ZombieWire.unpack(ZombieWire.pack([
+			{ "zid": 1, "pos": at, "yaw": 0.0, "state": 0, "type": 0, "mask": 0 },
+			{ "zid": 2, "pos": at + Vector3(-40.25, 1.5, 61.75), "yaw": 0.0, "state": 0, "type": 0, "mask": 0 },
+		]))
+		assert_lt((out[0].pos as Vector3).distance_to(at), 0.02, "first zombie at %s" % at)
+		assert_lt((out[1].pos as Vector3).distance_to(at + Vector3(-40.25, 1.5, 61.75)), 0.02, "its neighbour")
 
 
 func test_empty_list() -> void:

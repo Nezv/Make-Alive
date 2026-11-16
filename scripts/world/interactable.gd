@@ -4,7 +4,7 @@ extends Node3D
 ## state travels to every peer as a small Dictionary via get_state()/apply_state().
 ##
 ## To add a new one: extend this, build visuals + a click body in _init, implement the three
-## methods below, register it in CorridorMap.build(), and add on_right_click_<thing> to GameHooks.
+## methods below, list it in the map's data (map_areas.gd, built by MapData.build_interactables), and add on_right_click_<thing> to GameHooks.
 
 signal state_changed(iid: int, state: Dictionary)
 

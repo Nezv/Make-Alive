@@ -20,7 +20,10 @@ var punch := Vector2.ZERO # recoil on top of where you're looking (climb, sidewa
 var debug_aim := false    # tests and screenshots: hold the sights up / hold the sprint pose
 var debug_sprint := false
 var hide_view := false   # screenshots of the world without the gun in the way
-var bot := false # test mode: Game aims and fires for us
+var bot := false # test mode: a Bot aims, fires and walks for us
+var bot_move := Vector3.ZERO # with `bot`: the direction to walk (world space, flat), zero to stand
+var bot_sprint := false
+var _aim_latched := false # Settings aim_toggle: right mouse flips this instead of being held
 
 
 func _ready() -> void:
@@ -37,7 +40,7 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.top_level = true
 	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	camera.fov = Config.FOV
+	camera.fov = base_fov()
 	camera.near = 0.05
 	camera.far = 300
 	add_child(camera)
@@ -86,11 +89,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		return
 	if event is InputEventMouseMotion:
-		var sens := Config.MOUSE_SENS * camera.fov / Config.FOV # slower when zoomed in
+		var sens: float = Settings.get_value("mouse_sensitivity") * camera.fov / base_fov() # slower when zoomed in
 		yaw -= event.relative.x * sens
-		pitch = clampf(pitch - event.relative.y * sens, -1.5, 1.5)
+		pitch = clampf(pitch - event.relative.y * sens * (-1.0 if Settings.get_value("invert_y") else 1.0), -1.5, 1.5)
 	elif bot:
 		return
+	elif event.is_action_pressed("aim") and Settings.get_value("aim_toggle"):
+		_aim_latched = not _aim_latched
 	elif event.is_action_pressed("fire"):
 		fire_buffer = Config.FIRE_BUFFER
 	elif event.is_action_pressed("reload"):
@@ -115,7 +120,11 @@ func _physics_process(delta: float) -> void:
 		firing = false
 
 	var ready := not weapons.is_reloading() and weapons.draw_left <= 0.0
-	var want_aim := debug_aim or (captured and not bot and not aim_blocked and Input.is_action_pressed("aim"))
+	var toggle: bool = Settings.get_value("aim_toggle")
+	if not toggle or not ready or aim_blocked or not captured:
+		_aim_latched = false # reloading, swapping, using a door or leaving the window lowers the sights
+	var held := _aim_latched if toggle else Input.is_action_pressed("aim")
+	var want_aim := debug_aim or (captured and not bot and not aim_blocked and held)
 	aiming = want_aim and ready
 	var running := captured and not bot and Input.is_action_pressed("sprint") and input.y > 0 and not aiming
 	sprinting = (running or debug_sprint) and not aiming
@@ -125,6 +134,12 @@ func _physics_process(delta: float) -> void:
 	elif aiming:
 		speed *= Config.ADS_MOVE_MULT
 	var dir := Basis(Vector3.UP, yaw) * Vector3(input.x, 0, -input.y)
+	if bot:
+		dir = bot_move
+		running = bot_sprint and bot_move != Vector3.ZERO and not aiming
+		sprinting = running or debug_sprint
+		if running:
+			speed = Config.SPRINT_SPEED
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
 	if is_on_floor():
@@ -144,7 +159,12 @@ func _process(delta: float) -> void:
 	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, 0)), origin)
 	view.update(delta, move_speed, aiming, sprinting, weapons)
 	var zoom: float = weapons.def().ads_fov
-	camera.fov = lerpf(Config.FOV, zoom, Viewmodel._ease(view.aim))
+	camera.fov = lerpf(base_fov(), minf(zoom, base_fov()), Viewmodel._ease(view.aim))
+
+
+## The field of view the player chose (Config.FOV unless they changed it).
+func base_fov() -> float:
+	return Settings.get_value("fov")
 
 
 func teleport(pos: Vector3) -> void:

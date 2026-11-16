@@ -42,6 +42,45 @@ func on_player_joined(player_id: int) -> void:
 	game.feed.rpc("%s joined" % game.player_name(player_id))
 
 
+## At 0 HP a player goes down instead of dying (fired by the downed-state step).
+func on_player_downed(player_id: int) -> void:
+	fired.emit(&"on_player_downed", [player_id])
+
+
+func on_player_revived(player_id: int, by_player: int) -> void:
+	fired.emit(&"on_player_revived", [player_id, by_player])
+
+
+# --- Mission ----------------------------------------------------------------------
+
+## The match began on a mission (`mission` is a Missions id). Free play never fires this.
+func on_mission_started(mission: String) -> void:
+	fired.emit(&"on_mission_started", [mission])
+
+
+## An objective of the mission's list was completed. `by_player` is 0 when nobody in particular did it.
+func on_objective_reached(objective_id: String, by_player: int) -> void:
+	fired.emit(&"on_objective_reached", [objective_id, by_player])
+
+
+## The way out is open: `zone` is the id of the extraction zone in the map's data.
+func on_extraction_ready(zone: String) -> void:
+	fired.emit(&"on_extraction_ready", [zone])
+
+
+## These players got out. The mission is won.
+func on_extracted(player_ids: Array) -> void:
+	fired.emit(&"on_extracted", [player_ids])
+
+
+func on_mission_failed(reason: String) -> void:
+	fired.emit(&"on_mission_failed", [reason])
+
+
+func on_checkpoint_reached(checkpoint_id: String) -> void:
+	fired.emit(&"on_checkpoint_reached", [checkpoint_id])
+
+
 # --- Right-click ------------------------------------------------------------------
 
 ## A player right-clicked something in reach. Routes to the specific handler below.
@@ -53,6 +92,10 @@ func on_right_click(player_id: int, target: Interactable) -> void:
 		on_right_click_lootbox(player_id, target)
 	elif target is WeaponPickup:
 		on_right_click_weapon(player_id, target)
+	elif target is AmmoBox:
+		on_right_click_ammo_box(player_id, target)
+	elif target is AmmoCrate:
+		on_right_click_ammo_crate(player_id, target)
 
 
 func on_right_click_door(player_id: int, door: Door) -> void:
@@ -81,6 +124,34 @@ func on_weapon_picked_up(player_id: int, weapon: int, pickup: WeaponPickup) -> v
 	game.feed.rpc("%s found a %s" % [game.player_name(player_id), Weapons.def(weapon).name])
 
 
+## A carton of one calibre: the player takes what fits in their reserve, the rest stays in it.
+func on_right_click_ammo_box(player_id: int, box: AmmoBox) -> void:
+	fired.emit(&"on_right_click_ammo_box", [player_id, box])
+	if box.taken_by >= 0:
+		return
+	var got := game.give_ammo(player_id, box.ammo, box.rounds)
+	if got > 0:
+		box.take(got, player_id)
+		on_ammo_picked_up(player_id, box.ammo, got)
+
+
+## The military crate: a couple of cartons of whatever the gun in the player's hands is fed with.
+func on_right_click_ammo_crate(player_id: int, crate: AmmoCrate) -> void:
+	fired.emit(&"on_right_click_ammo_crate", [player_id, crate])
+	if crate.uses <= 0 or not game.players.has(player_id):
+		return
+	var type := Weapons.ammo_of(game.players[player_id].weapon)
+	var carton: int = Weapons.AMMO[type].box
+	var got := game.give_ammo(player_id, type, carton * Config.AMMO_CRATE_BOXES)
+	if got > 0 and crate.use(): # a full player wastes no use
+		on_ammo_picked_up(player_id, type, got)
+
+
+## `rounds` of a calibre (Weapons.Ammo) went into a player's reserve from a box, a crate or a drop.
+func on_ammo_picked_up(player_id: int, ammo_type: int, rounds: int) -> void:
+	fired.emit(&"on_ammo_picked_up", [player_id, ammo_type, rounds])
+
+
 func on_loot_received(player_id: int, item: String) -> void:
 	fired.emit(&"on_loot_received", [player_id, item])
 	match item:
@@ -104,6 +175,10 @@ func on_limb_severed(zombie: Zombie, part: int, by_player: int) -> void:
 ## Called just before the zombie is removed and turned into a ragdoll.
 func on_zombie_killed(zombie: Zombie, by_player: int, headshot: bool) -> void:
 	fired.emit(&"on_zombie_killed", [zombie, by_player, headshot])
+	if not game.map.infinite_ammo: # a few of the dead had ammo on them (which ones is seeded by their id)
+		var drop := AmmoBox.roll_drop(zombie.zid, Characters.outfit_for(zombie.zid, zombie.type))
+		if not drop.is_empty():
+			game.drop_ammo_box(zombie.global_position, drop.ammo, drop.rounds)
 
 
 ## A leaper finished its jump (it may or may not have hit anyone).
@@ -122,3 +197,9 @@ func on_horde_incoming(wave: int, count: int) -> void:
 func on_door_broken(door: Door) -> void:
 	fired.emit(&"on_door_broken", [door])
 	game.feed.rpc("The door has been smashed!")
+
+
+## Something loud happened at `position` (`loudness` is how many metres away it is heard).
+## `by_player` is 0 when no player caused it.
+func on_noise(position: Vector3, loudness: float, by_player: int) -> void:
+	fired.emit(&"on_noise", [position, loudness, by_player])

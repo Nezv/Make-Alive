@@ -32,7 +32,9 @@ func test_is_direct() -> void:
 
 
 func test_spawn_points_are_past_the_door_inside_leg_b() -> void:
+	var m := CorridorGameMap.new()
 	for i in 20:
-		var p := CorridorMap.zombie_spawn_point()
+		var p := m.zombie_spawn_point([])
 		assert_gt(p.x, CorridorMap.DOOR_X + 5.0)
 		assert_lt(absf(p.z), CorridorMap.HALF_W)
+	m.root.free()

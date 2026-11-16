@@ -105,7 +105,7 @@ func player_spawn() -> Vector3:
 	return poi_pos(mission if CityData.POIS.has(mission) else "terminal") + Vector3(0, 0.1, 0)
 
 
-func player_spawn_point() -> Vector3:
+func player_spawn_point(_slot := 0) -> Vector3:
 	var p := player_spawn() + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0))
 	p.y = ground_y(p) + 0.1
 	return p

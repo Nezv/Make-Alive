@@ -10,15 +10,17 @@ extends Node
 
 signal leave_requested
 
-enum Fx { HIT, SEVER, DIE }
+enum GoreFx { HIT, SEVER, DIE }
 
 var is_host := false
 var my_id := 1
 var bot := false
 var bot_fires := true
 var bot_aim := "chest" ## chest | head | legs | arms
+var brain: Bot             ## what plays for the local player when `bot` is on (scripts/bot.gd)
 var map_name := "corridor" ## set before start_host; clients get it in `welcome`
 var mission := ""          ## a city POI id ("mirante"...) or "" for free play; clients get it in `welcome`
+var limited_ammo := false  ## set before start_host: reloads take from a reserve even on a test map (--limited-ammo, tests)
 var map: GameMap
 var world: Node3D
 var door: Door
@@ -27,19 +29,21 @@ var interactables := {}  ## iid -> Interactable
 var local_player: LocalPlayer
 var hud: Hud
 var gore: Gore
+var fx: Fx
 var hooks: GameHooks
 var director: HordeDirector
-var shot_player: AudioStreamPlayer
 var remotes := {}        ## peer id -> RemotePlayer
+var names := {}          ## peer id -> player name, on every peer (sent when someone joins or leaves)
 var zombies := {}        ## zombie id -> Zombie
 var zombie_list: Array[Zombie] = [] ## same zombies as an array, refreshed each host tick
 var looked_at: Interactable = null
 var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellets (tests seed it)
 
 # Host-only
-var players := {}        ## peer id -> { name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, owned }
+var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, owned, reserve }
 var _pending_shots: Array = []
 var _next_zombie := 1
+var _next_drop := 0      ## how many things have been dropped (their iids count up from Config.DROP_IID_BASE)
 var _snapshot_timer := 0.0
 var _now := 0.0
 # Client-only
@@ -58,14 +62,12 @@ func _ready() -> void:
 	director = HordeDirector.new(self)
 	gore = Gore.new()
 	add_child(gore)
+	fx = Fx.new()
+	add_child(fx)
+	Settings.changed.connect(_on_setting_changed)
 	hud = Hud.new()
 	hud.leave_pressed.connect(func(): leave_requested.emit())
 	add_child(hud)
-	shot_player = AudioStreamPlayer.new()
-	shot_player.stream = Sfx.gunshot()
-	shot_player.max_polyphony = 6
-	shot_player.volume_db = -6
-	add_child(shot_player)
 
 
 # --- Session start ------------------------------------------------------------
@@ -76,6 +78,8 @@ func start_host(player_name_: String) -> void:
 	_build_world()
 	map.roll_weapons(rng)
 	_add_player(1, player_name_)
+	if mission != "":
+		hooks.on_mission_started(mission)
 	if not Net.peer_left.is_connected(_on_peer_left):
 		Net.peer_left.connect(_on_peer_left)
 
@@ -89,7 +93,10 @@ func start_client(player_name_: String) -> void:
 func _build_world() -> void:
 	map = GameMap.create(map_name)
 	map.mission = mission
+	if limited_ammo:
+		map.infinite_ammo = false
 	gore.ground = map.ground_y
+	fx.ground = map.ground_y
 	world = map.root
 	add_child(world)
 	door = map.door
@@ -141,8 +148,12 @@ func _build_world() -> void:
 	local_player.name = "LocalPlayer"
 	local_player.bot = bot
 	local_player.set_loadout(_starting_weapons())
+	if not map.infinite_ammo:
+		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
 	local_player.teleport(map.player_spawn())
+	if bot:
+		brain = Bot.new(self)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -156,7 +167,7 @@ func request_join(player_name_: String) -> void:
 	var states := {}
 	for iid: int in interactables:
 		states[iid] = (interactables[iid] as Interactable).get_state()
-	welcome.rpc_id(id, map_name, mission, states)
+	welcome.rpc_id(id, map_name, mission, states, { "infinite_ammo": map.infinite_ammo })
 	_add_player(id, player_name_)
 
 
@@ -177,24 +188,31 @@ func client_shoot(origin: Vector3, dir: Vector3, weapon: int) -> void:
 		_queue_shot(multiplayer.get_remote_sender_id(), origin, dir, weapon)
 
 
+## A reload took `rounds` of a calibre out of the sender's reserve. Sent when it happens, not in snapshots.
 @rpc("any_peer", "call_remote", "reliable")
-func client_interact(iid: int) -> void:
+func client_ammo_used(type: int, rounds: int) -> void:
 	if is_host:
-		host_interact(multiplayer.get_remote_sender_id(), iid)
+		_ammo_used(multiplayer.get_remote_sender_id(), type, rounds)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func client_interact(iid: int, weapon: int = -1) -> void:
+	if is_host:
+		host_interact(multiplayer.get_remote_sender_id(), iid, weapon)
 
 
 # --- RPCs: host -> clients ------------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
-func welcome(map_name_: String, mission_: String, interactable_states: Dictionary) -> void:
+func welcome(map_name_: String, mission_: String, interactable_states: Dictionary, rules: Dictionary = {}) -> void:
 	if not GameMap.NAMES.has(map_name_):
 		return
 	map_name = map_name_
 	mission = mission_
+	limited_ammo = not rules.get("infinite_ammo", true)
 	_build_world()
 	for iid: int in interactable_states:
-		if interactables.has(iid):
-			(interactables[iid] as Interactable).apply_state(interactable_states[iid])
+		_apply_interact_state(iid, interactable_states[iid])
 	print("[client %d] joined host" % my_id)
 
 
@@ -207,8 +225,16 @@ func respawn_at(pos: Vector3, reason: String) -> void:
 
 
 @rpc("authority", "call_remote", "unreliable_ordered")
-func snapshot(players_data: Array, zombie_bytes: PackedByteArray) -> void:
-	_apply_snapshot(players_data, ZombieWire.unpack(zombie_bytes))
+func snapshot(player_bytes: PackedByteArray, zombie_bytes: PackedByteArray) -> void:
+	_apply_snapshot(PlayerWire.unpack(player_bytes), ZombieWire.unpack(zombie_bytes))
+
+
+## Who is playing. Names change when someone joins or leaves, so they are not in the snapshots.
+@rpc("authority", "call_remote", "reliable")
+func player_names(names_: Dictionary) -> void:
+	names = names_
+	for id: int in remotes:
+		(remotes[id] as RemotePlayer).tag.text = names.get(id, "Survivor")
 
 
 ## You picked up a gun: it's yours now, loaded, and in your hands.
@@ -216,6 +242,14 @@ func snapshot(players_data: Array, zombie_bytes: PackedByteArray) -> void:
 func got_weapon(weapon: int) -> void:
 	if local_player and Weapons.valid(weapon):
 		local_player.receive_weapon(weapon)
+
+
+## The host put rounds in your reserve.
+@rpc("authority", "call_remote", "reliable")
+func got_ammo(type: int, rounds: int) -> void:
+	if local_player:
+		local_player.weapons.add_reserve(type, rounds)
+		hud.gain("+%d  %s" % [rounds, Weapons.ammo_name(type)])
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -228,10 +262,61 @@ func zombie_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> vo
 	_apply_fx(zid, kind, part, pos, dir)
 
 
+## An effect from Fx.Kind at a place: impacts, flashes, explosions. Its own channel, so a burst of
+## them never holds up doors and gore.
+@rpc("authority", "call_remote", "reliable", 2)
+func world_fx(kind: int, pos: Vector3, dir: Vector3, arg: float) -> void:
+	fx.play(kind, pos, dir, arg)
+
+
 @rpc("authority", "call_remote", "reliable")
 func interact_state(iid: int, state: Dictionary) -> void:
+	_apply_interact_state(iid, state)
+
+
+## A peer learns the state of interactable `iid`. One it has never seen is something dropped
+## during the match (its state says where it lies), so it is built here.
+func _apply_interact_state(iid: int, state: Dictionary) -> void:
 	if interactables.has(iid):
 		(interactables[iid] as Interactable).apply_state(state)
+	elif state.get("drop", false) and state.get("by", -1) < 0:
+		_add_drop(iid, state)
+	_after_state(iid)
+
+
+## An interactable just changed on this peer: what the match itself does about it.
+func _after_state(iid: int) -> void:
+	var box := interactables.get(iid) as AmmoBox
+	if box == null or box.taken_by < 0:
+		return
+	# Emptied: it hops to whoever took it (or just shrinks away if nobody did).
+	box.hop_to(_player_pos(box.taken_by) + Vector3(0, Config.PICKUP_HOP_HEIGHT, 0) if box.taken_by > 0 else box.global_position)
+	if box.dynamic:
+		interactables.erase(iid) # it frees itself after the hop
+
+
+## Where a player is, as this peer sees them.
+func _player_pos(id: int) -> Vector3:
+	if id == my_id and local_player != null:
+		return local_player.global_position
+	if remotes.has(id):
+		return (remotes[id] as Node3D).global_position
+	if players.has(id):
+		return players[id].pos
+	return Vector3.ZERO
+
+
+func _add_drop(iid: int, state: Dictionary) -> AmmoBox:
+	var box := AmmoBox.new()
+	box.iid = iid
+	box.dynamic = true
+	box.position = state.get("at", Vector3.ZERO)
+	box.rotation.y = fposmod(iid * 2.399963, TAU) # each lies at its own angle, the same on every peer
+	box.apply_state(state)
+	world.add_child(box)
+	interactables[iid] = box
+	box.state_changed.connect(_on_interactable_changed)
+	return box
 
 
 @rpc("authority", "call_local", "reliable")
@@ -250,7 +335,7 @@ func announce(text: String) -> void:
 func _send_to(id: int, method: StringName, args: Array) -> void:
 	if id == my_id:
 		callv(method, args)
-	else:
+	elif multiplayer.get_peers().has(id): # someone who has just left gets nothing
 		callv("rpc_id", [id, method] + args)
 
 
@@ -263,12 +348,20 @@ func player_name(id: int) -> String:
 func _add_player(id: int, player_name_: String) -> void:
 	var n := player_name_.strip_edges().substr(0, 20)
 	var health := Health.new()
-	players[id] = { "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
+	var taken := {}
+	for other: Dictionary in players.values():
+		taken[other.slot] = true
+	var slot := 0 # the lowest free slot: it picks this player's own spawn point
+	while taken.has(slot):
+		slot += 1
+	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
-		"weapon": Weapons.DEFAULT if map.all_weapons else Weapons.P19, "owned": _starting_weapons() }
+		"weapon": Weapons.DEFAULT if map.all_weapons else Weapons.P19, "owned": _starting_weapons(),
+		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	health.died.connect(func(): hooks.on_player_died(id))
 	respawn_player(id, "spawn")
+	_send_names()
 	hooks.on_player_joined(id)
 
 
@@ -276,13 +369,22 @@ func _on_peer_left(id: int) -> void:
 	if players.has(id):
 		feed.rpc("%s left" % players[id].name)
 		players.erase(id)
+		_send_names()
+
+
+func _send_names() -> void:
+	var all := {}
+	for id: int in players:
+		all[id] = players[id].name
+	player_names.rpc(all)
+	player_names(all)
 
 
 func respawn_player(id: int, reason: String) -> void:
 	if not players.has(id):
 		return
 	var p: Dictionary = players[id]
-	p.pos = map.player_spawn_point()
+	p.pos = map.player_spawn_point(p.slot)
 	(p.health as Health).reset()
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
@@ -302,6 +404,37 @@ func give_weapon(id: int, weapon: int) -> void:
 	if players.has(id) and Weapons.valid(weapon):
 		players[id].owned[weapon] = true
 		_send_to(id, &"got_weapon", [weapon])
+
+
+## Rounds of a calibre (Weapons.Ammo) a player has outside their magazines; -1 where ammo is infinite.
+func ammo_of(id: int, type: int) -> int:
+	if map.infinite_ammo:
+		return -1
+	if not players.has(id):
+		return 0
+	var have: int = players[id].reserve.get(type, 0)
+	return have
+
+
+## Put rounds in a player's reserve (a pickup, a crate, a hook's reward). Returns how many fitted.
+func give_ammo(id: int, type: int, rounds: int) -> int:
+	if map.infinite_ammo or not players.has(id) or type < 0 or type >= Weapons.Ammo.COUNT:
+		return 0
+	var have := ammo_of(id, type)
+	var cap: int = Weapons.AMMO[type].max
+	var fits := clampi(rounds, 0, maxi(0, cap - have))
+	if fits > 0:
+		players[id].reserve[type] = have + fits
+		_send_to(id, &"got_ammo", [type, fits])
+	return fits
+
+
+## A player's reload took rounds out of their reserve: keep the host's count in step.
+func _ammo_used(id: int, type: int, rounds: int) -> void:
+	if not players.has(id) or type < 0 or type >= Weapons.Ammo.COUNT or rounds <= 0:
+		return
+	var have: int = players[id].reserve.get(type, 0)
+	players[id].reserve[type] = maxi(0, have - rounds)
 
 
 func damage_player(id: int, amount: int, by: Zombie = null) -> void:
@@ -332,9 +465,12 @@ func nearest_player(from: Vector3) -> int:
 # --- Host: interactions -----------------------------------------------------------
 
 ## A player right-clicked interactable `iid`. Returns false if it was out of reach or unknown.
-func host_interact(player_id: int, iid: int) -> bool:
+## `weapon`: the gun in the player's hands as they clicked (the host otherwise only learns it from shots).
+func host_interact(player_id: int, iid: int, weapon: int = -1) -> bool:
 	if not players.has(player_id) or not interactables.has(iid):
 		return false
+	if Weapons.valid(weapon) and players[player_id].owned.has(weapon):
+		players[player_id].weapon = weapon
 	var target: Interactable = interactables[iid]
 	var pos: Vector3 = players[player_id].pos
 	if pos.distance_to(target.global_position) > Config.INTERACT_RANGE + 1.5:
@@ -346,6 +482,26 @@ func host_interact(player_id: int, iid: int) -> bool:
 func _on_interactable_changed(iid: int, state: Dictionary) -> void:
 	if is_host:
 		interact_state.rpc(iid, state)
+		_after_state(iid)
+
+
+## Host: leave a carton of `rounds` of a calibre on the ground at `at` (what a dead zombie had on it).
+func drop_ammo_box(at: Vector3, type: int, rounds: int) -> AmmoBox:
+	if not is_host or type < 0 or type >= Weapons.Ammo.COUNT or rounds <= 0:
+		return null
+	var lying: Array[int] = []
+	for iid: int in interactables:
+		if iid >= Config.DROP_IID_BASE:
+			lying.append(iid)
+	if lying.size() >= Config.AMMO_DROPS_MAX: # the oldest one makes room
+		lying.sort()
+		var oldest: AmmoBox = interactables[lying[0]]
+		oldest.take(oldest.rounds, 0)
+	var iid := Config.DROP_IID_BASE + _next_drop
+	_next_drop += 1
+	var box := _add_drop(iid, { "ammo": type, "rounds": rounds, "by": -1, "at": Vector3(at.x, map.ground_y(at), at.z) })
+	interact_state.rpc(iid, box.get_state())
+	return box
 
 
 func _on_door_smashed(d: Door) -> void:
@@ -433,16 +589,16 @@ func hit_zombie(shooter: int, z: Zombie, part: int, pos: Vector3, dir: Vector3,
 		damage: int = Config.WEAPON_DAMAGE) -> void:
 	var result := z.take_hit(part, damage)
 	hooks.on_zombie_hit(z, part, damage, shooter)
-	_broadcast_fx(z.zid, Fx.HIT, part, pos, dir)
+	_broadcast_fx(z.zid, GoreFx.HIT, part, pos, dir)
 	var severed: int = result.severed
 	if severed >= 0:
 		hooks.on_limb_severed(z, severed, shooter)
-		_broadcast_fx(z.zid, Fx.SEVER, severed, pos, dir)
+		_broadcast_fx(z.zid, GoreFx.SEVER, severed, pos, dir)
 	if result.killed:
 		hooks.on_zombie_killed(z, shooter, result.headshot)
 		if players.has(shooter):
 			players[shooter].kills += 1
-		_broadcast_fx(z.zid, Fx.DIE, part, pos, dir)
+		_broadcast_fx(z.zid, GoreFx.DIE, part, pos, dir)
 	if players.has(shooter):
 		_send_to(shooter, &"hit_confirm", [result.killed])
 
@@ -450,6 +606,18 @@ func hit_zombie(shooter: int, z: Zombie, part: int, pos: Vector3, dir: Vector3,
 func _broadcast_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> void:
 	zombie_fx.rpc(zid, kind, part, pos, dir)
 	_apply_fx(zid, kind, part, pos, dir)
+
+
+## Host: show effect `kind` (an Fx.Kind) on every peer. `dir` is the surface normal or throw
+## direction, `arg` its size. The host says what happened; each peer draws its own particles.
+func play_fx(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
+	world_fx.rpc(kind, pos, dir, arg)
+	fx.play(kind, pos, dir, arg)
+
+
+func _on_setting_changed(key: String) -> void:
+	if key == "graphics_tier":
+		fx.set_tier(Settings.get_value(key))
 
 
 # --- Every peer: gore -------------------------------------------------------------
@@ -461,11 +629,11 @@ func _apply_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> vo
 	var rig := z.rig
 	var local_dir := z.global_basis.inverse() * dir
 	match kind:
-		Fx.HIT:
+		GoreFx.HIT:
 			gore.burst(pos, dir + Vector3(0, 0.3, 0), 16, 5.0)   # exit spray
 			gore.burst(pos, -dir + Vector3(0, 0.5, 0), 6, 2.5)   # splash back
 			rig.hit_react(local_dir, 1.3 if part == Humanoid.Part.HEAD else 0.8)
-		Fx.SEVER:
+		GoreFx.SEVER:
 			var root := rig.part_root(part)
 			var wound := root.global_position
 			gore.gibs_from_segments(rig.sever(part), dir * 4.0 + z.est_velocity)
@@ -477,7 +645,7 @@ func _apply_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> vo
 				out = Vector3(1, 0.3, 0)
 			gore.spurt(root.get_parent(), root.position, out)
 			rig.hit_react(local_dir, 1.5)
-		Fx.DIE:
+		GoreFx.DIE:
 			if part == Humanoid.Part.HEAD and not rig.is_severed(Humanoid.Part.HEAD):
 				var head_pos := rig.neck.global_position + Vector3(0, 0.15, 0)
 				Humanoid.discard(rig.sever(Humanoid.Part.HEAD)) # the head just pops
@@ -512,35 +680,42 @@ func _physics_process(delta: float) -> void:
 	_snapshot_timer -= delta
 	if _snapshot_timer <= 0.0:
 		_snapshot_timer += 1.0 / Config.TICK_RATE
-		var pd := []
-		for id: int in players:
-			var p: Dictionary = players[id]
-			pd.append([id, p.name, p.pos, p.yaw, (p.health as Health).hp, p.kills, p.weapon])
-		var zd := []
-		for z: Zombie in zombies.values():
-			zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
-				"type": z.type, "mask": z.rig.severed_mask })
-		snapshot.rpc(pd, ZombieWire.pack(zd))
-		_apply_snapshot(pd, zd)
+		var snap := build_snapshot()
+		snapshot.rpc(PlayerWire.pack(snap[0]), ZombieWire.pack(snap[1]))
+		_apply_snapshot(snap[0], snap[1])
+
+
+## Host: where everyone and everything is right now, as [players, zombies] (see PlayerWire and
+## ZombieWire for what each entry holds). Sent Config.TICK_RATE times a second; must fit one packet.
+func build_snapshot() -> Array:
+	var pd := []
+	for id: int in players:
+		var p: Dictionary = players[id]
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon })
+	var zd := []
+	for z: Zombie in zombies.values():
+		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
+			"type": z.type, "mask": z.rig.severed_mask })
+	return [pd, zd]
 
 
 # --- Every peer -------------------------------------------------------------------
 
 func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 	var seen := {}
-	for e: Array in players_data:
-		var id: int = e[0]
+	for e: Dictionary in players_data:
+		var id: int = e.id
 		if id == my_id:
-			hud.set_hp(e[4])
-			hud.set_info(players_data.size(), zombies_data.size(), e[5])
+			hud.set_hp(e.hp)
+			hud.set_info(players_data.size(), zombies_data.size(), e.kills)
 			continue
 		seen[id] = true
 		if not remotes.has(id):
-			var r := RemotePlayer.create(id, e[1])
+			var r := RemotePlayer.create(id, names.get(id, "Survivor"))
 			remotes[id] = r
 			add_child(r)
-		(remotes[id] as RemotePlayer).buffer.push(e[2], e[3])
-		(remotes[id] as RemotePlayer).set_weapon(e[6])
+		(remotes[id] as RemotePlayer).buffer.push(e.pos, e.yaw)
+		(remotes[id] as RemotePlayer).set_weapon(e.weapon)
 	for id: int in remotes.keys():
 		if not seen.has(id):
 			(remotes[id] as Node).queue_free()
@@ -582,8 +757,8 @@ func _process(delta: float) -> void:
 	elif not Input.is_action_pressed("interact"):
 		local_player.aim_blocked = false
 
-	if bot:
-		_bot_aim()
+	if brain != null:
+		brain.step(delta)
 	_update_weapon()
 
 	if not is_host:
@@ -606,24 +781,31 @@ func _update_weapon() -> void:
 	var auto: bool = d.auto
 	if lp.firing and (auto or bot or lp.fire_buffer > 0.0):
 		if ws.rounds() == 0:
-			ws.start_reload()
+			if not ws.start_reload() and ws.is_dry() and lp.fire_buffer > 0.0:
+				lp.fire_buffer = 0.0 # one click per pull, and no shot goes to the host
+				lp.view.dry_fire()
+				Sfx.play_ui("dry_fire", Config.DRY_FIRE_VOLUME)
 		elif ws.try_fire():
 			lp.fire_buffer = 0.0
 			_fire(d)
+	var spent := ws.take_spent() # a reload finished: tell the host what it took, once
+	for type: int in spent:
+		if is_host:
+			_ammo_used(my_id, type, spent[type])
+		else:
+			client_ammo_used.rpc_id(1, type, spent[type])
 	var scoped: bool = d.scoped
 	var through_scope := scoped and lp.view.aim > 0.9
 	lp.view.visible = not through_scope and not lp.hide_view
 	hud.set_scope(through_scope)
 	hud.set_aiming(lp.view.aim > 0.5)
-	hud.set_weapon(d.name, ws.rounds(), d.mag, ws.is_reloading())
+	hud.set_weapon(d.name, ws.rounds(), ws.is_reloading(), ws.reserve_rounds())
 
 
 func _fire(d: Dictionary) -> void:
 	var lp := local_player
 	lp.view.fire()
-	shot_player.pitch_scale = d.pitch * rng.randf_range(0.96, 1.04)
-	shot_player.volume_db = d.volume
-	shot_player.play()
+	Sfx.play_ui("gunshot", d.volume, d.pitch * rng.randf_range(0.96, 1.04))
 	var cam := lp.camera
 	var origin := cam.global_position
 	var cone := 0.0 if bot else Weapons.spread(d, lp.aiming, lp.move_speed / Config.SPRINT_SPEED)
@@ -652,29 +834,8 @@ func _update_looked_at() -> void:
 ## The local player right-clicks `target`.
 func interact_with(target: Interactable) -> void:
 	if is_host:
-		host_interact(my_id, target.iid)
+		host_interact(my_id, target.iid, local_player.weapons.current)
 	else:
-		client_interact.rpc_id(1, target.iid)
+		client_interact.rpc_id(1, target.iid, local_player.weapons.current)
 
 
-## Test bot: aim at the nearest zombie's chest and hold the trigger.
-func _bot_aim() -> void:
-	var me := local_player.global_position
-	var best: Zombie = null
-	var best_d := 25.0
-	for z: Zombie in zombies.values():
-		var d := me.distance_to(z.global_position)
-		if d < best_d and map.is_direct(me, z.global_position):
-			best_d = d
-			best = z
-	local_player.firing = best != null and bot_fires
-	if best:
-		var eye := me + Vector3(0, Config.EYE_HEIGHT, 0)
-		var aim := best.rig.spine.global_position + Vector3(0, 0.3, 0)
-		match bot_aim:
-			"head": aim = best.rig.neck.global_position + Vector3(0, 0.15, 0)
-			"legs": aim = (best.rig.knee_l if not best.rig.is_severed(Humanoid.Part.LEG_L) else best.rig.knee_r).global_position
-			"arms": aim = (best.rig.elbow_l if not best.rig.is_severed(Humanoid.Part.ARM_L) else best.rig.elbow_r).global_position
-		var to := aim - eye
-		local_player.yaw = atan2(-to.x, -to.z)
-		local_player.pitch = atan2(to.y, Vector2(to.x, to.z).length())

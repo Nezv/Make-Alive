@@ -7,21 +7,15 @@ func _init() -> void:
 	name = "corridor"
 	var built := CorridorMap.build()
 	root = built.root
-	door = built.door
-	lootbox = built.lootbox
-	interactables = built.interactables
+	use_data(MapAreas.CORRIDOR)
+	var made := data.build_interactables(root) # ids come from the data, identical on every peer
+	door = made.doors[0]
+	lootbox = made.lootboxes[0]
+	interactables = made.all
 
 
 func player_spawn() -> Vector3:
 	return CorridorMap.PLAYER_SPAWN
-
-
-func player_spawn_point() -> Vector3:
-	return CorridorMap.player_spawn_point()
-
-
-func zombie_spawn_point(_avoid: Array) -> Vector3:
-	return CorridorMap.zombie_spawn_point()
 
 
 func is_direct(from: Vector3, to: Vector3) -> bool:

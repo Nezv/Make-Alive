@@ -6,6 +6,23 @@ enum { P19, P90, TYPE95, AK47, ASVAL, USAS12, SPAS12, T5000, DRAGUNOV, COUNT }
 enum Carry { HIGH, LOW }            ## while sprinting: muzzle up and ready, or dropped across the body
 enum Reload { MAG, SHELLS }         ## swap a magazine, or push shells in one at a time
 enum Cycle { BLOWBACK, PUMP, BOLT } ## what the action does after each shot
+enum Ammo { MM9, MM57, MM58, MM762, MM9X39, GAUGE12, LAPUA338, MM762R, COUNT } ## calibres: what a reserve is counted in
+
+## The calibres, in Ammo order. start: rounds in reserve when a mission begins (a map's
+## `starting_ammo` can say otherwise) · max: the most a player can carry · box: rounds in one
+## carton (AmmoBox) · color: the stripe on that carton.
+const AMMO := [
+	{ "name": "9 mm", "start": 45, "max": 150, "box": 15, "color": Color("e0c040") },
+	{ "name": "5.7", "start": 100, "max": 250, "box": 50, "color": Color("4080e0") },
+	{ "name": "5.8", "start": 90, "max": 240, "box": 30, "color": Color("30b0a0") },
+	{ "name": "7.62", "start": 90, "max": 240, "box": 30, "color": Color("d04030") },
+	{ "name": "9x39", "start": 60, "max": 160, "box": 20, "color": Color("9050c0") },
+	{ "name": "12 gauge", "start": 24, "max": 64, "box": 8, "color": Color("f08020") },
+	{ "name": ".338", "start": 15, "max": 40, "box": 5, "color": Color("e8e8e8") },
+	{ "name": "7.62R", "start": 30, "max": 80, "box": 10, "color": Color("50b040") },
+]
+## Which calibre each gun is fed with, in id order (the two shotguns share shells).
+const GUN_AMMO := [Ammo.MM9, Ammo.MM57, Ammo.MM58, Ammo.MM762, Ammo.MM9X39, Ammo.GAUGE12, Ammo.GAUGE12, Ammo.LAPUA338, Ammo.MM762R]
 
 const DEFAULT := AK47
 
@@ -75,6 +92,23 @@ static func valid(id: int) -> bool:
 
 static func def(id: int) -> Dictionary:
 	return DEFS[id]
+
+
+## The calibre (Ammo) gun `id` is fed with.
+static func ammo_of(id: int) -> int:
+	return GUN_AMMO[id]
+
+
+static func ammo_name(type: int) -> String:
+	return AMMO[type].name if type >= 0 and type < Ammo.COUNT else ""
+
+
+## The calibre called `ammo_name_` ("9 mm", "12 gauge"...), or -1.
+static func ammo_id(ammo_name_: String) -> int:
+	for type in Ammo.COUNT:
+		if AMMO[type].name == ammo_name_:
+			return type
+	return -1
 
 
 ## How far one shot throws the view: Vector2(climb, sideways) in radians. Never the same twice.

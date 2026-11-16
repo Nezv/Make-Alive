@@ -64,15 +64,8 @@ static func nav_target(from: Vector3, to: Vector3, lane := 0.0) -> Vector3:
 	return to
 
 
-static func zombie_spawn_point() -> Vector3:
-	return Vector3(randf_range(37.0, LEG_B_END - 1.0), 0.1, randf_range(-HALF_W + 0.6, HALF_W - 0.6))
-
-
-static func player_spawn_point() -> Vector3:
-	return PLAYER_SPAWN + Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5))
-
-
-## Builds geometry, lights and interactables. Returns { root, door, lootbox, interactables }.
+## Builds geometry and lights. Returns { root }. Spawns, the door and the lootbox are data:
+## MapAreas.CORRIDOR, read by CorridorGameMap.
 static func build() -> Dictionary:
 	var root := Node3D.new()
 	root.name = "Corridor"
@@ -140,15 +133,4 @@ static func build() -> Dictionary:
 		root.add_child(light)
 	root.add_child(lamp_mesh.instance(MeshKit.emissive(Color("ffd9a0"), 3.0), false))
 
-	# Interactables (ids must be identical on every peer)
-	var door := Door.new()
-	door.iid = 1
-	door.position = Vector3(DOOR_X, 0, 0)
-	root.add_child(door)
-	var box := Lootbox.new()
-	box.iid = 2
-	box.position = Vector3(HALF_W - 0.6, 0, 22)
-	box.rotation.y = -PI / 2.0
-	root.add_child(box)
-
-	return { "root": root, "door": door, "lootbox": box, "interactables": [door, box] }
+	return { "root": root }

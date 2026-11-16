@@ -345,6 +345,7 @@ func close() -> void:
 func _save_name() -> void:
 	var n := name_edit.text.strip_edges()
 	Net.player_name = n if n != "" else "Survivor"
+	Settings.set_value("player_name", n)
 
 
 func _join(ip: String) -> void:

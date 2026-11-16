@@ -18,6 +18,11 @@ var all_weapons := true      ## players carry every gun (test maps) or must find
 var nav_refresh := 0.0       ## seconds a zombie keeps its last waypoint (0 = ask every tick)
 var spots: Array = []        ## every WeaponPickup on the map, filled or not (Scenery makes them)
 var mission := ""            ## which mission is being played on this map ("" = free play); set right after create
+var infinite_ammo := true    ## test maps never run dry; off, players live on `starting_ammo()` and what they find
+var data := MapData.new()    ## this area as data (map_areas.gd): spawns, closets, zones, objectives
+var zones := {}              ## data.zones: id -> { id, kind, box | polygon, y }
+var spawns: Array = []       ## data.spawns: [{ at, yaw }], one per player slot
+var objective_defs: Array = [] ## data.objectives, in order
 
 
 static func create(map_name: String) -> GameMap:
@@ -31,13 +36,54 @@ func player_spawn() -> Vector3:
 	return Vector3.ZERO
 
 
-func player_spawn_point() -> Vector3:
-	return player_spawn()
+## Read this map's data dictionary (see map_data.gd for the format).
+func use_data(dict: Dictionary) -> void:
+	data = MapData.new(dict)
+	zones = data.zones
+	spawns = data.spawns
+	objective_defs = data.objectives
+
+
+## The reserve every player starts with (Weapons.Ammo -> rounds): each calibre's own default
+## unless the map's data says otherwise.
+func starting_ammo() -> Dictionary:
+	var out := {}
+	for type in Weapons.Ammo.COUNT:
+		out[type] = data.starting_ammo.get(type, Weapons.AMMO[type].start)
+	return out
+
+
+## Where the player in `slot` (0, 1, 2...) appears: their own spawn from the data, if the map has any.
+func player_spawn_point(slot := 0) -> Vector3:
+	if spawns.is_empty():
+		return player_spawn()
+	return spawns[posmod(slot, spawns.size())].at
 
 
 ## Where the next zombie appears. `avoid` holds player positions to keep away from.
 func zombie_spawn_point(_avoid: Array) -> Vector3:
-	return Vector3.ZERO
+	if data.closets.is_empty():
+		return Vector3.ZERO
+	var c: Dictionary = data.closets[randi() % data.closets.size()]
+	var at: Vector3 = c.at
+	var r: float = c.radius * sqrt(randf())
+	var a := randf() * TAU
+	return at + Vector3(cos(a) * r, 0, sin(a) * r)
+
+
+## Can someone stand at `p`? (MapData.check uses this to catch spawns in walls.)
+func is_walkable(p: Vector3) -> bool:
+	return data.in_bounds(p)
+
+
+## Is there an open line from `a` to `b` at floor level? Walked in half-metre steps over the
+## walkable ground, so it is only as fine as `is_walkable`.
+func sees(a: Vector3, b: Vector3) -> bool:
+	var n := maxi(1, ceili(a.distance_to(b) / 0.5))
+	for i in n + 1:
+		if not is_walkable(a.lerp(b, float(i) / n)):
+			return false
+	return true
 
 
 ## Height of the walkable ground under `p` (flat maps: 0).
