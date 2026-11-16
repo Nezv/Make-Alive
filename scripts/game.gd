@@ -30,6 +30,7 @@ var local_player: LocalPlayer
 var hud: Hud
 var gore: Gore
 var fx: Fx
+var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host, debug)
 var hooks: GameHooks
 var director: HordeDirector
 var remotes := {}        ## peer id -> RemotePlayer
@@ -43,6 +44,7 @@ var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellet
 var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve }
 var _pending_shots: Array = []
 var _next_zombie := 1
+var _step_t := 0.0       ## seconds since players were last checked for sprinting footsteps
 var _next_drop := 0      ## how many things have been dropped (their iids count up from Config.DROP_IID_BASE)
 var _snapshot_timer := 0.0
 var _now := 0.0
@@ -382,7 +384,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0,
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	health.died.connect(func(): hooks.on_player_died(id))
@@ -411,6 +413,7 @@ func respawn_player(id: int, reason: String) -> void:
 		return
 	var p: Dictionary = players[id]
 	p.pos = map.player_spawn_point(p.slot)
+	p.step_pos = p.pos
 	(p.health as Health).reset()
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
@@ -481,6 +484,48 @@ func _ammo_used(id: int, type: int, rounds: int) -> void:
 		return
 	var have: int = players[id].reserve.get(type, 0)
 	players[id].reserve[type] = maxi(0, have - rounds)
+
+
+# --- Host: noise ------------------------------------------------------------------
+
+## Something loud happened at `at`: it is heard `loudness` metres away. Zombies in earshot go and
+## look at the spot, and the director's heat rises. `by` is the player who caused it (0 = nobody).
+## Every loud thing calls this: shots, broken doors, sprinting, and later explosions and alarms.
+func make_noise(at: Vector3, loudness: float, by: int = 0) -> void:
+	if not is_host or loudness <= 0.0:
+		return
+	hooks.on_noise(at, loudness, by)
+	for z: Zombie in zombies.values():
+		if z.global_position.distance_to(at) <= loudness:
+			z.hear(at)
+	director.add_heat(loudness)
+	if noise_rings != null:
+		noise_rings.add(at, loudness)
+
+
+## Debug: draw a ring for every noise from now on (--noise).
+func show_noise() -> void:
+	if noise_rings == null:
+		noise_rings = NoiseRings.new()
+		add_child(noise_rings)
+
+
+## Host, every tick: a player covering ground at a sprint, and not crouched, is heard.
+func _footsteps(delta: float) -> void:
+	_step_t += delta
+	if _step_t < Config.NOISE_STEP_INTERVAL:
+		return
+	for id: int in players:
+		var p: Dictionary = players[id]
+		var pos: Vector3 = p.pos
+		var from: Vector3 = p.step_pos
+		var over_ground := Vector2(pos.x - from.x, pos.z - from.z).length() / _step_t
+		p.step_pos = pos
+		var crouched: bool = int(p.action) & PlayerWire.ACTION_CROUCH != 0
+		# (faster than anyone runs = a respawn or a teleport, not footsteps)
+		if over_ground >= Config.NOISE_SPRINT_SPEED and over_ground < Config.SPRINT_SPEED * 2.0 and not crouched:
+			make_noise(pos, Config.NOISE_SPRINT, id)
+	_step_t = 0.0
 
 
 ## Host: a player landed after falling `height` metres. Above the safe height it costs HP.
@@ -572,6 +617,7 @@ func _on_door_smashed(d: Door) -> void:
 	gore.gib_box(Vector3(Door.THICK, Door.HEIGHT, Door.WIDTH), xf, Color("6a4a2c"), Vector3(-6, 2, randf_range(-1, 1)))
 	if is_host:
 		hooks.on_door_broken(d)
+		make_noise(d.global_position, Config.NOISE_DOOR_BREAK)
 
 
 # --- Host: zombies ----------------------------------------------------------------
@@ -617,6 +663,7 @@ func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weap
 	p.last_shot = _now
 	p.weapon = weapon
 	_pending_shots.append([shooter, origin, dir, weapon])
+	make_noise(origin, Weapons.loudness(weapon), shooter)
 
 
 ## One trigger pull of `weapon`: a single bullet, or a cloud of pellets for shotguns.
@@ -731,6 +778,7 @@ func _physics_process(delta: float) -> void:
 	players[1].pos = local_player.global_position
 	players[1].yaw = local_player.yaw
 	players[1].action = local_player.action_bits()
+	_footsteps(delta)
 
 	director.step(delta)
 	zombie_list.assign(zombies.values())

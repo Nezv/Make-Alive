@@ -35,6 +35,8 @@ var _attack_door: Door = null
 var _last_pos := Vector3.ZERO
 var _waypoint := Vector3.ZERO ## open maps: where the path says to walk, refreshed a few times a second
 var _waypoint_t := 0.0
+var heard := Vector3.ZERO ## where the last noise it heard came from
+var heard_left := 0.0     ## seconds it still cares (0 = heard nothing)
 
 
 static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, severed := 0) -> Zombie:
@@ -77,6 +79,16 @@ static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, sev
 
 
 # --- Queries --------------------------------------------------------------------
+
+## A noise reached it: it will go and look, unless a player is close enough to go for instead.
+func hear(spot: Vector3) -> void:
+	heard = spot
+	heard_left = Config.NOISE_INVESTIGATE_TIME
+
+
+func investigating() -> bool:
+	return heard_left > 0.0
+
 
 func is_crawling() -> bool:
 	return rig.legs_lost() > 0
@@ -130,6 +142,9 @@ func host_step(delta: float, game: Game) -> void:
 	var to_target := target_pos - global_position
 	to_target.y = 0.0
 	var move := Vector3.ZERO
+	heard_left = maxf(0.0, heard_left - delta)
+	# A noise pulls it to where the noise was, not to whoever made it, until a player is close.
+	var lured := heard_left > 0.0 and (target_id == 0 or to_target.length() > Config.ZOMBIE_NOTICE_RANGE)
 
 	match state:
 		State.STAGGER:
@@ -163,7 +178,9 @@ func host_step(delta: float, game: Game) -> void:
 			if state_t >= 0.3:
 				set_state(State.CHASE)
 		State.CHASE:
-			if target_id != 0:
+			if lured:
+				move = _investigate(game)
+			elif target_id != 0:
 				move = _chase(game, target_id, target_pos, to_target)
 
 	velocity.x = move.x
@@ -196,11 +213,39 @@ func _chase(game: Game, target_id: int, target_pos: Vector3, to_target: Vector3)
 		set_state(State.WINDUP)
 		return Vector3.ZERO
 
-	var aim := target_pos
+	return _steer_to(game, target_pos, direct, to_target)
+
+
+## Walk to where the noise was and stand there looking for it.
+func _investigate(game: Game) -> Vector3:
+	var here := global_position
+	var to_spot := heard - here
+	to_spot.y = 0.0
+	var dist := to_spot.length()
+	if dist < Config.NOISE_ARRIVE:
+		return Vector3.ZERO
+	var map := game.map
+	var door := map.door_in_the_way(here, heard)
+	if door != null: # the noise is behind a closed door: through it
+		_attack_door = door
+		set_state(State.ATTACK)
+		return Vector3.ZERO
+	var costly := map.nav_refresh > 0.0
+	var direct := (not costly or dist < Config.DIRECT_CHECK_RANGE) and map.is_direct(here, heard)
+	return _steer_to(game, heard, direct, to_spot)
+
+
+## One tick of walking toward `goal`: along the map's path unless the way is `direct`, keeping
+## clear of the neighbours. Returns the velocity over the ground.
+func _steer_to(game: Game, goal: Vector3, direct: bool, facing: Vector3) -> Vector3:
+	var here := global_position
+	var map := game.map
+	var costly := map.nav_refresh > 0.0
+	var aim := goal
 	if not direct or not costly:
 		_waypoint_t -= get_physics_process_delta_time()
 		if not costly or _waypoint_t <= 0.0 or here.distance_to(_waypoint) < 0.6:
-			_waypoint = map.nav_target(here, target_pos, lane)
+			_waypoint = map.nav_target(here, goal, lane)
 			_waypoint_t = map.nav_refresh * randf_range(0.8, 1.2) # stagger the horde's path queries
 		aim = _waypoint
 	else:
@@ -219,7 +264,7 @@ func _chase(game: Game, target_id: int, target_pos: Vector3, to_target: Vector3)
 		if d < Config.ZOMBIE_SEPARATION:
 			push += (off / d if d > 0.01 else Vector3(lane, 0, 0.5)) * (1.0 - d / Config.ZOMBIE_SEPARATION)
 	dir = (dir + push * 1.6).limit_length(1.0)
-	_face(dir if dir.length() > 0.1 else to_target)
+	_face(dir if dir.length() > 0.1 else facing)
 	return dir * move_speed()
 
 

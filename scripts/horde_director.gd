@@ -6,6 +6,7 @@ extends RefCounted
 var game: Game
 var enabled := true
 var wave := 0
+var heat := 0.0 ## filled by noise (Game.make_noise); full, it brings the next horde sooner
 var _trickle := 1.0
 var _horde_timer := Config.HORDE_FIRST
 
@@ -15,6 +16,7 @@ func _init(owner_game: Game) -> void:
 
 
 func step(delta: float) -> void:
+	heat = maxf(0.0, heat - Config.NOISE_HEAT_DECAY * delta)
 	if not enabled:
 		return
 	_trickle -= delta
@@ -25,6 +27,14 @@ func step(delta: float) -> void:
 	if _horde_timer <= 0.0:
 		_horde_timer = Config.HORDE_INTERVAL
 		spawn_horde(horde_size(wave + 1))
+
+
+## Something loud happened (`loudness` in metres). Enough of it and the next horde will not wait.
+func add_heat(loudness: float) -> void:
+	heat += loudness * Config.NOISE_HEAT_PER_M
+	if heat >= Config.NOISE_HEAT_FULL:
+		heat = 0.0
+		_horde_timer = minf(_horde_timer, Config.NOISE_HORDE_SOON)
 
 
 func _spawn_point() -> Vector3:

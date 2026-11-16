@@ -232,14 +232,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Shove a downed crawler away from a teammate
 - [ ] Impact: thud, small blood puff, camera nudge
 
-### [ ] S020 · Noise
+### [x] S020 · Noise
 > needs: S003 | size: M | test: `tests/test_noise.gd`
-- [ ] Every loud event calls `Game.make_noise(position, loudness, by)`: shots by calibre, explosions, breaking doors, sprinting, car alarms
-- [ ] Loudness per gun in `weapons.gd`, suppressed value alongside
-- [ ] Zombies within the radius turn and investigate the spot, not the player
-- [ ] Director heat: noise fills a meter, a full meter brings the next horde sooner
-- [ ] `on_noise` hook
-- [ ] `--noise` debug flag draws expanding rings where noise happened
+- [x] Every loud event calls `Game.make_noise(position, loudness, by)`: shots by calibre, explosions, breaking doors, sprinting, car alarms
+- [x] Loudness per gun in `weapons.gd`, suppressed value alongside
+- [x] Zombies within the radius turn and investigate the spot, not the player
+- [x] Director heat: noise fills a meter, a full meter brings the next horde sooner
+- [x] `on_noise` hook
+- [x] `--noise` debug flag draws expanding rings where noise happened
 
 ---
 

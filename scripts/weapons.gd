@@ -28,6 +28,10 @@ const GUN_KIND := [Kind.SIDEARM, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.
 const GUN_DRAW := [0.25, 0.3, 0.35, 0.35, 0.33, 0.48, 0.45, 0.55, 0.5]
 ## How fast you sprint with each gun in hand, as a share of Config.SPRINT_SPEED, in id order.
 const GUN_SPRINT := [1.0, 1.0, 0.97, 0.95, 0.97, 0.88, 0.9, 0.85, 0.88]
+## How far a shot is heard, in metres, in id order (the AS Val is suppressed as built), and the
+## same with a suppressor fitted.
+const GUN_LOUDNESS := [35.0, 40.0, 55.0, 60.0, 14.0, 70.0, 70.0, 90.0, 80.0]
+const GUN_LOUDNESS_SUPPRESSED := [12.0, 13.0, 18.0, 20.0, 14.0, 28.0, 28.0, 35.0, 30.0]
 ## Which calibre each gun is fed with, in id order (the two shotguns share shells).
 const GUN_AMMO := [Ammo.MM9, Ammo.MM57, Ammo.MM58, Ammo.MM762, Ammo.MM9X39, Ammo.GAUGE12, Ammo.GAUGE12, Ammo.LAPUA338, Ammo.MM762R]
 
@@ -111,6 +115,11 @@ static func draw_time(id: int) -> float:
 
 static func sprint_mult(id: int) -> float:
 	return GUN_SPRINT[id]
+
+
+## Metres away one shot of gun `id` is heard (Game.make_noise).
+static func loudness(id: int, suppressed := false) -> float:
+	return GUN_LOUDNESS_SUPPRESSED[id] if suppressed else GUN_LOUDNESS[id]
 
 
 ## The calibre (Ammo) gun `id` is fed with.

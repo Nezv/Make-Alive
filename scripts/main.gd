@@ -25,6 +25,7 @@ extends Node
 ##   --pose=aim             hold a gun pose for screenshots: aim, sprint or reload
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --noise                host: draw an expanding ring wherever something made noise, out to where it is heard
 ##   --zones                draw the map data: zones, zombie closets (red), horde routes (orange), spawns (white)
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
@@ -116,6 +117,8 @@ func _host(map_name := "city", mission := "") -> void:
 		_gun_rack()
 	if _args.has("fx-rack"):
 		_fx_rack()
+	if _args.has("noise"):
+		game.show_noise()
 	if _args.has("zones"):
 		game.add_child(game.map.data.debug_node())
 	if _args.has("cam") or _args.has("shot-cam"):
