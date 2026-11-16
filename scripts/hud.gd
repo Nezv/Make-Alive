@@ -22,6 +22,7 @@ var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
 var inventory_label: Label ## what is carried besides guns, small, bottom left
 var status_label: Label    ## wounds and what is being put on, above it
+var director_label: Label  ## --director: the horde director's pace (host debug)
 var wheel_view: ItemWheelView ## the item wheel, while its key is held
 var objective_label: Label  ## the current objective and its clock, top centre
 var countdown_label: Label  ## big numerals while the extraction clock runs
@@ -108,6 +109,8 @@ void fragment() {
 	stamina_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stamina_fill.size = STAMINA_SIZE
 	stamina_bar.add_child(stamina_fill)
+	director_label = _label(14, Control.PRESET_TOP_LEFT, Vector2(24, 96))
+	director_label.modulate = Color(1, 0.85, 0.4, 0.9)
 	status_label = _label(17, Control.PRESET_BOTTOM_LEFT, Vector2(28, -132))
 	inventory_label = _label(15, Control.PRESET_BOTTOM_LEFT, Vector2(28, -104))
 	inventory_label.modulate.a = 0.85
@@ -379,6 +382,11 @@ func set_inventory(inv: Inventory) -> void:
 	for id in inv.keys():
 		parts.append("Key %s" % id)
 	inventory_label.text = "  ·  ".join(parts)
+
+
+## The director's pace as text (`--director`); "" hides it.
+func set_director(text: String) -> void:
+	director_label.text = text
 
 
 ## "BLEEDING x2" and what is being put on, with the seconds left. Nothing when all is well.

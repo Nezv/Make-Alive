@@ -28,6 +28,7 @@ func test_director_sends_a_horde_on_its_own() -> void:
 	g.director.enabled = true
 	g.director.step(Config.HORDE_FIRST + 0.1)
 	assert_eq(count(calls, &"on_horde_incoming"), 1)
+	g.director.step(Config.HORDE_STREAM_GAP * Config.HORDE_SIZE) # they come out one after another
 	assert_gt(g.zombies.size(), Config.HORDE_SIZE - 1)
 
 

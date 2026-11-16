@@ -30,6 +30,7 @@ func on_low_hp(player_id: int) -> void:
 func on_player_damaged(player_id: int, amount: int, by: Zombie) -> void:
 	fired.emit(&"on_player_damaged", [player_id, amount, by])
 	game.score.add(player_id, "damage", amount)
+	game.director.hurt(amount) # being hurt is what the pacing feels
 
 
 func on_player_died(player_id: int) -> void:
@@ -286,6 +287,11 @@ func on_zombie_shoved(zombie: Zombie, by_player: int) -> void:
 ## A leaper finished its jump (it may or may not have hit anyone).
 func on_zombie_leap_landed(zombie: Zombie) -> void:
 	fired.emit(&"on_zombie_leap_landed", [zombie])
+
+
+## The director's pace changed: `state` is a HordeDirector.State (CALM, BUILD, PEAK, RELAX).
+func on_pacing_changed(state: int) -> void:
+	fired.emit(&"on_pacing_changed", [state])
 
 
 func on_horde_incoming(wave: int, count: int) -> void:

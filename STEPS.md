@@ -317,15 +317,18 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Nightmare: no HUD markers, friendly fire on
 - [x] Sent in `welcome`
 
-### [ ] S028 · Horde director 2
+### [x] S028 · Horde director 2
 > needs: S002, S020 | size: L | test: `tests/test_director.gd`
-- [ ] Pacing states: CALM, BUILD, PEAK, RELAX, driven by stress (damage taken, zombies near, ammo low)
-- [ ] Spawns only in closets no alive player can see or is close to, test proves it across 1000 seeded spawns
-- [ ] Hordes travel along routes so they arrive as a stream round a corner, not a blob
-- [ ] Wanderers: a few idle zombies placed ahead of the players, from map data
-- [ ] Specials on a budget: at most N of each special type alive
-- [ ] Stragglers that lose the players are recycled to a closet ahead
-- [ ] `--director` debug overlay: state, stress, heat
+- [x] Pacing states: CALM, BUILD, PEAK, RELAX, driven by stress (damage taken, zombies near, ammo low)
+- [x] Spawns only in closets no alive player can see or is close to, test proves it across 1000 seeded spawns
+- [x] Hordes travel along routes so they arrive as a stream round a corner, not a blob
+  - One zombie every `Config.HORDE_STREAM_GAP` out of one hidden closet, each told the closet's `horde_routes` points (`Zombie.route`)
+- [x] Wanderers: a few idle zombies placed ahead of the players, from map data
+  - `zombie_wanderers` in the map's data; no map lists any yet (S051 and the five places will)
+- [x] Specials on a budget: at most N of each special type alive (`Config.SPECIAL_BUDGET`, only the leaper for now)
+- [x] Stragglers that lose the players are recycled to a closet ahead
+- [x] `--director` debug overlay: state, stress, heat
+- The city has no closets yet, so there the director still asks `CityMap.zombie_spawn_point` (a street corner out of sight); the closets come with S051
 
 ---
 

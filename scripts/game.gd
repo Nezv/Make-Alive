@@ -37,6 +37,7 @@ var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host,
 var hooks: GameHooks
 var director: HordeDirector
 var score := Score.new() ## what each player did this match (host)
+var director_overlay := false ## --director: the pacing as text on the HUD (host)
 var final_score_view := {} ## the end screen's numbers as this peer was sent them (Score.summary)
 var rules: MissionRules  ## the objective list being played (host runs it; see `mission_view` for what peers know)
 ## The mission as this peer was last told it (MissionRules.state); the clock is counted along locally.
@@ -1324,6 +1325,7 @@ func _process(delta: float) -> void:
 	local_player.status.tick_view(delta)
 	hud.set_inventory(local_player.inventory)
 	hud.set_status(local_player.status)
+	hud.set_director(director.debug_text() if director_overlay and is_host else "")
 	hud.set_wheel(local_player.wheel)
 	hud.set_countdown(mission_view)
 	_update_extraction()

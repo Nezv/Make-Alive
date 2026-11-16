@@ -159,6 +159,28 @@ const HORDE_SIZE := 16
 const HORDE_GROWTH := 4       # extra zombies per wave
 const RUNNER_SHARE := 0.25    # of the usual mix (Difficulty scales it)
 const LEAPER_SHARE := 0.15
+## Pacing (scripts/horde_director.gd): stress 0..1 decides how fast the next horde builds up and when the breather ends.
+const STRESS_PER_HP := 0.012    # added for every HP of damage a player takes
+const STRESS_NEAR := 8.0        # metres: a zombie this close to a living player...
+const STRESS_PER_ZOMBIE := 0.04 # ...adds this much a second
+const STRESS_AMMO_LOW := 10     # reserve rounds of the held gun's calibre under which ammo adds stress (limited-ammo maps)
+const STRESS_AMMO_RATE := 0.03  # a second, per player short of ammo
+const STRESS_DECAY := 0.06      # lost every second
+const STRESS_CALM := 0.25       # at or under this the players have calmed down
+const CALM_TIME := 6.0          # the quiet at least this long, then the build-up
+const BUILD_RATE_CALM := 1.4    # the build-up's clock runs at this speed when stress is 0...
+const BUILD_RATE_STRESSED := 0.4 # ...and this at full stress
+const PEAK_MIN := 10.0          # a peak lasts at least this long...
+const PEAK_MAX := 45.0          # ...at most this long...
+const PEAK_END_ALIVE := 0.25    # ...and ends once this share of its horde (or less) is left alive
+const RELAX_MIN := 10.0         # the breather after a peak, at least this long
+const HORDE_STREAM_GAP := 0.3   # seconds between one zombie of a horde and the next out of its closet
+const ROUTE_ARRIVE := 2.0       # metres from a route point at which a zombie moves on to the next
+## Most of a type alive at once (the others are not limited). Specials go here as they are added.
+const SPECIAL_BUDGET := { Zombie.Type.LEAPER: 3 }
+const STRAGGLER_DIST := 40.0    # a zombie this far from every living player...
+const STRAGGLER_TIME := 20.0    # ...for this long has lost them: it is moved up to a closet ahead
+const STRAGGLER_CHECK := 1.0    # seconds between checks for stragglers
 
 # --- World ---
 const WEAPON_SPOTS_ACTIVE := 8 # how many of a map's weapon spots hold a gun each match
