@@ -33,6 +33,10 @@ var fx: Fx
 var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host, debug)
 var hooks: GameHooks
 var director: HordeDirector
+var rules: MissionRules  ## the objective list being played (host runs it; see `mission_view` for what peers know)
+## The mission as this peer was last told it (MissionRules.state); the clock is counted along locally.
+var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason": "", "id": "", "kind": "", "text": "",
+	"left": -1.0, "counting": false, "wave": 0, "has_marker": false, "marker": Vector3.ZERO }
 var remotes := {}        ## peer id -> RemotePlayer
 var names := {}          ## peer id -> player name, on every peer (sent when someone joins or leaves)
 var zombies := {}        ## zombie id -> Zombie
@@ -62,6 +66,7 @@ func _ready() -> void:
 	hooks.game = self
 	add_child(hooks)
 	director = HordeDirector.new(self)
+	rules = MissionRules.new(self)
 	gore = Gore.new()
 	add_child(gore)
 	fx = Fx.new()
@@ -80,6 +85,7 @@ func start_host(player_name_: String) -> void:
 	_build_world()
 	map.roll_weapons(rng)
 	_add_player(1, player_name_)
+	rules.start(map.objective_defs, map.data.respawn)
 	if mission != "":
 		hooks.on_mission_started(mission)
 	if not Net.peer_left.is_connected(_on_peer_left):
@@ -170,8 +176,13 @@ func request_join(player_name_: String) -> void:
 	var states := {}
 	for iid: int in interactables:
 		states[iid] = (interactables[iid] as Interactable).get_state()
-	welcome.rpc_id(id, map_name, mission, states, { "infinite_ammo": map.infinite_ammo })
+	welcome.rpc_id(id, map_name, mission, states, welcome_rules())
 	_add_player(id, player_name_)
+
+
+## What a joining player must know about this match beyond the map: sent in `welcome`.
+func welcome_rules() -> Dictionary:
+	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state() }
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
@@ -215,16 +226,40 @@ func client_interact(iid: int, weapon: int = -1, rounds: int = -1) -> void:
 # --- RPCs: host -> clients ------------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
-func welcome(map_name_: String, mission_: String, interactable_states: Dictionary, rules: Dictionary = {}) -> void:
+func welcome(map_name_: String, mission_: String, interactable_states: Dictionary, match_rules: Dictionary = {}) -> void:
 	if not GameMap.NAMES.has(map_name_):
 		return
 	map_name = map_name_
 	mission = mission_
-	limited_ammo = not rules.get("infinite_ammo", true)
+	limited_ammo = not match_rules.get("infinite_ammo", true)
+	if match_rules.has("mission"):
+		mission_state(match_rules.mission)
 	_build_world()
 	for iid: int in interactable_states:
 		_apply_interact_state(iid, interactable_states[iid])
 	print("[client %d] joined host" % my_id)
+
+
+## The objective changed, its clock started or stopped, or the mission ended (MissionRules.state).
+@rpc("authority", "call_remote", "reliable")
+func mission_state(state: Dictionary) -> void:
+	mission_view = state.duplicate() # counted down here; never the sender's own copy
+
+
+## Host: tell everyone where the mission stands. Called by MissionRules whenever something changes.
+func send_mission_state() -> void:
+	if not is_host:
+		return
+	var state := rules.state()
+	mission_state.rpc(state)
+	mission_state(state)
+
+
+## Between two messages from the host every peer counts the objective's clock down itself.
+func _tick_mission_view(delta: float) -> void:
+	var left: float = mission_view.left
+	if mission_view.counting and left > 0.0:
+		mission_view.left = maxf(0.0, left - delta)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -559,6 +594,8 @@ func nearest_player(from: Vector3) -> int:
 	var best := 0
 	var best_d := Config.ZOMBIE_AGGRO_RANGE
 	for id: int in players:
+		if rules.out.has(id):
+			continue # dead or down: the living are more interesting
 		var pos: Vector3 = players[id].pos
 		var d := Vector2(pos.x - from.x, pos.z - from.z).length()
 		if d < best_d:
@@ -583,6 +620,7 @@ func host_interact(player_id: int, iid: int, weapon: int = -1, rounds: int = -1)
 	if pos.distance_to(target.global_position) > Config.INTERACT_RANGE + 1.5:
 		return false
 	hooks.on_right_click(player_id, target)
+	rules.interacted(player_id, iid)
 	return true
 
 
@@ -781,6 +819,7 @@ func _physics_process(delta: float) -> void:
 	_footsteps(delta)
 
 	director.step(delta)
+	rules.step(delta)
 	zombie_list.assign(zombies.values())
 	for z in zombie_list:
 		z.host_step(delta, self)
@@ -869,6 +908,8 @@ func _process(delta: float) -> void:
 	elif not Input.is_action_pressed("interact"):
 		local_player.aim_blocked = false
 
+	_tick_mission_view(delta)
+	hud.set_objective(mission_view)
 	if brain != null:
 		brain.step(delta)
 	_update_weapon()

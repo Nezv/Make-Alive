@@ -21,8 +21,13 @@ extends RefCounted
 ##                                                   missing = a full carton of that calibre
 ##   starting_ammo   { "9 mm": 45, "12 gauge": 16 }  the reserve a player starts with, by calibre name
 ##                                                   (Weapons.AMMO); a missing calibre uses its own default
-##   objectives      [{ id, kind, zone, seconds, waves, text }]  in order;
+##   respawn         true                            the dead come back (false: a dead player is out)
+##   objectives      [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]  in order;
 ##                                                   kind: reach, hold, survive, interact, extract
+##                     reach: `who` "any" (default) or "all" players still in the fight
+##                     hold / extract: `seconds` in the zone · survive: `waves` (sizes) or `seconds`
+##                     interact: `target` is the iid of the thing to right-click
+##                     `time_limit`: seconds before this objective fails the mission (0 = none)
 ##
 ## `errors` lists what is wrong with the dictionary itself (duplicate ids, references to things
 ## that aren't there). `check(map)` lists what is wrong once it is laid over the real map: a spawn
@@ -42,7 +47,8 @@ var spawns: Array = []      ## [{ at, yaw }]
 var closets: Array = []     ## [{ id, at, radius, waves }]
 var routes: Array = []      ## [{ closet, points }]
 var zones := {}             ## id -> { id, kind, box | polygon, y }
-var objectives: Array = []  ## [{ id, kind, zone, seconds, waves, text }]
+var objectives: Array = []  ## [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]
+var respawn := true         ## the dead come back
 var starting_ammo := {}     ## Weapons.Ammo -> rounds in reserve at the start
 var errors: Array = []
 
@@ -52,6 +58,7 @@ func _init(dict: Dictionary = {}) -> void:
 	name = dict.get("name", "")
 	bounds = PackedVector2Array(dict.get("bounds", []))
 	blocked_exits = dict.get("blocked_exits", [])
+	respawn = dict.get("respawn", true)
 	_read_spawns(dict)
 	_read_closets(dict)
 	_read_zones(dict)
@@ -117,6 +124,10 @@ func _read_zones(dict: Dictionary) -> void:
 
 func _read_objectives(dict: Dictionary) -> void:
 	var seen := {}
+	var iids := {} # every interactable the data lists
+	for list_name: String in INTERACTABLE_LISTS:
+		for e: Dictionary in dict.get(list_name, []):
+			iids[e.get("iid", -1)] = true
 	for e: Dictionary in dict.get("objectives", []):
 		var id: String = e.get("id", "")
 		if seen.has(id):
@@ -128,8 +139,17 @@ func _read_objectives(dict: Dictionary) -> void:
 		var zone: String = e.get("zone", "")
 		if zone != "" and not zones.has(zone):
 			_error("objective '%s' is in zone '%s', which isn't there" % [id, zone])
-		objectives.append({ "id": id, "kind": kind, "zone": zone, "seconds": e.get("seconds", 0.0),
-			"waves": e.get("waves", []), "text": e.get("text", "") })
+		elif zone == "" and ["reach", "hold", "extract"].has(kind):
+			_error("objective '%s' (%s) needs a zone" % [id, kind])
+		var who: String = e.get("who", "any")
+		if who != "any" and who != "all":
+			_error("objective '%s' is for '%s' (any or all)" % [id, who])
+		var target: int = e.get("target", -1)
+		if kind == "interact" and not iids.has(target):
+			_error("objective '%s' has no thing to interact with (target %d)" % [id, target])
+		objectives.append({ "id": id, "kind": kind, "zone": zone, "seconds": float(e.get("seconds", 0.0)),
+			"waves": e.get("waves", []), "text": e.get("text", ""), "who": who, "target": target,
+			"time_limit": float(e.get("time_limit", 0.0)) })
 
 
 func _read_interactables(dict: Dictionary) -> void:

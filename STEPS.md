@@ -245,18 +245,18 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ## P03 · Missions
 
-### [ ] S021 · Mission state and objectives
+### [x] S021 · Mission state and objectives
 > needs: S002, S003 | size: L | test: `tests/test_mission_rules.gd`
-- [ ] `scripts/mission_rules.gd` on the host: runs the map data's objective list in order
-  - [ ] REACH a zone (any player, or all alive players)
-  - [ ] HOLD a zone for seconds
-  - [ ] SURVIVE waves
-  - [ ] INTERACT with a thing (switch, radio, generator)
-  - [ ] EXTRACT
-- [ ] State in `welcome` and on change to every peer: objective index, text, timer, marker position
-- [ ] Fires the mission hooks
-- [ ] Fail conditions: everyone dead or downed, timer out
-- [ ] Corridor gets a tiny objective list as the test bed
+- [x] `scripts/mission_rules.gd` on the host: runs the map data's objective list in order
+  - [x] REACH a zone (any player, or all alive players)
+  - [x] HOLD a zone for seconds
+  - [x] SURVIVE waves
+  - [x] INTERACT with a thing (switch, radio, generator)
+  - [x] EXTRACT
+- [x] State in `welcome` and on change to every peer: objective index, text, timer, marker position
+- [x] Fires the mission hooks
+- [x] Fail conditions: everyone dead or downed, timer out
+- [x] Corridor gets a tiny objective list as the test bed
 
 ### [ ] S022 · Extraction zone
 > needs: S021 | size: M | test: `tests/test_extraction.gd` | see: `--host --map=corridor --bot`

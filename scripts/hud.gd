@@ -19,6 +19,7 @@ var feed_box: VBoxContainer
 var prompt_label: Label
 var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
+var objective_label: Label  ## the current objective and its clock, top centre
 var stamina_bar: ColorRect  ## the trough; only there while stamina is not full
 var stamina_fill: ColorRect
 var scope: ColorRect
@@ -106,6 +107,10 @@ void fragment() {
 	toast_label.size.x = 800
 	toast_label.modulate.a = 0
 
+	objective_label = _label(20, Control.PRESET_CENTER_TOP, Vector2(-400, 22))
+	objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	objective_label.size.x = 800
+
 	feed_box = VBoxContainer.new()
 	feed_box.position = Vector2(24, 20)
 	add_child(feed_box)
@@ -180,6 +185,28 @@ func set_weapon(gun_name: String, rounds: int, reloading: bool, reserve := -1) -
 	weapon_label.text = "%s   %s / %s" % [gun_name, "RELOADING" if reloading else str(rounds), left]
 	var empty := rounds == 0 and not reloading
 	weapon_label.modulate = Color("ff5555") if empty else (Color("ffcc66") if reserve == 0 else Color.WHITE)
+
+
+## The mission as every peer is told it (MissionRules.state): the objective's text and what is
+## left on its clock, or how the mission ended. Nothing in free play.
+func set_objective(view: Dictionary) -> void:
+	var status: int = view.get("status", MissionRules.Status.IDLE)
+	var text: String = view.get("text", "")
+	var left: float = view.get("left", -1.0)
+	objective_label.modulate = Color.WHITE
+	if status == MissionRules.Status.FAILED:
+		objective_label.text = "MISSION FAILED  ·  %s" % view.get("reason", "")
+		objective_label.modulate = Color("ff5555")
+	elif status == MissionRules.Status.WON:
+		objective_label.text = "MISSION COMPLETE"
+		objective_label.modulate = Color("7be08a")
+	elif status != MissionRules.Status.RUNNING or text == "":
+		objective_label.text = ""
+	elif left >= 0.0:
+		var whole := ceili(left)
+		objective_label.text = "▸ %s   %d:%02d" % [text, whole / 60, whole % 60]
+	else:
+		objective_label.text = "▸ %s" % text
 
 
 ## `share` 0..1 of a full bar; `winded` = ran dry and cannot sprint yet.

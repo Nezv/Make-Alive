@@ -34,7 +34,10 @@ func on_player_damaged(player_id: int, amount: int, by: Zombie) -> void:
 func on_player_died(player_id: int) -> void:
 	fired.emit(&"on_player_died", [player_id])
 	game.feed.rpc("%s was eaten" % game.player_name(player_id))
-	game.respawn_player(player_id, "died")
+	if game.rules.running() and not game.rules.respawn:
+		game.rules.set_out(player_id, true) # no way back on this mission: with everyone out it is lost
+	else:
+		game.respawn_player(player_id, "died")
 
 
 func on_player_joined(player_id: int) -> void:
@@ -71,10 +74,12 @@ func on_extraction_ready(zone: String) -> void:
 ## These players got out. The mission is won.
 func on_extracted(player_ids: Array) -> void:
 	fired.emit(&"on_extracted", [player_ids])
+	game.announce.rpc("EXTRACTED")
 
 
 func on_mission_failed(reason: String) -> void:
 	fired.emit(&"on_mission_failed", [reason])
+	game.announce.rpc("MISSION FAILED  ·  %s" % reason)
 
 
 func on_checkpoint_reached(checkpoint_id: String) -> void:
