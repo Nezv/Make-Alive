@@ -26,7 +26,8 @@ extends RefCounted
 ##                                                   missing = a full carton of that calibre
 ##   starting_ammo   { "9 mm": 45, "12 gauge": 16 }  the reserve a player starts with, by calibre name
 ##                                                   (Weapons.AMMO); a missing calibre uses its own default
-##   respawn         true                            the dead come back (false: a dead player is out)
+##   respawn         true                            how the dead come back: true at once · false never (out for the
+##                                                   mission) · "checkpoint" at the next checkpoint · seconds (a timer)
 ##   objectives      [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]  in order;
 ##                                                   kind: reach, hold, survive, interact, extract
 ##                     reach: `who` "any" (default) or "all" players still in the fight
@@ -58,7 +59,9 @@ var routes: Array = []      ## [{ closet, points }]
 var wanderers: Array = []   ## [{ at, count, radius }]
 var zones := {}             ## id -> { id, kind, box | polygon, y }
 var objectives: Array = []  ## [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]
-var respawn := true         ## the dead come back
+var respawn := true         ## the dead come back at once
+var respawn_after := -1.0   ## ...or after this many seconds (-1: no timer)
+var respawn_checkpoint := false ## ...or when the next checkpoint is reached
 var starting_ammo := {}     ## Weapons.Ammo -> rounds in reserve at the start
 var errors: Array = []
 
@@ -68,7 +71,7 @@ func _init(dict: Dictionary = {}) -> void:
 	name = dict.get("name", "")
 	bounds = PackedVector2Array(dict.get("bounds", []))
 	blocked_exits = dict.get("blocked_exits", [])
-	respawn = dict.get("respawn", true)
+	_read_respawn(dict.get("respawn", true))
 	_read_spawns(dict)
 	_read_closets(dict)
 	_read_wanderers(dict)
@@ -101,6 +104,19 @@ func _read_spawns(dict: Dictionary) -> void:
 		var e: Dictionary = list[i]
 		if _need(e, "at", "player_spawns[%d]" % i):
 			spawns.append({ "at": e.at, "yaw": e.get("yaw", 0.0) })
+
+
+func _read_respawn(value: Variant) -> void:
+	if value is bool:
+		respawn = value
+	elif value is String and value == "checkpoint":
+		respawn = false
+		respawn_checkpoint = true
+	elif (value is float or value is int) and float(value) >= 0.0:
+		respawn = false
+		respawn_after = float(value)
+	else:
+		_error("respawn must be true, false, \"checkpoint\" or a number of seconds, not %s" % str(value))
 
 
 func _read_wanderers(dict: Dictionary) -> void:

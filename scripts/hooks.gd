@@ -39,9 +39,16 @@ func on_player_died(player_id: int) -> void:
 	game.drop_backpack(player_id) # what they carried stays where they fell
 	game.clear_status(player_id)
 	if game.rules.running() and not game.rules.respawn:
-		game.rules.set_out(player_id, true) # no way back on this mission: with everyone out it is lost
+		game.rules.set_out(player_id, true) # no way back yet: with everyone out the mission is lost
+		game.mark_dead(player_id)
 	else:
 		game.respawn_player(player_id, "died")
+
+
+## A player is back on their feet at the spawn (or the checkpoint): `reason` is "died", "respawn" (the
+## timer), "checkpoint" or "spawn" (joining).
+func on_player_respawned(player_id: int, reason: String) -> void:
+	fired.emit(&"on_player_respawned", [player_id, reason])
 
 
 func on_player_joined(player_id: int) -> void:

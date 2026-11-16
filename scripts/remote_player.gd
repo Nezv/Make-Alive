@@ -9,6 +9,7 @@ var buffer := SnapshotBuffer.new()
 var gun: GunModel
 var weapon_id := -1
 var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
+var hp := 100 ## from the last snapshot (temporary HP included)
 var _last_pos := Vector3.ZERO
 
 

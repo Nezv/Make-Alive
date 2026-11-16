@@ -26,6 +26,13 @@ var last_weapon := -1     # the gun held before this one (the last-weapon key go
 var inventory := Inventory.new() # a copy of what the host says we carry: for the wheel and the HUD, never trusted
 var wheel := ItemWheel.new()     # the item wheel, while its key is held
 var status := PlayerStatus.new() # wounds and what is being put on, as the host says (a copy, for the HUD and the view)
+var spectator := Spectator.new() # who a dead player watches
+var spectate_candidates: Array = [] # the living they may watch (Game fills it)
+var spectate_following := false   # the camera has someone to follow...
+var spectate_focus := Vector3.ZERO # ...standing here...
+var spectate_yaw := 0.0            # ...facing this way
+var _spectate_cam := Vector3.INF   # where the camera is
+var _dead_t := 0.0
 var view: Viewmodel
 var aiming := false
 var sprinting := false
@@ -167,6 +174,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## What a key press or mouse move does (only while the mouse is captured; tests call this directly).
 func handle_event(event: InputEvent) -> void:
+	if status.dead: # watching: fire goes to the next one, aim to the one before
+		if event.is_action_pressed("fire"):
+			spectator.cycle(spectate_candidates, 1)
+		elif event.is_action_pressed("aim"):
+			spectator.cycle(spectate_candidates, -1)
+		elif event is InputEventMouseMotion:
+			pass
+		return
 	if wheel.open: # nothing else works with the wheel up
 		if event.is_action_released("item_wheel"):
 			close_wheel()
@@ -222,6 +237,15 @@ func _physics_process(delta: float) -> void:
 		if weapons.switch_to(loadout.sidearm()): # the pistol comes out by itself
 			last_weapon = before
 			view.show_weapon(weapons.current)
+	if status.dead: # a ghost: no walking about, no shooting
+		firing = false
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not is_on_floor():
+			velocity.y -= Config.GRAVITY * delta
+		move_and_slide()
+		move_speed = 0.0
+		return
 	var ready := not weapons.is_reloading() and weapons.draw_left <= 0.0
 	var toggle: bool = Settings.get_value("aim_toggle")
 	if not toggle or not ready or aim_blocked or not captured:
@@ -272,7 +296,7 @@ func _physics_process(delta: float) -> void:
 ## Strike with the gun's stock or muzzle. False if a swing is still going, you are too tired, or
 ## your hands are busy.
 func try_shove() -> bool:
-	if status.downed or shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
+	if status.downed or status.dead or shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
 		return false
 	shove_left = Config.SHOVE_TIME
 	move.stamina -= Config.SHOVE_STAMINA
@@ -361,10 +385,29 @@ func _process(delta: float) -> void:
 	shove_left = maxf(0.0, shove_left - delta)
 	fire_buffer -= delta
 	punch = punch.lerp(Vector2.ZERO, 1.0 - exp(-Config.RECOIL_RECOVER * delta))
+	if status.dead:
+		_place_spectator_camera(origin, delta)
+		return
+	_spectate_cam = Vector3.INF
+	_dead_t = 0.0
 	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, 0)), origin)
 	view.update(delta, move_speed, aiming, sprinting, weapons)
 	var zoom: float = weapons.def().ads_fov
 	camera.fov = lerpf(base_fov(), minf(zoom, base_fov()), Viewmodel._ease(view.aim))
+
+
+## The camera of a dead player: behind and above whoever they watch, easing after them, or slowly
+## round their own body when nobody is left. `origin` is where their eyes were.
+func _place_spectator_camera(origin: Vector3, delta: float) -> void:
+	_dead_t += delta
+	var focus := spectate_focus if spectate_following else global_position
+	var goal := Spectator.camera_goal(spectate_focus, spectate_yaw) if spectate_following else Spectator.orbit_goal(global_position, _dead_t)
+	_spectate_cam = origin if _spectate_cam == Vector3.INF else Spectator.follow(_spectate_cam, goal, delta)
+	var look := focus + Vector3(0, 1.4, 0) - _spectate_cam
+	if look.length() > 0.01: # (straight down at the first frame, from the eyes: pick another way up)
+		var up := Vector3.UP if absf(look.normalized().y) < 0.99 else Vector3.FORWARD
+		camera.global_transform = Transform3D(Basis.IDENTITY, _spectate_cam).looking_at(focus + Vector3(0, 1.4, 0), up)
+	view.update(delta, 0.0, false, false, weapons)
 
 
 ## The field of view the player chose (Config.FOV unless they changed it).

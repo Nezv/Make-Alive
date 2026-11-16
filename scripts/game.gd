@@ -94,7 +94,7 @@ func start_host(player_name_: String) -> void:
 	_build_world()
 	map.roll_weapons(rng)
 	_add_player(1, player_name_)
-	rules.start(map.objective_defs, map.data.respawn)
+	rules.start(map.objective_defs, map.data.respawn, map.data.respawn_after, map.data.respawn_checkpoint)
 	if mission != "":
 		hooks.on_mission_started(mission)
 	if not Net.peer_left.is_connected(_on_peer_left):
@@ -249,8 +249,8 @@ func _on_local_shove(origin: Vector3, dir: Vector3) -> void:
 func host_shove(id: int, origin: Vector3, dir: Vector3) -> int:
 	if not players.has(id) or _now - float(players[id].last_shove) < Config.SHOVE_TIME * 0.8:
 		return 0
-	if (players[id].status as PlayerStatus).downed:
-		return 0 # no shoving from the floor
+	if (players[id].status as PlayerStatus).downed or (players[id].status as PlayerStatus).dead:
+		return 0 # no shoving from the floor, or from beyond
 	players[id].last_shove = _now
 	var flat := Vector3(dir.x, 0, dir.z).normalized()
 	if flat == Vector3.ZERO:
@@ -610,6 +610,7 @@ func respawn_player(id: int, reason: String) -> void:
 	rules.set_out(id, false) # (a downed player who bled out is back in the fight)
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
+	hooks.on_player_respawned(id, reason)
 
 
 ## What a player carries when they arrive: every gun on a test map or in free play, just the
@@ -797,6 +798,12 @@ func tick_status(delta: float) -> void:
 		var health: Health = p.health
 		var status: PlayerStatus = p.status
 		status.invuln = maxf(0.0, status.invuln - delta)
+		if status.dead:
+			if status.respawn_left >= 0.0: # a timer brings them back; otherwise a checkpoint does, or nothing
+				status.respawn_left -= delta
+				if status.respawn_left <= 0.0:
+					respawn_player(id, "respawn")
+			continue
 		if status.downed:
 			_tick_downed(id, delta)
 			continue
@@ -857,10 +864,22 @@ func down_player(id: int) -> void:
 ## Host: a player dies for good (and respawns or stays out, as the mission says): HP ran out with nobody
 ## to help, or a downed player bled out or was finished.
 func kill_player(id: int) -> void:
+	(players[id].health as Health).hp = 0
 	for other: int in players: # whoever was getting them up stops
 		if other != id and (players[other].status as PlayerStatus).revive_target == id:
 			cancel_use(other)
 	hooks.on_player_died(id)
+
+
+## Host: dead with no way back yet (`rules.respawn` off): out of the fight, watching, until the timer or
+## the next checkpoint (or the end of the mission) says otherwise.
+func mark_dead(id: int) -> void:
+	var status: PlayerStatus = players[id].status
+	status.dead = true
+	status.respawn_left = rules.respawn_after
+	status.respawn_checkpoint = rules.respawn_checkpoint
+	rules.set_out(id, true)
+	_sync_status(id)
 
 
 ## Host: `id` starts getting the downed player `target` up (the use key held beside them).
@@ -910,6 +929,49 @@ func revive_player(id: int, by: int) -> void:
 	rules.set_out(id, false)
 	_sync_status(id)
 	hooks.on_player_revived(id, by)
+
+
+## Who the local player can watch: the other players standing (not downed, not dead), by id.
+func spectate_candidates() -> Array:
+	var ids := []
+	for id: int in remotes:
+		var bits := int((remotes[id] as RemotePlayer).action)
+		if (remotes[id] as RemotePlayer).hp > 0 and bits & (PlayerWire.ACTION_DOWNED | PlayerWire.ACTION_DEAD) == 0:
+			ids.append(id)
+	ids.sort()
+	return ids
+
+
+## While dead: keep following someone who is still standing and tell the camera where they are.
+func _update_spectating(_delta: float) -> void:
+	var lp := local_player
+	lp.spectate_candidates = spectate_candidates()
+	lp.spectator.update(lp.spectate_candidates)
+	var target := lp.spectator.target
+	lp.spectate_following = target != 0 and remotes.has(target)
+	if lp.spectate_following:
+		lp.spectate_focus = (remotes[target] as Node3D).global_position
+		lp.spectate_yaw = (remotes[target] as Node3D).rotation.y
+
+
+## What a dead player's screen says: who they are watching and when (if ever) they come back.
+func spectate_text() -> String:
+	if local_player == null or not local_player.status.dead:
+		return ""
+	var lines: Array[String] = []
+	var target := local_player.spectator.target
+	if target != 0 and remotes.has(target):
+		var r := remotes[target] as RemotePlayer
+		lines.append("SPECTATING  %s   ♥ %d   %s" % [names.get(target, "Survivor"), r.hp,
+			Weapons.def(r.weapon_id).name if Weapons.valid(r.weapon_id) else ""])
+	var status := local_player.status
+	if status.respawn_left >= 0.0:
+		lines.append("Respawn in %d s" % ceili(status.respawn_left))
+	elif status.respawn_checkpoint:
+		lines.append("Respawn at the next checkpoint")
+	else:
+		lines.append("You are out for this mission")
+	return "\n".join(lines)
 
 
 ## The downed teammate within reach of the local player, as this peer sees them (0 for none).
@@ -1075,8 +1137,8 @@ func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) 
 	if not players.has(id):
 		return
 	var status: PlayerStatus = players[id].status
-	if status.invuln > 0.0:
-		return # just got up: nothing can hurt them yet
+	if status.invuln > 0.0 or status.dead:
+		return # just got up (nothing can hurt them yet), or there is nothing left to hurt
 	hooks.on_player_damaged(id, amount, by)
 	if status.downed: # on the floor: the hit costs time, and can finish them
 		if amount > 0:
@@ -1129,7 +1191,8 @@ func nearest_player(from: Vector3) -> int:
 ## `weapon`: the gun in the player's hands as they clicked (the host otherwise only learns it from shots).
 ## `rounds`: what is in the magazine of the gun they would drop to take this one (-1 = not said).
 func host_interact(player_id: int, iid: int, weapon: int = -1, rounds: int = -1) -> bool:
-	if not players.has(player_id) or not interactables.has(iid) or (players[player_id].status as PlayerStatus).downed:
+	if not players.has(player_id) or not interactables.has(iid) or (players[player_id].status as PlayerStatus).downed \
+			or (players[player_id].status as PlayerStatus).dead:
 		return false
 	if Weapons.valid(weapon) and players[player_id].loadout.has(weapon):
 		players[player_id].weapon = weapon
@@ -1214,6 +1277,8 @@ func zombie_leap_lands(z: Zombie) -> void:
 func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weapons.DEFAULT) -> void:
 	var p = players.get(shooter)
 	if p == null or not Weapons.valid(weapon) or not p.loadout.has(weapon):
+		return
+	if (p.status as PlayerStatus).dead:
 		return
 	if (p.status as PlayerStatus).downed and weapon != (p.loadout as Loadout).sidearm():
 		return # only the pistol is within reach
@@ -1404,6 +1469,8 @@ func _action_bits(p: Dictionary) -> int:
 		bits |= PlayerWire.ACTION_HEAL
 	if (p.status as PlayerStatus).downed:
 		bits |= PlayerWire.ACTION_DOWNED
+	if (p.status as PlayerStatus).dead:
+		bits |= PlayerWire.ACTION_DEAD
 	return bits
 
 
@@ -1439,6 +1506,8 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		(remotes[id] as RemotePlayer).buffer.push(e.pos, e.yaw)
 		(remotes[id] as RemotePlayer).set_weapon(e.weapon)
 		(remotes[id] as RemotePlayer).set_action(e.get("action", 0))
+		(remotes[id] as RemotePlayer).hp = e.hp
+		(remotes[id] as RemotePlayer).visible = int(e.get("action", 0)) & PlayerWire.ACTION_DEAD == 0 # (no ghost left standing)
 	for id: int in remotes.keys():
 		if not seen.has(id):
 			(remotes[id] as Node).queue_free()
@@ -1487,6 +1556,9 @@ func _process(delta: float) -> void:
 	local_player.status.tick_view(delta)
 	hud.set_inventory(local_player.inventory)
 	hud.set_status(local_player.status)
+	if local_player.status.dead:
+		_update_spectating(delta)
+	hud.set_spectate(spectate_text())
 	hud.set_director(director.debug_text() if director_overlay and is_host else "")
 	hud.set_wheel(local_player.wheel)
 	hud.set_countdown(mission_view)
@@ -1555,7 +1627,7 @@ func _update_weapon() -> void:
 			client_ammo_used.rpc_id(1, type, spent[type])
 	var scoped: bool = d.scoped
 	var through_scope := scoped and lp.view.aim > 0.9
-	lp.view.visible = not through_scope and not lp.hide_view
+	lp.view.visible = not through_scope and not lp.hide_view and not lp.status.dead
 	hud.set_scope(through_scope)
 	hud.set_aiming(lp.view.aim > 0.5)
 	hud.set_weapon(d.name, ws.rounds(), ws.is_reloading(), ws.reserve_rounds())

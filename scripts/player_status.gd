@@ -14,6 +14,9 @@ var down_total := 0.0
 var revive_left := 0.0    ## being got up: seconds to go (0 = nobody is)
 var revive_total := 0.0
 var revive_target := 0    ## (host) the downed player this one is getting up
+var dead := false         ## dead with no way back yet: out of the fight, watching
+var respawn_left := -1.0  ## seconds until they come back (-1: no timer)
+var respawn_checkpoint := false ## they come back at the next checkpoint
 var invuln := 0.0         ## (host) seconds nothing can hurt them (just revived)
 var _tick := 0.0          ## seconds until the next bleeding tick
 
@@ -87,6 +90,8 @@ func tick_view(delta: float) -> void:
 	if downed and revive_left <= 0.0:
 		down_left = maxf(0.0, down_left - delta)
 	revive_left = maxf(0.0, revive_left - delta)
+	if dead and respawn_left > 0.0:
+		respawn_left = maxf(0.0, respawn_left - delta)
 
 
 ## A new life.
@@ -101,11 +106,15 @@ func reset() -> void:
 	revive_total = 0.0
 	revive_target = 0
 	invuln = 0.0
+	dead = false
+	respawn_left = -1.0
+	respawn_checkpoint = false
 
 
 func get_state() -> Dictionary:
 	return { "bleed": bleed, "using": String(using), "left": use_left, "total": use_total,
-		"downed": downed, "down_left": down_left, "down_total": down_total, "revive_left": revive_left, "revive_total": revive_total }
+		"downed": downed, "down_left": down_left, "down_total": down_total, "revive_left": revive_left, "revive_total": revive_total,
+		"dead": dead, "respawn_left": respawn_left, "respawn_checkpoint": respawn_checkpoint }
 
 
 func apply_state(state: Dictionary) -> void:
@@ -118,3 +127,6 @@ func apply_state(state: Dictionary) -> void:
 	down_total = float(state.get("down_total", 0.0))
 	revive_left = float(state.get("revive_left", 0.0))
 	revive_total = float(state.get("revive_total", 0.0))
+	dead = bool(state.get("dead", false))
+	respawn_left = float(state.get("respawn_left", -1.0))
+	respawn_checkpoint = bool(state.get("respawn_checkpoint", false))
