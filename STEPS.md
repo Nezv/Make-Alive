@@ -303,12 +303,12 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Buttons: retry (host), back to lobby
   - Until the lobby exists (S122) the second button goes back to the menu
 
-### [ ] S027 · Difficulty
+### [x] S027 · Difficulty
 > needs: S023 | size: S | test: `tests/test_difficulty.gd`
-- [ ] Easy / normal / hard / nightmare as multipliers in `Config`: zombie HP, damage, speed share of runners, horde size, ammo found
-- [ ] Horde size scales with players alive
-- [ ] Nightmare: no HUD markers, friendly fire on
-- [ ] Sent in `welcome`
+- [x] Easy / normal / hard / nightmare as multipliers in `Config`: zombie HP, damage, speed share of runners, horde size, ammo found
+- [x] Horde size scales with players alive
+- [x] Nightmare: no HUD markers, friendly fire on
+- [x] Sent in `welcome`
 
 ### [ ] S028 · Horde director 2
 > needs: S002, S020 | size: L | test: `tests/test_director.gd`

@@ -96,6 +96,7 @@ const ZOMBIE_RADIUS := 0.35
 const ZOMBIE_SEPARATION := 0.9 # zombies steer apart when closer than this
 const ZOMBIE_AGGRO_RANGE := 200.0
 const ZOMBIE_NOTICE_RANGE := 15.0 # a player this close beats any noise: the zombie goes for them
+const FRIENDLY_FIRE_MULT := 0.5 # share of a bullet's damage a teammate takes (nightmare only)
 const WAVE_GAP := 15.0          # seconds of calm before a defended wave, unless the wave says otherwise
 const WAVE_PER_PLAYER := 0.35   # each living player beyond the first makes a wave this much bigger
 const LAST_WAVE_TOPUP := 2.0    # seconds between top-ups of the endless last wave while the helicopter comes
@@ -134,6 +135,8 @@ const HORDE_FIRST := 8.0      # seconds until the first horde
 const HORDE_INTERVAL := 30.0
 const HORDE_SIZE := 16
 const HORDE_GROWTH := 4       # extra zombies per wave
+const RUNNER_SHARE := 0.25    # of the usual mix (Difficulty scales it)
+const LEAPER_SHARE := 0.15
 
 # --- World ---
 const WEAPON_SPOTS_ACTIVE := 8 # how many of a map's weapon spots hold a gun each match

@@ -176,7 +176,7 @@ func _send_wave(o: Dictionary) -> void:
 
 ## A wave's size for the players still in the fight: bigger with every one beyond the first.
 func wave_size(size: int) -> int:
-	return roundi(size * (1.0 + Config.WAVE_PER_PLAYER * maxi(0, alive().size() - 1)))
+	return roundi(size * game.mult("horde") * (1.0 + Config.WAVE_PER_PLAYER * maxi(0, alive().size() - 1)))
 
 
 ## Where wave number `n` comes from: its own closets, or one more of the map's each wave.

@@ -21,6 +21,7 @@ var bot_aim := "chest" ## chest | head | legs | arms
 var brain: Bot             ## what plays for the local player when `bot` is on (scripts/bot.gd)
 var map_name := "corridor" ## set before start_host; clients get it in `welcome`
 var mission := ""          ## a city POI id ("mirante"...) or "" for free play; clients get it in `welcome`
+var difficulty := "normal" ## Difficulty.LEVELS; set before start_host, clients get it in `welcome`
 var limited_ammo := false  ## set before start_host: reloads take from a reserve even on a test map (--limited-ammo, tests)
 var map: GameMap
 var world: Node3D
@@ -117,6 +118,8 @@ func _build_world() -> void:
 	lootbox = map.lootbox
 	for it: Interactable in map.interactables:
 		interactables[it.iid] = it
+		if it is AmmoBox: # less (or more) is found by level
+			(it as AmmoBox).setup((it as AmmoBox).ammo, maxi(1, roundi((it as AmmoBox).rounds * mult("ammo"))))
 		it.state_changed.connect(_on_interactable_changed)
 	if door != null:
 		door.smashed.connect(_on_door_smashed)
@@ -188,7 +191,16 @@ func request_join(player_name_: String) -> void:
 
 ## What a joining player must know about this match beyond the map: sent in `welcome`.
 func welcome_rules() -> Dictionary:
-	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state() }
+	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty }
+
+
+## Are HUD markers shown on this level? (Nightmare: no.)
+func show_markers() -> bool:
+	return Difficulty.flag(difficulty, "markers")
+
+
+func mult(key: String) -> float:
+	return Difficulty.get_mult(difficulty, key)
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
@@ -238,6 +250,7 @@ func welcome(map_name_: String, mission_: String, interactable_states: Dictionar
 	map_name = map_name_
 	mission = mission_
 	limited_ammo = not match_rules.get("infinite_ammo", true)
+	difficulty = match_rules.get("difficulty", "normal")
 	if match_rules.has("mission"):
 		mission_state(match_rules.mission)
 	_build_world()
@@ -598,7 +611,7 @@ func match_over(won: bool) -> void:
 	if not is_host:
 		return
 	var seconds := rules.elapsed
-	var new_best := won and Records.submit(mission if mission != "" else map_name, seconds)
+	var new_best := won and Records.submit(mission if mission != "" else map_name, seconds, difficulty)
 	var summary := score.summary(won, seconds, new_best)
 	final_score.rpc(summary)
 	final_score(summary)
@@ -692,7 +705,7 @@ func drop_ammo_box(at: Vector3, type: int, rounds: int) -> AmmoBox:
 		oldest.take(oldest.rounds, 0)
 	var iid := Config.DROP_IID_BASE + _next_drop
 	_next_drop += 1
-	var box: AmmoBox = _add_drop(iid, { "ammo": type, "rounds": rounds, "by": -1, "at": Vector3(at.x, map.ground_y(at), at.z) })
+	var box: AmmoBox = _add_drop(iid, { "ammo": type, "rounds": maxi(1, roundi(rounds * mult("ammo"))), "by": -1, "at": Vector3(at.x, map.ground_y(at), at.z) })
 	interact_state.rpc(iid, box.get_state())
 	return box
 
@@ -713,6 +726,7 @@ func spawn_zombie(type: int, pos: Vector3) -> Zombie:
 	if zombies.size() >= Config.ZOMBIE_MAX:
 		return null
 	var z := Zombie.create(_next_zombie, type, true, pos)
+	z.hp = roundi(z.hp * mult("hp"))
 	_next_zombie += 1
 	zombies[z.zid] = z
 	add_child(z)
@@ -724,7 +738,7 @@ func zombie_attack_lands(z: Zombie, target_id: int) -> void:
 		return
 	var pos: Vector3 = players[target_id].pos
 	if Vector2(pos.x - z.global_position.x, pos.z - z.global_position.z).length() < Config.ZOMBIE_ATTACK_RANGE + 0.6:
-		damage_player(target_id, z.attack_damage(), z)
+		damage_player(target_id, roundi(z.attack_damage() * mult("damage")), z)
 
 
 func zombie_bashes_door(_z: Zombie, d: Door) -> void:
@@ -736,7 +750,7 @@ func zombie_leap_lands(z: Zombie) -> void:
 	for id: int in players:
 		var pos: Vector3 = players[id].pos
 		if pos.distance_to(z.global_position) < Config.LEAP_HIT_RADIUS:
-			damage_player(id, Config.LEAP_DAMAGE, z)
+			damage_player(id, roundi(Config.LEAP_DAMAGE * mult("damage")), z)
 
 
 func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weapons.DEFAULT) -> void:
@@ -774,6 +788,8 @@ func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -
 		Config.LAYER_WORLD | Config.LAYER_HITBOX)
 	q.collide_with_areas = true
 	var hit := space.intersect_ray(q)
+	if Difficulty.flag(difficulty, "friendly_fire") and _shoot_teammate(shooter, origin, dir, hit, d):
+		return false
 	if hit.is_empty():
 		return false
 	var collider: Object = hit.collider
@@ -783,6 +799,34 @@ func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -
 			hit_zombie(shooter, z, collider.get_meta("part"), hit.position, dir, d.damage)
 			return true
 	return false
+
+
+## Friendly fire: the first other player whose body the bullet passes through before whatever
+## else it hit takes part of its damage. Players are capsules at their reported positions.
+func _shoot_teammate(shooter: int, origin: Vector3, dir: Vector3, hit: Dictionary, d: Dictionary) -> bool:
+	var reach: float = d.range
+	if not hit.is_empty():
+		reach = origin.distance_to(hit.position)
+	var best := -1
+	var best_t := reach
+	for id: int in players:
+		if id == shooter:
+			continue
+		var feet: Vector3 = players[id].pos
+		var mid := feet + Vector3(0, Config.PLAYER_HEIGHT / 2.0, 0)
+		var t := (mid - origin).dot(dir)
+		if t <= 0.0 or t >= best_t:
+			continue
+		var p := origin + dir * t
+		var flat := Vector2(p.x - feet.x, p.z - feet.z).length()
+		if flat <= Config.PLAYER_RADIUS and p.y >= feet.y and p.y <= feet.y + Config.PLAYER_HEIGHT:
+			best = id
+			best_t = t
+	if best < 0:
+		return false
+	var dmg: int = d.damage
+	damage_player(best, roundi(dmg * Config.FRIENDLY_FIRE_MULT))
+	return true
 
 
 ## A bullet from `shooter` hit zombie `z` in `part`. Applies damage, fires hooks, and tells

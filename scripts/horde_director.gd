@@ -53,17 +53,23 @@ func _spawn_point() -> Vector3:
 	return game.map.zombie_spawn_point(avoid)
 
 
+## How many come in horde number `wave_number`: growing each wave, scaled by the level and by the
+## players still in the fight.
 func horde_size(wave_number: int) -> int:
-	return Config.HORDE_SIZE + Config.HORDE_GROWTH * (wave_number - 1)
+	var base := Config.HORDE_SIZE + Config.HORDE_GROWTH * (wave_number - 1)
+	var living := game.rules.alive().size() if game.rules != null else 1
+	return roundi(base * game.mult("horde") * (1.0 + Config.WAVE_PER_PLAYER * maxi(0, living - 1)))
 
 
+## The usual mix: mostly walkers, some runners (more on harder levels), a few leapers.
 func pick_type() -> int:
+	var runners := clampf(Config.RUNNER_SHARE * game.mult("runners"), 0.0, 1.0 - Config.LEAPER_SHARE)
 	var r := randf()
-	if r < 0.6:
-		return Zombie.Type.WALKER
-	if r < 0.85:
+	if r < Config.LEAPER_SHARE:
+		return Zombie.Type.LEAPER
+	if r < Config.LEAPER_SHARE + runners:
 		return Zombie.Type.RUNNER
-	return Zombie.Type.LEAPER
+	return Zombie.Type.WALKER
 
 
 ## A defended wave: `count` zombies of `types` ({ "walker": weight, ... }, empty = the usual mix),

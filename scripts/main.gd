@@ -21,6 +21,7 @@ extends Node
 ##   --no-fire              with --bot: aim but don't shoot
 ##   --bot-aim=legs         with --bot: chest (default), head, legs or arms
 ##   --weapon=4             start holding gun 1-9 (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov)
+##   --difficulty=hard      host: easy, normal (default), hard or nightmare (see scripts/difficulty.gd)
 ##   --limited-ammo         host: reloads take from a reserve (the map's starting_ammo) even on a test map
 ##   --pose=aim             hold a gun pose for screenshots: aim, sprint or reload
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
@@ -88,6 +89,7 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
+	game.difficulty = _args.get("difficulty", "normal")
 	game.bot_fires = not _args.has("no-fire")
 	game.bot_aim = _args.get("bot-aim", "chest")
 	game.leave_requested.connect(func(): _to_menu())
