@@ -40,7 +40,7 @@ var looked_at: Interactable = null
 var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellets (tests seed it)
 
 # Host-only
-var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, owned, reserve }
+var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve }
 var _pending_shots: Array = []
 var _next_zombie := 1
 var _next_drop := 0      ## how many things have been dropped (their iids count up from Config.DROP_IID_BASE)
@@ -147,7 +147,7 @@ func _build_world() -> void:
 	local_player = LocalPlayer.new()
 	local_player.name = "LocalPlayer"
 	local_player.bot = bot
-	local_player.set_loadout(_starting_weapons())
+	local_player.set_loadout(_starting_loadout())
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
@@ -196,9 +196,9 @@ func client_ammo_used(type: int, rounds: int) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func client_interact(iid: int, weapon: int = -1) -> void:
+func client_interact(iid: int, weapon: int = -1, rounds: int = -1) -> void:
 	if is_host:
-		host_interact(multiplayer.get_remote_sender_id(), iid, weapon)
+		host_interact(multiplayer.get_remote_sender_id(), iid, weapon, rounds)
 
 
 # --- RPCs: host -> clients ------------------------------------------------------
@@ -237,11 +237,12 @@ func player_names(names_: Dictionary) -> void:
 		(remotes[id] as RemotePlayer).tag.text = names.get(id, "Survivor")
 
 
-## You picked up a gun: it's yours now, loaded, and in your hands.
+## You picked up a gun: it's yours now, with `rounds` in it (-1 = full), and in your hands.
+## `dropped` is the gun that left your slots to make room (-1 = none).
 @rpc("authority", "call_remote", "reliable")
-func got_weapon(weapon: int) -> void:
+func got_weapon(weapon: int, rounds: int = -1, dropped: int = -1) -> void:
 	if local_player and Weapons.valid(weapon):
-		local_player.receive_weapon(weapon)
+		local_player.receive_weapon(weapon, rounds, dropped)
 
 
 ## The host put rounds in your reserve.
@@ -279,13 +280,17 @@ func interact_state(iid: int, state: Dictionary) -> void:
 func _apply_interact_state(iid: int, state: Dictionary) -> void:
 	if interactables.has(iid):
 		(interactables[iid] as Interactable).apply_state(state)
-	elif state.get("drop", false) and state.get("by", -1) < 0:
-		_add_drop(iid, state)
+	elif state.get("drop", false) and state.get("by", -1) < 0 and state.get("weapon", 0) >= 0:
+		_add_drop(iid, state) # (not one that is already taken)
 	_after_state(iid)
 
 
 ## An interactable just changed on this peer: what the match itself does about it.
 func _after_state(iid: int) -> void:
+	var gun := interactables.get(iid) as WeaponPickup
+	if gun != null and gun.dynamic and gun.weapon < 0: # a dropped gun was taken: nothing is left of it
+		interactables.erase(iid)
+		gun.queue_free()
 	var box := interactables.get(iid) as AmmoBox
 	if box == null or box.taken_by < 0:
 		return
@@ -306,17 +311,28 @@ func _player_pos(id: int) -> Vector3:
 	return Vector3.ZERO
 
 
-func _add_drop(iid: int, state: Dictionary) -> AmmoBox:
-	var box := AmmoBox.new()
-	box.iid = iid
-	box.dynamic = true
-	box.position = state.get("at", Vector3.ZERO)
-	box.rotation.y = fposmod(iid * 2.399963, TAU) # each lies at its own angle, the same on every peer
-	box.apply_state(state)
-	world.add_child(box)
-	interactables[iid] = box
-	box.state_changed.connect(_on_interactable_changed)
-	return box
+## Build something that was dropped during the match from its state: a gun or an ammo carton.
+func _add_drop(iid: int, state: Dictionary) -> Interactable:
+	var it: Interactable
+	if state.has("weapon"):
+		var gun := WeaponPickup.new()
+		gun.kind = "drop"
+		gun.dynamic = true
+		gun.rotation.y = state.get("yaw", 0.0)
+		gun.stand = state.get("at", Vector3.ZERO)
+		it = gun
+	else:
+		var box := AmmoBox.new()
+		box.dynamic = true
+		box.rotation.y = fposmod(iid * 2.399963, TAU) # each lies at its own angle, the same on every peer
+		it = box
+	it.iid = iid
+	it.position = state.get("at", Vector3.ZERO)
+	world.add_child(it)
+	it.apply_state(state)
+	interactables[iid] = it
+	it.state_changed.connect(_on_interactable_changed)
+	return it
 
 
 @rpc("authority", "call_local", "reliable")
@@ -356,7 +372,8 @@ func _add_player(id: int, player_name_: String) -> void:
 		slot += 1
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
-		"weapon": Weapons.DEFAULT if map.all_weapons else Weapons.P19, "owned": _starting_weapons(),
+		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
+		"loadout": _starting_loadout(), "swap_rounds": -1,
 		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	health.died.connect(func(): hooks.on_player_died(id))
@@ -390,20 +407,40 @@ func respawn_player(id: int, reason: String) -> void:
 	_send_to(id, &"respawn_at", [p.pos, reason])
 
 
-## The guns a player has when they arrive: all of them on test maps, just the pistol otherwise.
-func _starting_weapons() -> Dictionary:
-	var owned := { Weapons.P19: true }
-	if map.all_weapons:
-		for id in Weapons.COUNT:
-			owned[id] = true
-	return owned
+## What a player carries when they arrive: every gun on a test map or in free play, just the
+## pistol on a mission.
+func _starting_loadout() -> Loadout:
+	return Loadout.all() if map.all_weapons and mission == "" else Loadout.pistol()
 
 
-## Hand a player a gun (from a pickup, or any hook that wants to reward one).
-func give_weapon(id: int, weapon: int) -> void:
-	if players.has(id) and Weapons.valid(weapon):
-		players[id].owned[weapon] = true
-		_send_to(id, &"got_weapon", [weapon])
+## Hand a player a gun (from a pickup, or any hook that wants to reward one), with `rounds` in its
+## magazine (-1 = full). With their slots full, the gun it replaces drops at their feet.
+func give_weapon(id: int, weapon: int, rounds: int = -1) -> void:
+	if not players.has(id) or not Weapons.valid(weapon):
+		return
+	var p: Dictionary = players[id]
+	var carried: Loadout = p.loadout
+	var dropped := carried.take(weapon, p.weapon)
+	if dropped >= 0:
+		var mag: int = Weapons.def(dropped).mag
+		var left: int = clampi(p.swap_rounds, 0, mag) if p.swap_rounds >= 0 else mag
+		var pickup := drop_weapon(p.pos, p.yaw, dropped, left)
+		hooks.on_weapon_dropped(id, dropped, pickup)
+	p.weapon = weapon
+	p.swap_rounds = -1
+	_send_to(id, &"got_weapon", [weapon, rounds, dropped])
+
+
+## Host: lay a gun on the ground at `at` with `rounds` in its magazine. Every peer gets it, late joiners too.
+func drop_weapon(at: Vector3, yaw: float, weapon: int, rounds: int) -> WeaponPickup:
+	if not is_host or not Weapons.valid(weapon):
+		return null
+	var iid := Config.DROP_IID_BASE + _next_drop
+	_next_drop += 1
+	var pickup: WeaponPickup = _add_drop(iid, { "weapon": weapon, "rounds": rounds, "yaw": yaw,
+		"at": Vector3(at.x, map.ground_y(at), at.z) })
+	interact_state.rpc(iid, pickup.get_state())
+	return pickup
 
 
 ## Rounds of a calibre (Weapons.Ammo) a player has outside their magazines; -1 where ammo is infinite.
@@ -466,11 +503,13 @@ func nearest_player(from: Vector3) -> int:
 
 ## A player right-clicked interactable `iid`. Returns false if it was out of reach or unknown.
 ## `weapon`: the gun in the player's hands as they clicked (the host otherwise only learns it from shots).
-func host_interact(player_id: int, iid: int, weapon: int = -1) -> bool:
+## `rounds`: what is in the magazine of the gun they would drop to take this one (-1 = not said).
+func host_interact(player_id: int, iid: int, weapon: int = -1, rounds: int = -1) -> bool:
 	if not players.has(player_id) or not interactables.has(iid):
 		return false
-	if Weapons.valid(weapon) and players[player_id].owned.has(weapon):
+	if Weapons.valid(weapon) and players[player_id].loadout.has(weapon):
 		players[player_id].weapon = weapon
+	players[player_id].swap_rounds = rounds
 	var target: Interactable = interactables[iid]
 	var pos: Vector3 = players[player_id].pos
 	if pos.distance_to(target.global_position) > Config.INTERACT_RANGE + 1.5:
@@ -491,7 +530,7 @@ func drop_ammo_box(at: Vector3, type: int, rounds: int) -> AmmoBox:
 		return null
 	var lying: Array[int] = []
 	for iid: int in interactables:
-		if iid >= Config.DROP_IID_BASE:
+		if iid >= Config.DROP_IID_BASE and interactables[iid] is AmmoBox:
 			lying.append(iid)
 	if lying.size() >= Config.AMMO_DROPS_MAX: # the oldest one makes room
 		lying.sort()
@@ -499,7 +538,7 @@ func drop_ammo_box(at: Vector3, type: int, rounds: int) -> AmmoBox:
 		oldest.take(oldest.rounds, 0)
 	var iid := Config.DROP_IID_BASE + _next_drop
 	_next_drop += 1
-	var box := _add_drop(iid, { "ammo": type, "rounds": rounds, "by": -1, "at": Vector3(at.x, map.ground_y(at), at.z) })
+	var box: AmmoBox = _add_drop(iid, { "ammo": type, "rounds": rounds, "by": -1, "at": Vector3(at.x, map.ground_y(at), at.z) })
 	interact_state.rpc(iid, box.get_state())
 	return box
 
@@ -547,7 +586,7 @@ func zombie_leap_lands(z: Zombie) -> void:
 
 func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weapons.DEFAULT) -> void:
 	var p = players.get(shooter)
-	if p == null or not Weapons.valid(weapon) or not p.owned.has(weapon):
+	if p == null or not Weapons.valid(weapon) or not p.loadout.has(weapon):
 		return
 	var interval: float = Weapons.def(weapon).interval
 	if _now - p.last_shot < interval * 0.8:
@@ -833,9 +872,16 @@ func _update_looked_at() -> void:
 
 ## The local player right-clicks `target`.
 func interact_with(target: Interactable) -> void:
+	var ws := local_player.weapons
+	var rounds := -1 # taking a gun with full slots drops one: say what is left in its magazine
+	var gun := target as WeaponPickup
+	if gun != null:
+		var out := local_player.loadout.would_drop(gun.weapon, ws.current)
+		if out >= 0:
+			rounds = ws.ammo[out]
 	if is_host:
-		host_interact(my_id, target.iid, local_player.weapons.current)
+		host_interact(my_id, target.iid, ws.current, rounds)
 	else:
-		client_interact.rpc_id(1, target.iid, local_player.weapons.current)
+		client_interact.rpc_id(1, target.iid, ws.current, rounds)
 
 

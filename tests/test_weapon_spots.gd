@@ -96,8 +96,9 @@ func test_pickup_state_travels_to_other_peers() -> void:
 func test_right_click_takes_the_gun_and_the_host_then_accepts_its_shots() -> void:
 	var g := await new_game("city")
 	g.map.all_weapons = false
-	g.players[1].owned = { Weapons.P19: true }
-	g.local_player.set_loadout({ Weapons.P19: true })
+	g.players[1].loadout = Loadout.pistol()
+	g.players[1].weapon = Weapons.P19
+	g.local_player.set_loadout(Loadout.pistol())
 	var calls := spy(g)
 	var spot: WeaponPickup = _active(g.map)[0]
 	var weapon := spot.weapon
@@ -109,8 +110,8 @@ func test_right_click_takes_the_gun_and_the_host_then_accepts_its_shots() -> voi
 	assert_true(g.host_interact(1, spot.iid))
 	assert_eq(count(calls, &"on_right_click_weapon"), 1)
 	assert_eq(count(calls, &"on_weapon_picked_up"), 1)
-	assert_true(g.players[1].owned.has(weapon), "host knows you have it")
-	assert_true(g.local_player.owned.has(weapon))
+	assert_true(g.players[1].loadout.has(weapon), "host knows you have it")
+	assert_true(g.local_player.loadout.has(weapon))
 	assert_eq(g.local_player.weapons.current, weapon, "and it's in your hands")
 	assert_eq(spot.weapon, -1, "spot is empty now")
 	g.host_interact(1, spot.iid)
@@ -121,5 +122,5 @@ func test_right_click_takes_the_gun_and_the_host_then_accepts_its_shots() -> voi
 
 func test_corridor_players_keep_every_gun() -> void:
 	var g := await new_game()
-	assert_eq(g.local_player.owned.size(), Weapons.COUNT)
+	assert_eq(g.local_player.loadout.guns().size(), Weapons.COUNT)
 	assert_eq(g.local_player.weapons.current, Weapons.DEFAULT)

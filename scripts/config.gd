@@ -42,7 +42,7 @@ const PICKUP_GAIN_RISE := 34.0  # pixels it climbs meanwhile
 
 # --- Weapons (per-gun numbers are in weapons.gd) ---
 const WEAPON_DAMAGE := 34    # damage of a hit when no gun is named (same as the AK47)
-const WEAPON_DRAW_TIME := 0.35 # seconds to swap guns
+const WEAPON_DRAW_TIME := 0.35 # seconds the first gun of a match takes to come up (swaps: Weapons.GUN_DRAW)
 const FIRE_BUFFER := 0.12    # a click this long before the gun is ready still fires (semi-autos)
 const DRY_FIRE_TIME := 0.14  # seconds the gun twitches after a click on an empty chamber
 const DRY_FIRE_TWITCH := 0.03 # how far it dips, radians

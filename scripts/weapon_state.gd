@@ -10,6 +10,7 @@ var ammo := {}            ## gun id -> rounds in its magazine
 var cooldown := 0.0       ## seconds until the next shot is allowed
 var reload_left := 0.0    ## > 0 while reloading
 var draw_left := Config.WEAPON_DRAW_TIME ## > 0 while the gun is still coming up
+var draw_total := Config.WEAPON_DRAW_TIME ## how long this swap takes in all (Weapons.draw_time of the new gun)
 var since_shot := 99.0    ## seconds since the last shot (drives slide / pump / bolt animation)
 var infinite := true      ## reloads cost nothing
 var reserve := {}         ## Weapons.Ammo -> rounds not in a magazine (when not `infinite`)
@@ -147,5 +148,6 @@ func switch_to(id: int) -> bool:
 	reload_left = 0.0
 	cooldown = 0.0
 	since_shot = 99.0
-	draw_left = Config.WEAPON_DRAW_TIME
+	draw_total = Weapons.draw_time(id)
+	draw_left = draw_total
 	return true

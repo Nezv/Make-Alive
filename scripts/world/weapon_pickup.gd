@@ -6,6 +6,8 @@ extends Interactable
 
 var kind := ""              ## "truck", "vehicle", "corpse", "table", "crate"
 var weapon := -1            ## Weapons id, or -1 when there is nothing here
+var rounds := -1            ## what is in its magazine (-1 = full)
+var dynamic := false        ## a gun a player dropped (Game.drop_weapon): leaves the tree once taken
 var stand := Vector3.ZERO   ## a clear spot on the ground from which a player can reach it
 var gun: GunModel
 var _body: StaticBody3D
@@ -21,9 +23,10 @@ func prompt() -> String:
 	return "" if weapon < 0 else "Right-click: take %s" % Weapons.def(weapon).name
 
 
-## Host: put a gun here (-1 = nothing).
-func set_weapon(id: int) -> void:
+## Host: put a gun here (-1 = nothing), with `in_magazine` rounds (-1 = a full magazine).
+func set_weapon(id: int, in_magazine := -1) -> void:
 	weapon = id
+	rounds = in_magazine
 	_refresh()
 	_notify_changed()
 
@@ -37,11 +40,17 @@ func take() -> int:
 
 
 func get_state() -> Dictionary:
-	return { "weapon": weapon }
+	var state := { "weapon": weapon, "rounds": rounds }
+	if dynamic: # a peer that has never seen it builds it from this
+		state["drop"] = true
+		state["at"] = position
+		state["yaw"] = rotation.y
+	return state
 
 
 func apply_state(state: Dictionary) -> void:
 	weapon = state.get("weapon", -1)
+	rounds = state.get("rounds", -1)
 	_refresh()
 
 

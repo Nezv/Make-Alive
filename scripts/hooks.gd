@@ -113,15 +113,31 @@ func on_right_click_lootbox(player_id: int, box: Lootbox) -> void:
 ## A gun lying in a truck, by a corpse, on a table...
 func on_right_click_weapon(player_id: int, pickup: WeaponPickup) -> void:
 	fired.emit(&"on_right_click_weapon", [player_id, pickup])
-	var weapon := pickup.take()
-	if weapon >= 0:
-		on_weapon_picked_up(player_id, weapon, pickup)
+	var weapon := pickup.weapon
+	if weapon < 0 or not game.players.has(player_id):
+		return
+	var mag: int = Weapons.def(weapon).mag
+	var rounds := pickup.rounds if pickup.rounds >= 0 else mag
+	var carried: Loadout = game.players[player_id].loadout
+	pickup.take()
+	if carried.has(weapon) and not carried.everything: # a second one: strip its magazine
+		var got := game.give_ammo(player_id, Weapons.ammo_of(weapon), rounds)
+		if got > 0:
+			on_ammo_picked_up(player_id, Weapons.ammo_of(weapon), got)
+		return
+	on_weapon_picked_up(player_id, weapon, pickup, rounds)
 
 
-func on_weapon_picked_up(player_id: int, weapon: int, pickup: WeaponPickup) -> void:
+## `rounds`: what is in the magazine of the gun that was lying there.
+func on_weapon_picked_up(player_id: int, weapon: int, pickup: WeaponPickup, rounds := -1) -> void:
 	fired.emit(&"on_weapon_picked_up", [player_id, weapon, pickup])
-	game.give_weapon(player_id, weapon)
+	game.give_weapon(player_id, weapon, rounds)
 	game.feed.rpc("%s found a %s" % [game.player_name(player_id), Weapons.def(weapon).name])
+
+
+## A player's slots were full: `weapon` went to the ground as `pickup`, at their feet.
+func on_weapon_dropped(player_id: int, weapon: int, pickup: WeaponPickup) -> void:
+	fired.emit(&"on_weapon_dropped", [player_id, weapon, pickup])
 
 
 ## A carton of one calibre: the player takes what fits in their reserve, the rest stays in it.

@@ -124,7 +124,7 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	var reloading := ws.is_reloading()
 
 	# Swapping guns: the first half of the draw time lowers the old one, the second raises the new.
-	var draw := clampf(ws.draw_left / Config.WEAPON_DRAW_TIME, 0.0, 1.0)
+	var draw := clampf(ws.draw_left / ws.draw_total, 0.0, 1.0)
 	if _pending >= 0 and draw <= 0.5:
 		_swap(_pending)
 		d = Weapons.def(weapon_id)

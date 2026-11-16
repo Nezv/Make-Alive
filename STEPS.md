@@ -165,14 +165,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Pickup feel: box hops to the player over 0.15 s, shrinks, small "+30" rises on the HUD
 - [x] `on_ammo_picked_up` hook
 
-### [ ] S013 · Loadout
+### [x] S013 · Loadout
 > needs: S011 | size: M | test: `tests/test_loadout.gd`
-- [ ] Slots: two primaries, one sidearm, one melee
-- [ ] Picking up with full slots swaps: the old gun drops at the feet as a `WeaponPickup` with its magazine count
-- [ ] Number keys follow slots, wheel cycles, last-weapon key
-- [ ] Holster and draw animation per swap (existing draw timer), slower for heavy guns
-- [ ] Start: pistol only on missions, everything on test maps (`all_weapons`)
-- [ ] Dropped guns sync to late joiners
+- [x] Slots: two primaries, one sidearm, one melee
+- [x] Picking up with full slots swaps: the old gun drops at the feet as a `WeaponPickup` with its magazine count
+- [x] Number keys follow slots, wheel cycles, last-weapon key
+- [x] Holster and draw animation per swap (existing draw timer), slower for heavy guns
+- [x] Start: pistol only on missions, everything on test maps (`all_weapons`)
+- [x] Dropped guns sync to late joiners
 
 ### [ ] S014 · Inventory and item wheel
 > needs: S013 | size: L | test: `tests/test_inventory.gd`

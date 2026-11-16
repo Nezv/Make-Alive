@@ -21,6 +21,11 @@ const AMMO := [
 	{ "name": ".338", "start": 15, "max": 40, "box": 5, "color": Color("e8e8e8") },
 	{ "name": "7.62R", "start": 30, "max": 80, "box": 10, "color": Color("50b040") },
 ]
+enum Kind { PRIMARY, SIDEARM, MELEE } ## which slots of a Loadout a weapon may go in
+## What kind each gun is, in id order: the pistol is the sidearm, the rest are primaries.
+const GUN_KIND := [Kind.SIDEARM, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY]
+## Seconds to holster the gun in hand and bring this one up, in id order: heavy guns are slower.
+const GUN_DRAW := [0.25, 0.3, 0.35, 0.35, 0.33, 0.48, 0.45, 0.55, 0.5]
 ## Which calibre each gun is fed with, in id order (the two shotguns share shells).
 const GUN_AMMO := [Ammo.MM9, Ammo.MM57, Ammo.MM58, Ammo.MM762, Ammo.MM9X39, Ammo.GAUGE12, Ammo.GAUGE12, Ammo.LAPUA338, Ammo.MM762R]
 
@@ -92,6 +97,14 @@ static func valid(id: int) -> bool:
 
 static func def(id: int) -> Dictionary:
 	return DEFS[id]
+
+
+static func kind_of(id: int) -> int:
+	return GUN_KIND[id]
+
+
+static func draw_time(id: int) -> float:
+	return GUN_DRAW[id]
 
 
 ## The calibre (Ammo) gun `id` is fed with.

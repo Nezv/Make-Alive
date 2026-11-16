@@ -10,7 +10,8 @@ var firing := false
 var move_speed := 0.0
 var camera: Camera3D
 var weapons := WeaponState.new()
-var owned := {}           # Weapons id -> true: the guns this player has found
+var loadout := Loadout.all() # the guns this player carries, by slot (the host keeps its own copy)
+var last_weapon := -1     # the gun held before this one (the last-weapon key goes back to it)
 var view: Viewmodel
 var aiming := false
 var sprinting := false
@@ -51,31 +52,49 @@ func _ready() -> void:
 
 
 ## Call before the player enters the tree: the guns it starts with.
-func set_loadout(guns: Dictionary) -> void:
-	owned = guns
-	if not owned.has(weapons.current):
-		weapons.current = Weapons.P19
+func set_loadout(carried: Loadout) -> void:
+	loadout = carried
+	last_weapon = -1
+	if not loadout.has(weapons.current):
+		weapons.current = loadout.guns()[0]
+		if view != null:
+			view.show_weapon(weapons.current)
 
 
 func switch_weapon(id: int) -> void:
-	if owned.has(id) and weapons.switch_to(id):
+	var before := weapons.current
+	if loadout.has(id) and weapons.switch_to(id):
+		last_weapon = before
 		view.show_weapon(id)
 
 
-## Next (+1) or previous (-1) gun you actually own.
+## Number key `n` (0 = "1"): the gun in that slot, or gun `n` itself where everything is carried.
+func press_weapon_key(n: int) -> void:
+	var id := loadout.key(n)
+	if id >= 0:
+		switch_weapon(id)
+
+
+## Back to the gun held before this one.
+func switch_last() -> void:
+	if last_weapon >= 0 and loadout.has(last_weapon):
+		switch_weapon(last_weapon)
+
+
+## Next (+1) or previous (-1) gun you actually carry.
 func cycle_weapon(step: int) -> void:
-	for i in range(1, Weapons.COUNT):
-		var id := posmod(weapons.current + step * i, Weapons.COUNT)
-		if owned.has(id):
-			switch_weapon(id)
-			return
+	switch_weapon(loadout.next(weapons.current, step))
 
 
-## The host gave us a gun: own it, load it, hold it.
-func receive_weapon(id: int) -> void:
-	owned[id] = true
-	weapons.ammo[id] = Weapons.def(id).mag
+## The host gave us a gun: carry it (in place of `dropped`, if the slots were full), with `rounds`
+## in its magazine (-1 = a full one), and hold it.
+func receive_weapon(id: int, rounds := -1, dropped := -1) -> void:
+	loadout.swap(id, dropped)
+	var mag: int = Weapons.def(id).mag
+	weapons.ammo[id] = clampi(rounds, 0, mag) if rounds >= 0 else mag
 	switch_weapon(id)
+	if not loadout.has(last_weapon):
+		last_weapon = -1
 
 
 ## Recoil from one shot. Part of it stays (you pull down to compensate), the rest springs back.
@@ -100,6 +119,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		fire_buffer = Config.FIRE_BUFFER
 	elif event.is_action_pressed("reload"):
 		weapons.start_reload()
+	elif event.is_action_pressed("last_weapon"):
+		switch_last()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		cycle_weapon(1)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -107,7 +128,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	else:
 		for i in Weapons.COUNT:
 			if event.is_action_pressed("weapon_%d" % (i + 1)):
-				switch_weapon(i)
+				press_weapon_key(i)
 
 
 func _physics_process(delta: float) -> void:
