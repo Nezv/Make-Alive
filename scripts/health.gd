@@ -70,6 +70,13 @@ func heal(amount: int) -> void:
 	changed.emit(hp)
 
 
+## Up again after being downed, with `amount` HP.
+func revive(amount: int) -> void:
+	hp = clampi(amount, 1, max_hp)
+	temp = 0.0
+	changed.emit(hp)
+
+
 func reset() -> void:
 	hp = max_hp
 	temp = 0.0

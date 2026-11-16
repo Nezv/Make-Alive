@@ -11,6 +11,7 @@ const ACTION_CROUCH := 1
 const ACTION_AIR := 2 ## off the ground: jumping, falling, vaulting
 const ACTION_HEAL := 4  ## using a medical item (set by the host, never trusted from a client)
 const ACTION_BLEED := 8 ## has an open wound (host only too)
+const ACTION_DOWNED := 16 ## downed: crawling, waiting to be got up (host only too)
 const ACTION_BODY := ACTION_CROUCH | ACTION_AIR ## what a client may say about itself
 
 

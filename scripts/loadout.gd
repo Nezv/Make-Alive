@@ -40,6 +40,11 @@ func guns() -> Array:
 	return slots.filter(func(id: int) -> bool: return id >= 0)
 
 
+## The pistol, the only gun a downed player can reach (-1 if none is carried).
+func sidearm() -> int:
+	return Weapons.P19 if everything else slots[Slot.SIDEARM]
+
+
 ## The gun number key `n` (0 = the "1" key) brings up, or -1.
 func key(n: int) -> int:
 	if everything:

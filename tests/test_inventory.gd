@@ -393,7 +393,7 @@ func test_another_player_loots_the_backpack_and_it_is_gone_when_empty() -> void:
 	g.give_item(1, I.MEDKIT)
 	g.give_item(1, I.BANDAGE, 3)
 	g.give_key(1, &"generator")
-	g.damage_player(1, 9999)
+	g.kill_player(1) # (not down: there is a teammate, but this is about the pack)
 	var pack: Backpack = _backpacks(g)[0]
 	var iid := pack.iid
 	g.players[7].pos = pack.global_position + Vector3(1, 0, 0)
@@ -412,7 +412,7 @@ func test_a_full_pack_is_only_part_emptied() -> void:
 	var g := await new_game()
 	g._add_player(7, "Guest")
 	g.give_item(1, I.MEDKIT, 2)
-	g.damage_player(1, 9999)
+	g.kill_player(1) # (not down: there is a teammate, but this is about the pack)
 	var pack: Backpack = _backpacks(g)[0]
 	assert_eq(I.cap_of(I.MEDKIT), 2)
 	g.give_item(7, I.MEDKIT, 1)
@@ -427,7 +427,7 @@ func test_a_backpack_cannot_be_looted_from_across_the_map() -> void:
 	var g := await new_game()
 	g._add_player(7, "Guest")
 	g.give_item(1, I.MEDKIT)
-	g.damage_player(1, 9999)
+	g.kill_player(1) # (not down: there is a teammate, but this is about the pack)
 	var pack: Backpack = _backpacks(g)[0]
 	g.players[7].pos = pack.global_position + Vector3(40, 0, 0)
 	assert_false(g.host_interact(7, pack.iid))

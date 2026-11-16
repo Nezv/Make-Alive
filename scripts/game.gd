@@ -55,6 +55,7 @@ var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, k
 var _pending_shots: Array = []
 var _next_zombie := 1
 var _step_t := 0.0       ## seconds since players were last checked for sprinting footsteps
+var _reviving := 0         ## the downed teammate the local player is holding use on
 var _next_drop := 0      ## how many things have been dropped (their iids count up from Config.DROP_IID_BASE)
 var _snapshot_timer := 0.0
 var _now := 0.0
@@ -248,6 +249,8 @@ func _on_local_shove(origin: Vector3, dir: Vector3) -> void:
 func host_shove(id: int, origin: Vector3, dir: Vector3) -> int:
 	if not players.has(id) or _now - float(players[id].last_shove) < Config.SHOVE_TIME * 0.8:
 		return 0
+	if (players[id].status as PlayerStatus).downed:
+		return 0 # no shoving from the floor
 	players[id].last_shove = _now
 	var flat := Vector3(dir.x, 0, dir.z).normalized()
 	if flat == Vector3.ZERO:
@@ -293,6 +296,18 @@ func client_ammo_used(type: int, rounds: int) -> void:
 func client_interact(iid: int, weapon: int = -1, rounds: int = -1) -> void:
 	if is_host:
 		host_interact(multiplayer.get_remote_sender_id(), iid, weapon, rounds)
+
+
+## The sender holds use on a downed teammate (`on`) or let go.
+@rpc("any_peer", "call_remote", "reliable")
+func client_revive(target: int, on: bool) -> void:
+	if not is_host:
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if on:
+		start_revive(id, target)
+	elif players.has(id) and (players[id].status as PlayerStatus).using == &"revive":
+		cancel_use(id)
 
 
 ## The sender started something that stops them using an item (a sprint).
@@ -558,7 +573,7 @@ func _add_player(id: int, player_name_: String) -> void:
 		"reserve": map.starting_ammo(), "inventory": Inventory.new(), "status": PlayerStatus.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
-	health.died.connect(func(): hooks.on_player_died(id))
+	health.died.connect(func(): _hp_zero(id))
 	respawn_player(id, "spawn")
 	_send_names()
 	hooks.on_player_joined(id)
@@ -592,6 +607,7 @@ func respawn_player(id: int, reason: String) -> void:
 	p.step_pos = p.pos
 	(p.health as Health).reset()
 	clear_status(id)
+	rules.set_out(id, false) # (a downed player who bled out is back in the fight)
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
 
@@ -735,8 +751,16 @@ func cancel_use(id: int) -> bool:
 		return false
 	var status: PlayerStatus = players[id].status
 	var item := status.using
+	var helping := status.revive_target
 	if not status.cancel_use():
 		return false
+	if item == &"revive":
+		status.revive_target = 0
+		if players.has(helping): # the downed one goes back to waiting
+			var down: PlayerStatus = players[helping].status
+			down.revive_left = 0.0
+			down.revive_total = 0.0
+			_sync_status(helping)
 	_sync_status(id)
 	hooks.on_item_use_cancelled(id, item)
 	return true
@@ -763,24 +787,140 @@ func clear_status(id: int) -> void:
 		_sync_status(id)
 
 
-## Host, every physics tick: wounds bleed, painkillers wear off, what is being used gets nearer done.
+## Host, every physics tick: wounds bleed, painkillers wear off, what is being used gets nearer done,
+## the downed bleed out or are got up.
 func tick_status(delta: float) -> void:
 	for id: int in players.keys():
+		if not players.has(id):
+			continue # (one of the others died a moment ago and was taken out)
 		var p: Dictionary = players[id]
 		var health: Health = p.health
+		var status: PlayerStatus = p.status
+		status.invuln = maxf(0.0, status.invuln - delta)
+		if status.downed:
+			_tick_downed(id, delta)
+			continue
 		if health.is_dead() or rules.out.has(id):
 			continue
 		health.decay_temp(delta)
-		var lost: int = (p.status as PlayerStatus).bleed_damage(delta)
+		var lost: int = status.bleed_damage(delta)
 		if lost > 0:
 			hooks.on_player_damaged(id, lost, null)
 			health.damage(lost) # (not damage_player: bleeding must not cancel the bandage)
 			if health.is_dead():
-				continue # it killed them: they have a new life, or are out
-		var done: StringName = (p.status as PlayerStatus).step_use(delta)
-		if done != &"":
+				continue # it knocked them down or killed them: they have a new state
+		if status.using == &"revive" and not _in_reach_of_downed(id, status.revive_target):
+			cancel_use(id) # walked off, or the one they were helping is gone
+			continue
+		var done: StringName = status.step_use(delta)
+		if done == &"revive":
+			_finish_revive(id)
+		elif done != &"":
 			_sync_status(id)
 			_finish_use(id, done)
+
+
+## A downed player: bleeding out, unless someone is getting them up (then the clock waits).
+func _tick_downed(id: int, delta: float) -> void:
+	var status: PlayerStatus = players[id].status
+	if status.revive_left > 0.0:
+		status.revive_left = maxf(0.0, status.revive_left - delta)
+		return
+	status.down_left -= delta
+	if status.down_left <= 0.0:
+		kill_player(id)
+
+
+## HP reached 0. With a teammate still standing who could get them up, a player goes down; the last
+## one standing just dies.
+func _hp_zero(id: int) -> void:
+	for other: int in players:
+		if other != id and not rules.out.has(other):
+			down_player(id)
+			return
+	kill_player(id)
+
+
+## Host: down on the floor for `Config.DOWNED_TIME` seconds, out of the fight until got up.
+func down_player(id: int) -> void:
+	var status: PlayerStatus = players[id].status
+	cancel_use(id)
+	status.stop_bleeding()
+	status.downed = true
+	status.down_left = Config.DOWNED_TIME
+	status.down_total = Config.DOWNED_TIME
+	rules.set_out(id, true)
+	_sync_status(id)
+	hooks.on_player_downed(id)
+
+
+## Host: a player dies for good (and respawns or stays out, as the mission says): HP ran out with nobody
+## to help, or a downed player bled out or was finished.
+func kill_player(id: int) -> void:
+	for other: int in players: # whoever was getting them up stops
+		if other != id and (players[other].status as PlayerStatus).revive_target == id:
+			cancel_use(other)
+	hooks.on_player_died(id)
+
+
+## Host: `id` starts getting the downed player `target` up (the use key held beside them).
+func start_revive(id: int, target: int) -> bool:
+	if id == target or not players.has(id) or not players.has(target):
+		return false
+	var helper: PlayerStatus = players[id].status
+	var down: PlayerStatus = players[target].status
+	if not down.downed or helper.downed or rules.out.has(id) or helper.is_using() or down.revive_left > 0.0:
+		return false
+	if not _in_reach_of_downed(id, target):
+		return false
+	helper.begin_use(&"revive", Config.REVIVE_SECONDS)
+	helper.revive_target = target
+	down.revive_left = Config.REVIVE_SECONDS
+	down.revive_total = Config.REVIVE_SECONDS
+	_sync_status(id)
+	_sync_status(target)
+	return true
+
+
+func _in_reach_of_downed(id: int, target: int) -> bool:
+	if not players.has(target) or not (players[target].status as PlayerStatus).downed:
+		return false
+	return (players[id].pos as Vector3).distance_to(players[target].pos) <= Config.REVIVE_RANGE + 1.5
+
+
+func _finish_revive(id: int) -> void:
+	var helper: PlayerStatus = players[id].status
+	var target := helper.revive_target
+	helper.revive_target = 0
+	_sync_status(id)
+	if players.has(target) and (players[target].status as PlayerStatus).downed:
+		revive_player(target, id)
+
+
+## Host: up again at `Config.REVIVE_HP`, safe for a moment.
+func revive_player(id: int, by: int) -> void:
+	var status: PlayerStatus = players[id].status
+	status.downed = false
+	status.down_left = 0.0
+	status.down_total = 0.0
+	status.revive_left = 0.0
+	status.revive_total = 0.0
+	status.invuln = Config.REVIVE_INVULN
+	(players[id].health as Health).revive(Config.REVIVE_HP)
+	rules.set_out(id, false)
+	_sync_status(id)
+	hooks.on_player_revived(id, by)
+
+
+## The downed teammate within reach of the local player, as this peer sees them (0 for none).
+func downed_teammate_near() -> int:
+	if local_player == null or local_player.status.downed:
+		return 0
+	for id: int in remotes:
+		if int((remotes[id] as RemotePlayer).action) & PlayerWire.ACTION_DOWNED != 0 \
+				and _player_pos(id).distance_to(local_player.global_position) <= Config.REVIVE_RANGE:
+			return id
+	return 0
 
 
 ## Host: everything a player carries goes on the ground where they stand, for the others to loot.
@@ -934,8 +1074,18 @@ func _on_local_landed(height: float) -> void:
 func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) -> void:
 	if not players.has(id):
 		return
-	hooks.on_player_damaged(id, amount, by)
 	var status: PlayerStatus = players[id].status
+	if status.invuln > 0.0:
+		return # just got up: nothing can hurt them yet
+	hooks.on_player_damaged(id, amount, by)
+	if status.downed: # on the floor: the hit costs time, and can finish them
+		if amount > 0:
+			status.down_left -= amount * Config.DOWNED_DAMAGE_SECONDS
+			if status.down_left <= 0.0:
+				kill_player(id)
+			else:
+				_sync_status(id)
+		return
 	var bleeds := false
 	if amount > 0:
 		cancel_use(id) # a hit knocks the bandage off
@@ -956,14 +1106,20 @@ func heal_player(id: int, amount: int) -> void:
 func nearest_player(from: Vector3) -> int:
 	var best := 0
 	var best_d := Config.ZOMBIE_AGGRO_RANGE
+	var down := 0
+	var down_d := Config.DOWNED_FINISH_RANGE
 	for id: int in players:
-		if rules.out.has(id):
-			continue # dead or down: the living are more interesting
 		var pos: Vector3 = players[id].pos
 		var d := Vector2(pos.x - from.x, pos.z - from.z).length()
-		if d < best_d:
+		if (players[id].status as PlayerStatus).downed:
+			if d < down_d: # a downed player is only a target when nobody else is as near
+				down_d = d
+				down = id
+		elif not rules.out.has(id) and d < best_d:
 			best_d = d
 			best = id
+	if down != 0 and (best == 0 or best_d > Config.DOWNED_FINISH_RANGE):
+		return down
 	return best
 
 
@@ -973,7 +1129,7 @@ func nearest_player(from: Vector3) -> int:
 ## `weapon`: the gun in the player's hands as they clicked (the host otherwise only learns it from shots).
 ## `rounds`: what is in the magazine of the gun they would drop to take this one (-1 = not said).
 func host_interact(player_id: int, iid: int, weapon: int = -1, rounds: int = -1) -> bool:
-	if not players.has(player_id) or not interactables.has(iid):
+	if not players.has(player_id) or not interactables.has(iid) or (players[player_id].status as PlayerStatus).downed:
 		return false
 	if Weapons.valid(weapon) and players[player_id].loadout.has(weapon):
 		players[player_id].weapon = weapon
@@ -1059,6 +1215,8 @@ func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weap
 	var p = players.get(shooter)
 	if p == null or not Weapons.valid(weapon) or not p.loadout.has(weapon):
 		return
+	if (p.status as PlayerStatus).downed and weapon != (p.loadout as Loadout).sidearm():
+		return # only the pistol is within reach
 	var interval: float = Weapons.def(weapon).interval
 	if _now - p.last_shot < interval * 0.8:
 		return # rate limit: nobody fires faster than their gun can
@@ -1244,6 +1402,8 @@ func _action_bits(p: Dictionary) -> int:
 		bits |= PlayerWire.ACTION_BLEED
 	if (p.status as PlayerStatus).is_using():
 		bits |= PlayerWire.ACTION_HEAL
+	if (p.status as PlayerStatus).downed:
+		bits |= PlayerWire.ACTION_DOWNED
 	return bits
 
 
@@ -1313,12 +1473,14 @@ func _process(delta: float) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	_update_looked_at()
-	hud.set_prompt(looked_at.prompt() if looked_at else "")
+	var downed_near := downed_teammate_near() if looked_at == null else 0
+	hud.set_prompt(looked_at.prompt() if looked_at else ("Hold right-click: revive %s" % names.get(downed_near, "them") if downed_near != 0 else ""))
 	if captured and Input.is_action_just_pressed("interact") and right_click_is_use(looked_at):
 		interact_with(looked_at)
 		local_player.aim_blocked = true
 	elif not Input.is_action_pressed("interact"):
 		local_player.aim_blocked = false
+	_update_revive(captured and downed_near != 0 and Input.is_action_pressed("interact"), downed_near)
 
 	_tick_mission_view(delta)
 	hud.set_objective(mission_view, zombies.size())
@@ -1343,6 +1505,25 @@ func _process(delta: float) -> void:
 		if _send_timer <= 0.0:
 			_send_timer = 1.0 / 30.0
 			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits())
+
+
+## Holding use beside a downed teammate gets them up: say so to the host once, and again when you let go.
+func _update_revive(holding: bool, target: int) -> void:
+	if holding:
+		local_player.aim_blocked = true
+		if _reviving == 0 and not local_player.status.is_using():
+			_reviving = target
+			if is_host:
+				start_revive(my_id, target)
+			else:
+				client_revive.rpc_id(1, target, true)
+	elif _reviving != 0:
+		if is_host:
+			if (players[my_id].status as PlayerStatus).using == &"revive":
+				cancel_use(my_id)
+		else:
+			client_revive.rpc_id(1, _reviving, false)
+		_reviving = 0
 
 
 ## Right mouse uses what you're looking at; with nothing in reach it aims instead.

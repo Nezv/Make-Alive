@@ -204,13 +204,20 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S016 · Downed and revive
 > needs: S015, S003 | size: L | test: `tests/test_downed.gd` | see: `tools\play2.ps1`
-- [ ] At 0 HP a player is downed, not dead: bleed-out timer, pistol only, crawl speed
+- [x] At 0 HP a player is downed, not dead: bleed-out timer, pistol only, crawl speed
+  - Only while a teammate is still standing to get them up: the last one standing just dies. Damage to a downed player costs bleed-out time and can finish them
 - [ ] First-person camera drops to the floor, tilts, desaturates toward grey as the timer runs
+  - `local_player.status.downed` / `down_left` / `down_total` say when and how far
 - [ ] Third-person rig: fall animation, propped on one arm, crawl cycle, reaching hand when a teammate is near
+  - The host sets `PlayerWire.ACTION_DOWNED` in every snapshot (`RemotePlayer.action`)
 - [ ] Revive: hold use within reach for `Config.REVIVE_SECONDS`, progress ring on both HUDs, interrupted by damage to the reviver
+  - [x] Hold right-click beside a downed teammate (`Game.downed_teammate_near`, `start_revive`, `client_revive`); damage, a sprint, walking off or letting go cancels it; the bleed-out clock waits while it runs
+  - [ ] The progress ring: only a text line so far (`Hud.set_status`, from `status.use_left` for the helper and `status.revive_left` / `revive_total` for the downed player)
 - [ ] Revived at partial HP with a get-up animation and brief invulnerability
-- [ ] Zombies prefer standing players, finish downed ones when nobody else is near
-- [ ] All downed at once fails the mission
+  - [x] `Config.REVIVE_HP` and `Config.REVIVE_INVULN` seconds in which nothing hurts them
+  - [ ] The get-up animation
+- [x] Zombies prefer standing players, finish downed ones when nobody else is near
+- [x] All downed at once fails the mission
 
 ### [ ] S017 · Death and spectating
 > needs: S016 | size: M | test: `tests/test_spectate.gd`

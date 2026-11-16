@@ -76,6 +76,8 @@ func set_loadout(carried: Loadout) -> void:
 
 
 func switch_weapon(id: int) -> void:
+	if status.downed and id != loadout.sidearm():
+		return # on the floor, only the pistol is within reach
 	var before := weapons.current
 	if loadout.has(id) and weapons.switch_to(id):
 		last_weapon = before
@@ -188,7 +190,8 @@ func handle_event(event: InputEvent) -> void:
 	elif event.is_action_pressed("shove"):
 		try_shove()
 	elif event.is_action_pressed("item_wheel"):
-		open_wheel()
+		if not status.downed:
+			open_wheel()
 	elif event.is_action_pressed("quick_heal"):
 		try_quick_heal()
 	elif event.is_action_pressed("quick_throw"):
@@ -214,6 +217,11 @@ func _physics_process(delta: float) -> void:
 	elif not bot:
 		firing = false
 
+	if status.downed and loadout.sidearm() >= 0 and weapons.current != loadout.sidearm():
+		var before := weapons.current
+		if weapons.switch_to(loadout.sidearm()): # the pistol comes out by itself
+			last_weapon = before
+			view.show_weapon(weapons.current)
 	var ready := not weapons.is_reloading() and weapons.draw_left <= 0.0
 	var toggle: bool = Settings.get_value("aim_toggle")
 	if not toggle or not ready or aim_blocked or not captured:
@@ -235,13 +243,15 @@ func _physics_process(delta: float) -> void:
 		running = bot_sprint and bot_move != Vector3.ZERO and not aiming
 	else:
 		running = running and move.can_sprint() and not wants_crouch # winded or crouched: a walk
+	if status.downed:
+		running = false
 	check_use_cancel(running and move_speed > 0.1)
 	sprinting = (running or debug_sprint) and not aiming
-	var speed := move.speed(weapons.current, running, aiming)
+	var speed := Config.DOWNED_SPEED if status.downed else move.speed(weapons.current, running, aiming)
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
 	var fall_speed := maxf(0.0, -velocity.y)
-	if captured and not bot and Input.is_action_just_pressed("jump") and move.can_jump():
+	if captured and not bot and Input.is_action_just_pressed("jump") and move.can_jump() and not status.downed:
 		velocity.y = Config.JUMP_VELOCITY # also just after walking off an edge (coyote time)
 		move.jump()
 	elif not is_on_floor():
@@ -262,7 +272,7 @@ func _physics_process(delta: float) -> void:
 ## Strike with the gun's stock or muzzle. False if a swing is still going, you are too tired, or
 ## your hands are busy.
 func try_shove() -> bool:
-	if shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
+	if status.downed or shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
 		return false
 	shove_left = Config.SHOVE_TIME
 	move.stamina -= Config.SHOVE_STAMINA

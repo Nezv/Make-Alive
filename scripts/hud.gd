@@ -394,10 +394,14 @@ func set_status(status: PlayerStatus) -> void:
 	var parts: Array[String] = []
 	if status.bleed > 0:
 		parts.append("BLEEDING x%d" % status.bleed)
-	if status.is_using():
+	if status.downed:
+		parts.append(("BEING GOT UP  %.1f s" % status.revive_left) if status.revive_left > 0.0 else "DOWN  %d s" % ceili(status.down_left))
+	if status.using == &"revive":
+		parts.append("Getting them up  %.1f s" % status.use_left)
+	elif status.is_using():
 		parts.append("%s  %.1f s" % [Inventory.item_name(status.using), status.use_left])
 	status_label.text = "   ·   ".join(parts)
-	status_label.modulate = Color("ff6a5a") if status.bleed > 0 else Color.WHITE
+	status_label.modulate = Color("ff6a5a") if status.bleed > 0 or status.downed else Color.WHITE
 
 
 ## The item wheel is up (or not): drawn round the middle of the screen.

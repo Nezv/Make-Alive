@@ -8,6 +8,13 @@ var bleed := 0            ## wounds open, 0..Config.BLEED_MAX
 var using := &""          ## the Inventory item being applied, or &""
 var use_left := 0.0       ## seconds until it is done
 var use_total := 0.0
+var downed := false       ## at 0 HP with a teammate to get them up: crawling, bleeding out
+var down_left := 0.0      ## seconds until they die
+var down_total := 0.0
+var revive_left := 0.0    ## being got up: seconds to go (0 = nobody is)
+var revive_total := 0.0
+var revive_target := 0    ## (host) the downed player this one is getting up
+var invuln := 0.0         ## (host) seconds nothing can hurt them (just revived)
 var _tick := 0.0          ## seconds until the next bleeding tick
 
 
@@ -77,6 +84,9 @@ func step_use(delta: float) -> StringName:
 func tick_view(delta: float) -> void:
 	if is_using():
 		use_left = maxf(0.0, use_left - delta)
+	if downed and revive_left <= 0.0:
+		down_left = maxf(0.0, down_left - delta)
+	revive_left = maxf(0.0, revive_left - delta)
 
 
 ## A new life.
@@ -84,10 +94,18 @@ func reset() -> void:
 	bleed = 0
 	_tick = 0.0
 	cancel_use()
+	downed = false
+	down_left = 0.0
+	down_total = 0.0
+	revive_left = 0.0
+	revive_total = 0.0
+	revive_target = 0
+	invuln = 0.0
 
 
 func get_state() -> Dictionary:
-	return { "bleed": bleed, "using": String(using), "left": use_left, "total": use_total }
+	return { "bleed": bleed, "using": String(using), "left": use_left, "total": use_total,
+		"downed": downed, "down_left": down_left, "down_total": down_total, "revive_left": revive_left, "revive_total": revive_total }
 
 
 func apply_state(state: Dictionary) -> void:
@@ -95,3 +113,8 @@ func apply_state(state: Dictionary) -> void:
 	using = StringName(state.get("using", ""))
 	use_left = float(state.get("left", 0.0))
 	use_total = float(state.get("total", 0.0))
+	downed = bool(state.get("downed", false))
+	down_left = float(state.get("down_left", 0.0))
+	down_total = float(state.get("down_total", 0.0))
+	revive_left = float(state.get("revive_left", 0.0))
+	revive_total = float(state.get("revive_total", 0.0))
