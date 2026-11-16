@@ -28,7 +28,11 @@ extends RefCounted
 ##   objectives      [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]  in order;
 ##                                                   kind: reach, hold, survive, interact, extract
 ##                     reach: `who` "any" (default) or "all" players still in the fight
-##                     hold / extract: `seconds` in the zone · survive: `waves` (sizes) or `seconds`
+##                     hold / extract: `seconds` in the zone · survive: `waves` or `seconds`
+##                       a wave is a size, or { size, types: { walker: 0.6, runner: 0.3, leaper: 0.1 },
+##                       closets: [ids], gap: seconds of calm before it }; missing closets = one more
+##                       way in each wave. `heli`: seconds the helicopter needs once the last wave
+##                       begins; until it is down the last wave never ends (0 = it ends when cleared)
 ##                     interact: `target` is the iid of the thing to right-click
 ##                     `time_limit`: seconds before this objective fails the mission (0 = none)
 ##
@@ -150,9 +154,34 @@ func _read_objectives(dict: Dictionary) -> void:
 		var target: int = e.get("target", -1)
 		if kind == "interact" and not iids.has(target):
 			_error("objective '%s' has no thing to interact with (target %d)" % [id, target])
+		var waves: Array = []
+		for w: Variant in e.get("waves", []):
+			waves.append(_read_wave(id, w))
 		objectives.append({ "id": id, "kind": kind, "zone": zone, "seconds": float(e.get("seconds", 0.0)),
-			"waves": e.get("waves", []), "text": e.get("text", ""), "who": who, "target": target,
+			"waves": waves, "heli": float(e.get("heli", 0.0)), "text": e.get("text", ""), "who": who, "target": target,
 			"time_limit": float(e.get("time_limit", 0.0)) })
+
+
+const WAVE_TYPES := { "walker": 0, "runner": 1, "leaper": 2 } ## Zombie.Type by name
+
+
+## A wave as { size, types, closets, gap } whether it was written as a size or in full.
+static func wave(w: Variant) -> Dictionary:
+	var e: Dictionary = { "size": w } if w is int else w
+	return { "size": int(e.get("size", 0)), "types": e.get("types", {}), "closets": e.get("closets", []),
+		"gap": float(e.get("gap", Config.WAVE_GAP)) }
+
+
+## One wave of a survive objective, read and checked.
+func _read_wave(objective: String, w: Variant) -> Dictionary:
+	var out := wave(w)
+	for c: String in out.closets:
+		if not closets.any(func(k: Dictionary) -> bool: return k.id == c):
+			_error("objective '%s' sends a wave from closet '%s', which isn't there" % [objective, c])
+	for t: String in out.types:
+		if not WAVE_TYPES.has(t):
+			_error("objective '%s' has a wave of unknown type '%s'" % [objective, t])
+	return out
 
 
 func _read_interactables(dict: Dictionary) -> void:

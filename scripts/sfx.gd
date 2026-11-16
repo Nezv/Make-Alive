@@ -49,6 +49,8 @@ static func _builtin() -> void:
 		register("gunshot", "Guns", _gunshot)
 	if not _defs.has("dry_fire"):
 		register("dry_fire", "Guns", _dry_fire)
+	if not _defs.has("siren"):
+		register("siren", "World", _siren)
 	if not _defs.has("beep"):
 		register("beep", "UI", _beep)
 	if not _defs.has("breath"):
@@ -117,6 +119,18 @@ static func _dry_fire() -> PackedFloat32Array:
 	var tick := exp_tail(high_pass(noise(0.05, Hiss.WHITE, 5), 2500.0), 140.0)
 	var ring := exp_tail(fm(0.05, 1900.0, 2730.0, 1.5), 90.0)
 	return soft_clip(mix([tick, ring], [0.9, 0.35]), 1.5)
+
+
+## An air-raid siren winding up, holding and winding down: a saw swept up and back, softened.
+static func _siren() -> PackedFloat32Array:
+	var up := sweep(1.2, 220.0, 620.0, Wave.SAW)
+	var hold := tone(0.8, 620.0, Wave.SAW)
+	var down := sweep(1.0, 620.0, 260.0, Wave.SAW)
+	var buf := PackedFloat32Array()
+	buf.append_array(up)
+	buf.append_array(hold)
+	buf.append_array(down)
+	return envelope(low_pass(buf, 1800.0), 0.3, 0.2, 0.9, 0.6)
 
 
 ## A short electronic beep (the extraction countdown); played at rising pitches.

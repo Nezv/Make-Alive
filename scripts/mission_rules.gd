@@ -18,6 +18,9 @@ var progress := 0.0       ## seconds held / survived on the current objective
 var limit_left := -1.0    ## seconds before the current objective fails the mission (-1 = no limit)
 var counting := false     ## `progress` is running right now (peers count along)
 var wave := 0             ## SURVIVE: how many of the objective's waves have been sent
+var calm_left := -1.0     ## SURVIVE: seconds of calm left before the next wave (-1 = not calm)
+var heli_left := -1.0     ## SURVIVE: seconds until the helicopter is down, once the last wave began (-1 = not coming)
+var _topup := 0.0
 var respawn := true       ## the dead come back; off, a dead player is out until something brings them back
 var out := {}             ## player id -> true: dead (no respawn) or downed, so not counted and not needed
 var checkpoint := ""      ## the last checkpoint zone reached: where the dead come back
@@ -32,6 +35,9 @@ func _init(owner_game: Game) -> void:
 ## Begin (or begin again) with this list. An empty list is free play: nothing runs.
 func start(defs: Array, respawn_ := true) -> void:
 	objectives = defs
+	for o: Dictionary in objectives: # waves written as bare sizes (tests, hand-made lists) read like the data's
+		if o.has("waves"):
+			o.waves = (o.waves as Array).map(func(w: Variant) -> Dictionary: return MapData.wave(w))
 	respawn = respawn_
 	out = {}
 	reason = ""
@@ -116,15 +122,70 @@ func _step_objective(delta: float) -> void:
 				_count(true, delta)
 				if progress >= seconds:
 					_complete(0)
-			elif game.zombies.is_empty():
-				if wave >= waves.size():
-					_complete(0)
-				else:
-					wave += 1
-					game.director.spawn_horde(waves[wave - 1])
-					_changed()
+			else:
+				_defend(o, delta)
 		"interact":
 			pass # waits for `interacted`
+
+
+## SURVIVE with waves: send each when the last is dead and its calm is over; the last one, with a
+## helicopter coming, never ends until it is down.
+func _defend(o: Dictionary, delta: float) -> void:
+	var waves: Array = o.waves
+	if heli_left >= 0.0:
+		heli_left -= delta
+		if heli_left <= 0.0:
+			_complete(0)
+			return
+		_topup -= delta
+		var last: Dictionary = waves[-1]
+		var want := wave_size(last.size)
+		if _topup <= 0.0 and game.zombies.size() < want:
+			_topup = Config.LAST_WAVE_TOPUP
+			game.director.spawn_wave(want - game.zombies.size(), last.types, _closets_for(last, wave))
+		return
+	if calm_left >= 0.0:
+		calm_left -= delta
+		if calm_left <= 0.0:
+			calm_left = -1.0
+			_send_wave(o)
+		return
+	if not game.zombies.is_empty():
+		return
+	if wave >= waves.size():
+		_complete(0)
+	elif wave == 0:
+		_send_wave(o)
+	else:
+		var next: Dictionary = waves[wave]
+		calm_left = next.gap # a breather to barricade and restock
+		_changed()
+
+
+func _send_wave(o: Dictionary) -> void:
+	var waves: Array = o.waves
+	wave += 1
+	var w: Dictionary = waves[wave - 1]
+	game.director.spawn_wave(wave_size(w.size), w.types, _closets_for(w, wave))
+	var heli: float = o.get("heli", 0.0)
+	if wave == waves.size() and heli > 0.0:
+		heli_left = heli
+		_topup = Config.LAST_WAVE_TOPUP
+	_changed()
+
+
+## A wave's size for the players still in the fight: bigger with every one beyond the first.
+func wave_size(size: int) -> int:
+	return roundi(size * (1.0 + Config.WAVE_PER_PLAYER * maxi(0, alive().size() - 1)))
+
+
+## Where wave number `n` comes from: its own closets, or one more of the map's each wave.
+func _closets_for(w: Dictionary, n: int) -> Array:
+	var listed: Array = w.closets
+	if not listed.is_empty():
+		return listed
+	var all := game.map.data.closet_ids(n)
+	return all.slice(0, mini(n, all.size()))
 
 
 ## A player right-clicked interactable `iid`.
@@ -168,6 +229,10 @@ func seconds_left() -> float:
 	var waves: Array = o.waves
 	if seconds > 0.0 and (o.kind == "hold" or o.kind == "extract" or (o.kind == "survive" and waves.is_empty())):
 		return maxf(0.0, seconds - progress)
+	if heli_left >= 0.0:
+		return heli_left
+	if calm_left >= 0.0:
+		return calm_left
 	return limit_left
 
 
@@ -176,13 +241,15 @@ func state() -> Dictionary:
 	var o := current()
 	var s := { "index": index, "status": status, "reason": reason, "id": "", "kind": "", "text": "", "zone": "",
 		"left": seconds_left(), "counting": counting or (limit_left >= 0.0 and seconds_left() == limit_left),
-		"wave": wave, "has_marker": false, "marker": Vector3.ZERO }
+		"wave": wave, "waves": 0, "calm": calm_left >= 0.0, "heli": heli_left >= 0.0, "has_marker": false, "marker": Vector3.ZERO }
+	s.counting = s.counting or s.calm or s.heli
 	if o.is_empty():
 		return s
 	s.id = o.id
 	s.kind = o.kind
 	s.text = o.text
 	s.zone = o.zone
+	s.waves = (o.waves as Array).size()
 	var zone: String = o.zone
 	if game.map.data.zones.has(zone):
 		s.has_marker = true
@@ -206,6 +273,8 @@ func _begin() -> void:
 	progress = 0.0
 	counting = false
 	wave = 0
+	calm_left = -1.0
+	heli_left = -1.0
 	var limit: float = o.time_limit
 	limit_left = limit if limit > 0.0 else -1.0
 	if o.kind == "extract":

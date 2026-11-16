@@ -249,7 +249,10 @@ func welcome(map_name_: String, mission_: String, interactable_states: Dictionar
 ## The objective changed, its clock started or stopped, or the mission ended (MissionRules.state).
 @rpc("authority", "call_remote", "reliable")
 func mission_state(state: Dictionary) -> void:
+	var before: int = mission_view.get("wave", 0)
 	mission_view = state.duplicate() # counted down here; never the sender's own copy
+	if state.get("kind", "") == "survive" and int(state.get("wave", 0)) > before:
+		Sfx.play_ui("siren", -4.0) # a new wave is on its way
 
 
 ## Host: tell everyone where the mission stands. Called by MissionRules whenever something changes.
@@ -961,7 +964,7 @@ func _process(delta: float) -> void:
 		local_player.aim_blocked = false
 
 	_tick_mission_view(delta)
-	hud.set_objective(mission_view)
+	hud.set_objective(mission_view, zombies.size())
 	hud.set_countdown(mission_view)
 	_update_extraction()
 	var status: int = mission_view.status

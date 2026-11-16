@@ -134,6 +134,8 @@ func test_survive_sends_its_waves_one_after_the_other() -> void:
 	assert_eq(g.zombies.size(), 2, "the next one waits for these")
 	_kill_all(g)
 	g.rules.step(0.1)
+	assert_eq(g.zombies.size(), 0, "a calm first")
+	g.rules.step(Config.WAVE_GAP + 0.1)
 	assert_eq(g.zombies.size(), 3, "second wave")
 	assert_true(g.rules.running())
 	_kill_all(g)

@@ -320,7 +320,8 @@ func set_weapon(gun_name: String, rounds: int, reloading: bool, reserve := -1) -
 
 ## The mission as every peer is told it (MissionRules.state): the objective's text and what is
 ## left on its clock, or how the mission ended. Nothing in free play.
-func set_objective(view: Dictionary) -> void:
+## `zombies`: how many are about (shown while a wave is on).
+func set_objective(view: Dictionary, zombies := 0) -> void:
 	var status: int = view.get("status", MissionRules.Status.IDLE)
 	var text: String = view.get("text", "")
 	var left: float = view.get("left", -1.0)
@@ -333,11 +334,24 @@ func set_objective(view: Dictionary) -> void:
 		objective_label.modulate = Color("7be08a")
 	elif status != MissionRules.Status.RUNNING or text == "":
 		objective_label.text = ""
+	elif int(view.get("waves", 0)) > 0: # defending: the wave, what is left of it, the clocks
+		var line := "▸ %s   Wave %d/%d" % [text, view.get("wave", 0), view.waves]
+		if view.get("calm", false):
+			line += "   next wave %s" % _clock(left)
+		else:
+			line += "   %d left" % zombies
+			if view.get("heli", false):
+				line += "   Helicopter %s" % _clock(left)
+		objective_label.text = line
 	elif left >= 0.0:
-		var whole := ceili(left)
-		objective_label.text = "▸ %s   %d:%02d" % [text, whole / 60, whole % 60]
+		objective_label.text = "▸ %s   %s" % [text, _clock(left)]
 	else:
 		objective_label.text = "▸ %s" % text
+
+
+static func _clock(seconds: float) -> String:
+	var whole := ceili(maxf(seconds, 0.0))
+	return "%d:%02d" % [whole / 60, whole % 60]
 
 
 ## `share` 0..1 of a full bar; `winded` = ran dry and cannot sprint yet.

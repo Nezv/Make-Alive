@@ -66,6 +66,44 @@ func pick_type() -> int:
 	return Zombie.Type.LEAPER
 
 
+## A defended wave: `count` zombies of `types` ({ "walker": weight, ... }, empty = the usual mix),
+## spread round-robin over the closets `closet_ids` of the map's data (empty = wherever the map
+## says). Returns how many spawned.
+func spawn_wave(count: int, types: Dictionary, closet_ids: Array) -> int:
+	wave += 1
+	var spawned := 0
+	for i in count:
+		var at := _spawn_point() if closet_ids.is_empty() else _closet_point(closet_ids[i % closet_ids.size()])
+		if game.spawn_zombie(_pick_from(types), at) != null:
+			spawned += 1
+	game.hooks.on_horde_incoming(wave, spawned)
+	return spawned
+
+
+func _closet_point(id: String) -> Vector3:
+	for c: Dictionary in game.map.data.closets:
+		if c.id == id:
+			var r: float = c.radius * sqrt(randf())
+			var a := randf() * TAU
+			var at: Vector3 = c.at
+			return at + Vector3(cos(a) * r, 0, sin(a) * r)
+	return _spawn_point()
+
+
+func _pick_from(types: Dictionary) -> int:
+	if types.is_empty():
+		return pick_type()
+	var total := 0.0
+	for t: String in types:
+		total += float(types[t])
+	var r := randf() * total
+	for t: String in types:
+		r -= float(types[t])
+		if r <= 0.0:
+			return MapData.WAVE_TYPES[t]
+	return MapData.WAVE_TYPES[types.keys()[-1]]
+
+
 ## Spawn up to `count` zombies at once. Returns how many actually spawned (the cap may cut it).
 func spawn_horde(count: int) -> int:
 	wave += 1

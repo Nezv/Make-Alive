@@ -266,14 +266,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Countdown: big numerals on the HUD, beeps that rise in pitch for the last five
 - [x] Success: fade to white, `on_extracted`, end screen
 
-### [ ] S023 · Defend objective
+### [x] S023 · Defend objective
 > needs: S021 | size: M | test: `tests/test_defend.gd`
-- [ ] Waves from map data: size, types, which closets, gap between waves
-- [ ] Wave grows with player count, each wave bigger and from more directions
-- [ ] Between waves: a calm with a countdown, time to barricade and restock
-- [ ] Last wave does not end, it lasts until the helicopter is down
-- [ ] HUD: wave number, zombies left, helicopter ETA
-- [ ] Siren at each wave start, `on_horde_incoming` already exists
+- [x] Waves from map data: size, types, which closets, gap between waves
+- [x] Wave grows with player count, each wave bigger and from more directions
+- [x] Between waves: a calm with a countdown, time to barricade and restock
+- [x] Last wave does not end, it lasts until the helicopter is down
+- [x] HUD: wave number, zombies left, helicopter ETA
+- [x] Siren at each wave start, `on_horde_incoming` already exists
 
 ### [ ] S024 · Helicopter
 > needs: S022, S004 | size: L | test: `tests/test_helicopter.gd` | see: `--host --map=corridor --heli --shot-at=3,6,9`
