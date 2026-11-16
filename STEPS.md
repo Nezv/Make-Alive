@@ -175,16 +175,19 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Dropped guns sync to late joiners
 
 ### [ ] S014 · Inventory and item wheel
-> needs: S013 | size: L | test: `tests/test_inventory.gd`
-- [ ] `scripts/inventory.gd`, no nodes: counted stacks with caps
-  - [ ] Medkit, bandage, painkillers
-  - [ ] Throwable slots (filled later)
-  - [ ] Keys and keycards by id
-  - [ ] Planks for barricades
-- [ ] Host owns it, client gets its own inventory on change
+> needs: S013 | size: L | test: `tests/test_inventory.gd` | see: `--host --map=corridor --wheel --shot-at=3`
+- [x] `scripts/inventory.gd`, no nodes: counted stacks with caps
+  - [x] Medkit, bandage, painkillers
+  - [x] Throwable slots (filled later)
+  - [x] Keys and keycards by id
+  - [x] Planks for barricades
+- [x] Host owns it, client gets its own inventory on change
 - [ ] Hold a key for a radial wheel: eight wedges, icons drawn from boxes, mouse direction picks, time slows nothing
-- [ ] Quick-use keys for heal and throwable
-- [ ] Drop on death as a backpack other players can loot
+  - [x] Eight wedges (`ItemWheel`, `ItemWheelView`): hold Tab, the mouse moves a pointer instead of the view, release picks; names and counts for now
+  - [ ] Icons drawn from boxes instead of names, a little hop when a wedge is lit
+- [x] Quick-use keys for heal (H) and throwable (G)
+- [x] Drop on death as a backpack other players can loot
+- Medkit and bandage heal at once for now; painkillers and throwables are consumed with no effect until S015 and S093 write theirs in `GameHooks.on_item_used`.
 
 ### [ ] S015 · Bleeding and healing
 > needs: S014 | size: M | test: `tests/test_bleeding.gd`

@@ -167,6 +167,7 @@ func _build_world() -> void:
 	local_player.set_loadout(_starting_loadout())
 	local_player.landed.connect(_on_local_landed)
 	local_player.shoved.connect(_on_local_shove)
+	local_player.item_requested.connect(_on_local_item)
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
@@ -292,6 +293,13 @@ func client_interact(iid: int, weapon: int = -1, rounds: int = -1) -> void:
 		host_interact(multiplayer.get_remote_sender_id(), iid, weapon, rounds)
 
 
+## A player used an item from their inventory (Inventory ids travel as strings).
+@rpc("any_peer", "call_remote", "reliable")
+func client_use_item(item: String) -> void:
+	if is_host:
+		use_item(multiplayer.get_remote_sender_id(), StringName(item))
+
+
 # --- RPCs: host -> clients ------------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
@@ -385,6 +393,22 @@ func got_ammo(type: int, rounds: int) -> void:
 		hud.gain("+%d  %s" % [rounds, Weapons.ammo_name(type)])
 
 
+## What you carry changed: this is all of it now. `popup` is the "+1  Medkit" that rises on the HUD.
+@rpc("authority", "call_remote", "reliable")
+func inventory_changed(state: Dictionary, popup := "") -> void:
+	if local_player:
+		local_player.inventory.apply_state(state)
+		if popup != "":
+			hud.gain(popup)
+
+
+## A short line for one player (the HUD's rising text): "Can't carry any more".
+@rpc("authority", "call_remote", "reliable")
+func notice(text: String) -> void:
+	if hud:
+		hud.gain(text)
+
+
 @rpc("authority", "call_remote", "reliable")
 func hit_confirm(_killed: bool) -> void:
 	hud.hit_marker()
@@ -423,6 +447,11 @@ func _after_state(iid: int) -> void:
 	if gun != null and gun.dynamic and gun.weapon < 0: # a dropped gun was taken: nothing is left of it
 		interactables.erase(iid)
 		gun.queue_free()
+	var pack := interactables.get(iid) as Backpack
+	if pack != null and pack.taken_by >= 0: # emptied: nothing is left of it
+		interactables.erase(iid)
+		pack.queue_free()
+		return
 	var box := interactables.get(iid) as AmmoBox
 	if box == null or box.taken_by < 0:
 		return
@@ -446,7 +475,11 @@ func _player_pos(id: int) -> Vector3:
 ## Build something that was dropped during the match from its state: a gun or an ammo carton.
 func _add_drop(iid: int, state: Dictionary) -> Interactable:
 	var it: Interactable
-	if state.has("weapon"):
+	if state.has("pack"):
+		var pack := Backpack.new()
+		pack.rotation.y = state.get("yaw", 0.0)
+		it = pack
+	elif state.has("weapon"):
 		var gun := WeaponPickup.new()
 		gun.kind = "drop"
 		gun.dynamic = true
@@ -506,7 +539,7 @@ func _add_player(id: int, player_name_: String) -> void:
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
 		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
-		"reserve": map.starting_ammo() }
+		"reserve": map.starting_ammo(), "inventory": Inventory.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
 	health.died.connect(func(): hooks.on_player_died(id))
@@ -611,6 +644,128 @@ func _ammo_used(id: int, type: int, rounds: int) -> void:
 		return
 	var have: int = players[id].reserve.get(type, 0)
 	players[id].reserve[type] = maxi(0, have - rounds)
+
+
+# --- Host: inventory --------------------------------------------------------------
+
+## How many more of an item a player can carry (0 for nobody).
+func inventory_room(id: int, item: StringName) -> int:
+	return (players[id].inventory as Inventory).room(item) if players.has(id) else 0
+
+
+## Put `n` of an item in a player's inventory (a pickup, a lootbox, a hook's reward). Returns how many fitted.
+func give_item(id: int, item: StringName, n := 1) -> int:
+	if not players.has(id):
+		return 0
+	var got := (players[id].inventory as Inventory).add(item, n)
+	if got > 0:
+		_sync_inventory(id, "+%d  %s" % [got, Inventory.item_name(item)])
+		hooks.on_item_picked_up(id, item, got)
+	return got
+
+
+## Hand a player the key or keycard `key`. False if they had it already.
+func give_key(id: int, key: StringName) -> bool:
+	if not players.has(id) or not (players[id].inventory as Inventory).add_key(key):
+		return false
+	_sync_inventory(id, "Key  %s" % key)
+	hooks.on_key_picked_up(id, key)
+	return true
+
+
+## Tell a player what they carry (the whole inventory, whenever it changed).
+func _sync_inventory(id: int, popup := "") -> void:
+	if players.has(id):
+		_send_to(id, &"inventory_changed", [(players[id].inventory as Inventory).get_state(), popup])
+
+
+## Could this player use `item` right now? They must be alive and have one; a heal is only for the hurt.
+func can_use_item(id: int, item: StringName) -> bool:
+	if not players.has(id) or rules.out.has(id) or not Inventory.valid(item):
+		return false
+	var health: Health = players[id].health
+	if health.is_dead() or (players[id].inventory as Inventory).count(item) <= 0:
+		return false
+	match Inventory.kind_of(item):
+		Inventory.Kind.MATERIAL:
+			return false # planks go up on a barricade, they are not used from the pack
+		Inventory.Kind.MEDICAL:
+			return item == Inventory.PAINKILLERS or health.hp < health.max_hp
+	return true
+
+
+## A player uses an item: it leaves their inventory and `on_item_used` says what it does.
+func use_item(id: int, item: StringName) -> bool:
+	if not can_use_item(id, item):
+		return false
+	(players[id].inventory as Inventory).remove(item)
+	_sync_inventory(id)
+	hooks.on_item_used(id, item)
+	return true
+
+
+## Host: everything a player carries goes on the ground where they stand, for the others to loot.
+## Nothing carried means no backpack. Returns it, or null.
+func drop_backpack(id: int) -> Backpack:
+	if not is_host or not players.has(id):
+		return null
+	var inv: Inventory = players[id].inventory
+	if inv.is_empty():
+		return null
+	var lying: Array[int] = []
+	for iid: int in interactables:
+		if iid >= Config.DROP_IID_BASE and interactables[iid] is Backpack:
+			lying.append(iid)
+	if lying.size() >= Config.BACKPACKS_MAX: # the oldest one makes room
+		lying.sort()
+		(interactables[lying[0]] as Backpack).discard()
+	var at: Vector3 = players[id].pos
+	var state := inv.get_state()
+	state.merge({ "by": -1, "drop": true, "pack": true, "yaw": fposmod(_next_drop * 2.399963, TAU),
+		"at": Vector3(at.x, map.ground_y(at), at.z) })
+	var iid := Config.DROP_IID_BASE + _next_drop
+	_next_drop += 1
+	var pack := _add_drop(iid, state) as Backpack
+	interact_state.rpc(iid, pack.get_state())
+	inv.clear()
+	_sync_inventory(id)
+	hooks.on_backpack_dropped(id, pack)
+	return pack
+
+
+## A player takes what fits from a backpack. Returns how many things they took.
+func loot_backpack(id: int, pack: Backpack) -> int:
+	if not players.has(id) or pack.taken_by >= 0:
+		return 0
+	var inv: Inventory = players[id].inventory
+	var before := {}
+	for item: StringName in Inventory.ITEMS:
+		before[item] = inv.count(item)
+	var had_keys := inv.keys()
+	var moved := pack.loot(inv, id)
+	if moved == 0:
+		notice_to(id, "Can't carry any more")
+		return 0
+	_sync_inventory(id, "+%d  from the backpack" % moved)
+	for item: StringName in Inventory.ITEMS:
+		if inv.count(item) > before[item]:
+			hooks.on_item_picked_up(id, item, inv.count(item) - before[item])
+	for key in inv.keys():
+		if not had_keys.has(key):
+			hooks.on_key_picked_up(id, key)
+	return moved
+
+
+## Say something short to one player (the host included).
+func notice_to(id: int, text: String) -> void:
+	_send_to(id, &"notice", [text])
+
+
+func _on_local_item(item: StringName) -> void:
+	if is_host:
+		use_item(my_id, item)
+	else:
+		client_use_item.rpc_id(1, String(item))
 
 
 # --- Host: noise ------------------------------------------------------------------
@@ -1060,6 +1215,8 @@ func _process(delta: float) -> void:
 
 	_tick_mission_view(delta)
 	hud.set_objective(mission_view, zombies.size())
+	hud.set_inventory(local_player.inventory)
+	hud.set_wheel(local_player.wheel)
 	hud.set_countdown(mission_view)
 	_update_extraction()
 	var status: int = mission_view.status

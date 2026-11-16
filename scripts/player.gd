@@ -3,6 +3,7 @@ extends CharacterBody3D
 
 signal shoved(origin: Vector3, dir: Vector3) ## a shove went out: the game tells the host
 signal landed(height: float) ## the feet came down after falling this far (the host decides if it hurt)
+signal item_requested(item: StringName) ## an item of the inventory is to be used (the host decides if it can be)
 ## The player you control: physics movement, mouse look, first-person camera and guns.
 ## Movement runs at the physics rate; the camera is placed every rendered frame from the
 ## interpolated body transform, so it's smooth at 144 Hz.
@@ -21,6 +22,8 @@ var _breath_t := 0.0
 var shove_left := 0.0 # > 0 while a shove is still being swung
 var loadout := Loadout.all() # the guns this player carries, by slot (the host keeps its own copy)
 var last_weapon := -1     # the gun held before this one (the last-weapon key goes back to it)
+var inventory := Inventory.new() # a copy of what the host says we carry: for the wheel and the HUD, never trusted
+var wheel := ItemWheel.new()     # the item wheel, while its key is held
 var view: Viewmodel
 var aiming := false
 var sprinting := false
@@ -113,8 +116,51 @@ func kick_view(k: Vector2) -> void:
 	punch += k * (1.0 - Config.RECOIL_STAYS)
 
 
+## Hold the wheel key: the mouse moves its pointer instead of the view, until the key is let go.
+func open_wheel() -> void:
+	wheel.begin(inventory)
+
+
+## Let go of the wheel: a medical item is used, a throwable becomes the one the quick key throws.
+func close_wheel() -> void:
+	var item := wheel.finish()
+	match Inventory.kind_of(item):
+		Inventory.Kind.MEDICAL:
+			item_requested.emit(item)
+		Inventory.Kind.THROWABLE:
+			inventory.select_throwable(item)
+
+
+## The quick-heal key: the best heal carried. False if there is none.
+func try_quick_heal() -> bool:
+	var item := inventory.quick_heal()
+	if item == &"":
+		return false
+	item_requested.emit(item)
+	return true
+
+
+## The quick-throw key: the throwable that is ready. False if there is none.
+func try_quick_throw() -> bool:
+	var item := inventory.selected_throwable()
+	if item == &"":
+		return false
+	item_requested.emit(item)
+	return true
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		handle_event(event)
+
+
+## What a key press or mouse move does (only while the mouse is captured; tests call this directly).
+func handle_event(event: InputEvent) -> void:
+	if wheel.open: # nothing else works with the wheel up
+		if event.is_action_released("item_wheel"):
+			close_wheel()
+		elif event is InputEventMouseMotion:
+			wheel.push(event.relative)
 		return
 	if event is InputEventMouseMotion:
 		var sens: float = Settings.get_value("mouse_sensitivity") * camera.fov / base_fov() # slower when zoomed in
@@ -132,6 +178,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		switch_last()
 	elif event.is_action_pressed("shove"):
 		try_shove()
+	elif event.is_action_pressed("item_wheel"):
+		open_wheel()
+	elif event.is_action_pressed("quick_heal"):
+		try_quick_heal()
+	elif event.is_action_pressed("quick_throw"):
+		try_quick_throw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		cycle_weapon(1)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -145,9 +197,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	var input := Vector2.ZERO
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if wheel.open and not captured:
+		wheel.finish() # the window lost the mouse (pause menu) with the wheel up: nothing is picked
 	if captured and not bot:
 		input = Input.get_vector("move_left", "move_right", "move_back", "move_forward")
-		firing = Input.is_action_pressed("fire")
+		firing = Input.is_action_pressed("fire") and not wheel.open
 	elif not bot:
 		firing = false
 
@@ -156,7 +210,7 @@ func _physics_process(delta: float) -> void:
 	if not toggle or not ready or aim_blocked or not captured:
 		_aim_latched = false # reloading, swapping, using a door or leaving the window lowers the sights
 	var held := _aim_latched if toggle else Input.is_action_pressed("aim")
-	var want_aim := debug_aim or (captured and not bot and not aim_blocked and held)
+	var want_aim := debug_aim or (captured and not bot and not aim_blocked and held and not wheel.open)
 	aiming = want_aim and ready and not move.is_vaulting()
 	view.stow_goal = 1.0 if move.is_vaulting() else 0.0
 	if move.is_vaulting():

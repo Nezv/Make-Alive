@@ -35,6 +35,7 @@ func on_player_damaged(player_id: int, amount: int, by: Zombie) -> void:
 func on_player_died(player_id: int) -> void:
 	fired.emit(&"on_player_died", [player_id])
 	game.feed.rpc("%s was eaten" % game.player_name(player_id))
+	game.drop_backpack(player_id) # what they carried stays where they fell
 	if game.rules.running() and not game.rules.respawn:
 		game.rules.set_out(player_id, true) # no way back on this mission: with everyone out it is lost
 	else:
@@ -112,6 +113,8 @@ func on_right_click(player_id: int, target: Interactable) -> void:
 		on_right_click_ammo_box(player_id, target)
 	elif target is AmmoCrate:
 		on_right_click_ammo_crate(player_id, target)
+	elif target is Backpack:
+		on_right_click_backpack(player_id, target)
 
 
 func on_right_click_door(player_id: int, door: Door) -> void:
@@ -121,6 +124,10 @@ func on_right_click_door(player_id: int, door: Door) -> void:
 
 func on_right_click_lootbox(player_id: int, box: Lootbox) -> void:
 	fired.emit(&"on_right_click_lootbox", [player_id, box])
+	var wanted := StringName(box.loot)
+	if not box.opened and Inventory.valid(wanted) and game.inventory_room(player_id, wanted) <= 0:
+		game.notice_to(player_id, "Can't carry any more %s" % Inventory.item_name(wanted)) # it stays shut for later
+		return
 	var item := box.try_open()
 	if item != "":
 		on_loot_received(player_id, item)
@@ -184,12 +191,43 @@ func on_ammo_picked_up(player_id: int, ammo_type: int, rounds: int) -> void:
 	fired.emit(&"on_ammo_picked_up", [player_id, ammo_type, rounds])
 
 
+## What a lootbox held, by Inventory id: it goes in the player's pack.
 func on_loot_received(player_id: int, item: String) -> void:
 	fired.emit(&"on_loot_received", [player_id, item])
-	match item:
-		"medkit":
-			game.heal_player(player_id, Config.MEDKIT_HEAL)
-			game.feed.rpc("%s found a medkit (+%d HP)" % [game.player_name(player_id), Config.MEDKIT_HEAL])
+	if Inventory.valid(StringName(item)) and game.give_item(player_id, StringName(item)) > 0:
+		game.feed.rpc("%s found a %s" % [game.player_name(player_id), Inventory.item_name(StringName(item)).to_lower()])
+
+
+# --- Inventory --------------------------------------------------------------------
+
+## `count` of an item went into a player's inventory (found, looted, handed out).
+func on_item_picked_up(player_id: int, item: StringName, count: int) -> void:
+	fired.emit(&"on_item_picked_up", [player_id, item, count])
+
+
+func on_key_picked_up(player_id: int, key: StringName) -> void:
+	fired.emit(&"on_key_picked_up", [player_id, key])
+
+
+## A player used an item (the host already took it out of their inventory): this is what it does.
+## Painkillers and the throwables have no effect yet: S015 and S093 write them here.
+func on_item_used(player_id: int, item: StringName) -> void:
+	fired.emit(&"on_item_used", [player_id, item])
+	if item == Inventory.MEDKIT:
+		game.heal_player(player_id, Config.MEDKIT_HEAL)
+	elif item == Inventory.BANDAGE:
+		game.heal_player(player_id, Config.BANDAGE_HEAL)
+
+
+## A dead player's inventory is lying where they fell.
+func on_backpack_dropped(player_id: int, pack: Backpack) -> void:
+	fired.emit(&"on_backpack_dropped", [player_id, pack])
+
+
+## Someone takes what they can from a backpack; what does not fit stays in it.
+func on_right_click_backpack(player_id: int, pack: Backpack) -> void:
+	fired.emit(&"on_right_click_backpack", [player_id, pack])
+	game.loot_backpack(player_id, pack)
 
 
 # --- Zombies ----------------------------------------------------------------------

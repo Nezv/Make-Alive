@@ -26,6 +26,7 @@ extends Node
 ##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload or shove
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --wheel                host: carry a little of everything and hold the item wheel up (pointer on the bandage)
 ##   --noise                host: draw an expanding ring wherever something made noise, out to where it is heard
 ##   --zones                draw the map data: zones, zombie closets (red), horde routes (orange), spawns (white)
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
@@ -125,6 +126,8 @@ func _host(map_name := "city", mission := "") -> void:
 		_fx_rack()
 	if _args.has("noise"):
 		game.show_noise()
+	if _args.has("wheel"):
+		_wheel()
 	if _args.has("zones"):
 		game.add_child(game.map.data.debug_node())
 	if _args.has("cam") or _args.has("shot-cam"):
@@ -209,6 +212,18 @@ func _demo() -> void:
 		Zombie.Type.WALKER, Zombie.Type.RUNNER, Zombie.Type.LEAPER, Zombie.Type.WALKER]
 	for i in types.size():
 		game.spawn_zombie(types[i], Vector3(-2.2 + (i % 4) * 1.4, 0.1, 8.0 + (i / 4) * 5.0 + (i % 2) * 1.5))
+
+
+## A little of everything in the pack and the item wheel up, for looking at it.
+func _wheel() -> void:
+	game.give_item(1, Inventory.BANDAGE, 3)
+	game.give_item(1, Inventory.PLANK, 4)
+	game.give_item(1, Inventory.FRAG, 2)
+	game.give_item(1, Inventory.LURE, 1)
+	game.give_key(1, &"generator")
+	var p := game.local_player
+	p.open_wheel()
+	p.wheel.offset = Vector2(Config.WHEEL_RADIUS, -Config.WHEEL_RADIUS * 0.6)
 
 
 ## Hold a first-person gun pose so a screenshot can show it.

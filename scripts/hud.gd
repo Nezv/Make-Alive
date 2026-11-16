@@ -20,6 +20,8 @@ var feed_box: VBoxContainer
 var prompt_label: Label
 var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
+var inventory_label: Label ## what is carried besides guns, small, bottom left
+var wheel_view: ItemWheelView ## the item wheel, while its key is held
 var objective_label: Label  ## the current objective and its clock, top centre
 var countdown_label: Label  ## big numerals while the extraction clock runs
 var last_beep_pitch := 0.0  ## pitch of the last countdown beep (tests)
@@ -105,6 +107,10 @@ void fragment() {
 	stamina_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stamina_fill.size = STAMINA_SIZE
 	stamina_bar.add_child(stamina_fill)
+	inventory_label = _label(15, Control.PRESET_BOTTOM_LEFT, Vector2(28, -104))
+	inventory_label.modulate.a = 0.85
+	wheel_view = ItemWheelView.new()
+	add_child(wheel_view)
 	weapon_label = _label(26, Control.PRESET_BOTTOM_RIGHT, Vector2(-420, -82))
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	weapon_label.size.x = 400
@@ -287,7 +293,7 @@ func _build_pause() -> void:
 	leave.pressed.connect(func(): leave_pressed.emit())
 	v.add_child(leave)
 	var help := Label.new()
-	help.text = "WASD move · Shift sprint · Ctrl crouch · Space jump (sprint into low cover to vault it)\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · V shove · 1-9 or mouse wheel change gun · Q last gun · Esc menu"
+	help.text = "WASD move · Shift sprint · Ctrl crouch · Space jump (sprint into low cover to vault it)\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · V shove · 1-9 or mouse wheel change gun · Q last gun · Esc menu\nH heal · G throw · hold Tab for the item wheel"
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.modulate.a = 0.7
 	v.add_child(help)
@@ -359,6 +365,26 @@ func set_stamina(share: float, winded: bool) -> void:
 	_stamina = clampf(share, 0.0, 1.0)
 	stamina_fill.size.x = STAMINA_SIZE.x * _stamina
 	stamina_fill.color = STAMINA_WINDED if winded else STAMINA_COLOR
+
+
+## What is carried besides guns: "Medkit 1 · Bandage 2 · Frag grenade 3 (ready)". Empty, nothing shows.
+func set_inventory(inv: Inventory) -> void:
+	var parts: Array[String] = []
+	for item: StringName in Inventory.ITEMS:
+		if inv.count(item) > 0:
+			var ready := " (ready)" if item == inv.selected_throwable() and inv.throwables().size() > 1 else ""
+			parts.append("%s %d%s" % [Inventory.item_name(item), inv.count(item), ready])
+	for id in inv.keys():
+		parts.append("Key %s" % id)
+	inventory_label.text = "  ·  ".join(parts)
+
+
+## The item wheel is up (or not): drawn round the middle of the screen.
+func set_wheel(wheel: ItemWheel) -> void:
+	wheel_view.wheel = wheel
+	wheel_view.visible = wheel.open
+	if wheel.open:
+		wheel_view.queue_redraw()
 
 
 ## Something was picked up: `text` ("+30  7.62") rises over the ammo count and fades.

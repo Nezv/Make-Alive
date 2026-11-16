@@ -19,7 +19,7 @@ Legend: [x] exists, [ ] not built.
 - [ ] Defend objective: timer until the helicopter arrives, escalating hordes, helicopter fly-in.
 - [x] Limited ammo, ammo pickups, reserve ammo per calibre (built; both maps still play with infinite ammo, try it with `--limited-ammo`).
 - [ ] Loadout: carry 2-3 weapons instead of all nine, weapon pickups already exist (`weapon_pickup.gd`).
-- [ ] Inventory: medkits, grenades, keys, barricade materials.
+- [ ] Inventory: medkits, bandages, planks, keys, throwable slots, item wheel (H heal, G throw, hold Tab) and dead players' backpacks are built; grenades themselves come with the throwables step, the wheel's icons are still names.
 - [ ] Health: bleeding, healing items, downed state and revive by teammates.
 - [ ] Respawn / spectator after death.
 - [ ] Stamina for sprinting.
