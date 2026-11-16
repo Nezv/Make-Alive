@@ -260,6 +260,7 @@ func test_a_medkit_is_spent_to_heal_and_never_wasted_at_full_health() -> void:
 	assert_eq(g.players[1].inventory.count(I.MEDKIT), 1, "and it is still there")
 	g.damage_player(1, 50)
 	assert_true(g.use_item(1, I.MEDKIT))
+	g.tick_status(I.use_time(I.MEDKIT)) # healing takes its time
 	assert_eq(g.players[1].health.hp, 50 + Config.MEDKIT_HEAL)
 	assert_eq(g.players[1].inventory.count(I.MEDKIT), 0)
 	assert_eq(g.local_player.inventory.count(I.MEDKIT), 0, "the player's copy follows")
@@ -288,6 +289,7 @@ func test_the_quick_heal_key_asks_the_host_for_the_best_heal() -> void:
 	g.give_item(1, I.MEDKIT)
 	g.damage_player(1, 60)
 	assert_true(lp.try_quick_heal())
+	g.tick_status(I.use_time(I.MEDKIT))
 	assert_eq(g.players[1].health.hp, 40 + Config.MEDKIT_HEAL, "the medkit went first")
 	assert_eq(g.players[1].inventory.count(I.MEDKIT), 0)
 	assert_eq(g.players[1].inventory.count(I.BANDAGE), 1)
@@ -327,6 +329,7 @@ func test_holding_the_wheel_takes_the_mouse_off_the_view_and_releasing_uses_the_
 	assert_eq(lp.wheel.selected(), 0, "the mouse moved the wheel instead")
 	lp.close_wheel()
 	assert_false(lp.wheel.open)
+	g.tick_status(I.use_time(I.MEDKIT))
 	assert_eq(g.players[1].health.hp, 50 + Config.MEDKIT_HEAL, "up is the medkit")
 	# A throwable wedge only makes it the one the quick key throws.
 	lp.open_wheel()
@@ -475,6 +478,7 @@ func test_a_lootbox_medkit_goes_into_the_inventory_and_stays_shut_when_there_is_
 	assert_false(g.lootbox.opened, "no room: the crate stays shut for when there is")
 	g.damage_player(1, 30)
 	assert_true(g.use_item(1, I.MEDKIT))
+	g.tick_status(I.use_time(I.MEDKIT))
 	g.host_interact(1, g.lootbox.iid)
 	assert_true(g.lootbox.opened)
 	assert_eq(g.players[1].inventory.count(I.MEDKIT), I.cap_of(I.MEDKIT), "one used, one found")

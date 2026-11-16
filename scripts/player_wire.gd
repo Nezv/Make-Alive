@@ -9,6 +9,9 @@ class_name PlayerWire
 const BYTES_EACH := 23
 const ACTION_CROUCH := 1
 const ACTION_AIR := 2 ## off the ground: jumping, falling, vaulting
+const ACTION_HEAL := 4  ## using a medical item (set by the host, never trusted from a client)
+const ACTION_BLEED := 8 ## has an open wound (host only too)
+const ACTION_BODY := ACTION_CROUCH | ACTION_AIR ## what a client may say about itself
 
 
 ## `list`: Array of { id, pos: Vector3, yaw, hp, kills, weapon, action } (`action` may be left out).

@@ -36,6 +36,7 @@ func on_player_died(player_id: int) -> void:
 	fired.emit(&"on_player_died", [player_id])
 	game.feed.rpc("%s was eaten" % game.player_name(player_id))
 	game.drop_backpack(player_id) # what they carried stays where they fell
+	game.clear_status(player_id)
 	if game.rules.running() and not game.rules.respawn:
 		game.rules.set_out(player_id, true) # no way back on this mission: with everyone out it is lost
 	else:
@@ -209,14 +210,36 @@ func on_key_picked_up(player_id: int, key: StringName) -> void:
 	fired.emit(&"on_key_picked_up", [player_id, key])
 
 
-## A player used an item (the host already took it out of their inventory): this is what it does.
-## Painkillers and the throwables have no effect yet: S015 and S093 write them here.
+## A player used an item (it is on, and the host already took it out of their inventory): this is what it does.
+## Throwables have no effect yet: S093 writes theirs here.
 func on_item_used(player_id: int, item: StringName) -> void:
 	fired.emit(&"on_item_used", [player_id, item])
-	if item == Inventory.MEDKIT:
-		game.heal_player(player_id, Config.MEDKIT_HEAL)
-	elif item == Inventory.BANDAGE:
-		game.heal_player(player_id, Config.BANDAGE_HEAL)
+	if item == Inventory.PAINKILLERS:
+		game.players[player_id].health.add_temp(Config.PAINKILLERS_TEMP)
+		return
+	if item != Inventory.MEDKIT and item != Inventory.BANDAGE:
+		return
+	var health: Health = game.players[player_id].health
+	var before := health.hp
+	game.heal_player(player_id, Config.MEDKIT_HEAL if item == Inventory.MEDKIT else Config.BANDAGE_HEAL)
+	(game.players[player_id].status as PlayerStatus).stop_bleeding()
+	game._sync_status(player_id)
+	on_player_healed(player_id, item, health.hp - before)
+
+
+## A heal finished: `amount` HP came back (and the wounds closed).
+func on_player_healed(player_id: int, item: StringName, amount: int) -> void:
+	fired.emit(&"on_player_healed", [player_id, item, amount])
+
+
+## A zombie's hit opened another wound: `stacks` are bleeding now.
+func on_player_bleeding(player_id: int, stacks: int) -> void:
+	fired.emit(&"on_player_bleeding", [player_id, stacks])
+
+
+## What a player was putting on was knocked off (a hit) or abandoned (a sprint). The item is still theirs.
+func on_item_use_cancelled(player_id: int, item: StringName) -> void:
+	fired.emit(&"on_item_use_cancelled", [player_id, item])
 
 
 ## A dead player's inventory is lying where they fell.

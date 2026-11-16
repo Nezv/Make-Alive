@@ -4,6 +4,7 @@ extends CharacterBody3D
 signal shoved(origin: Vector3, dir: Vector3) ## a shove went out: the game tells the host
 signal landed(height: float) ## the feet came down after falling this far (the host decides if it hurt)
 signal item_requested(item: StringName) ## an item of the inventory is to be used (the host decides if it can be)
+signal use_cancelled ## a sprint began while an item was being put on
 ## The player you control: physics movement, mouse look, first-person camera and guns.
 ## Movement runs at the physics rate; the camera is placed every rendered frame from the
 ## interpolated body transform, so it's smooth at 144 Hz.
@@ -24,6 +25,7 @@ var loadout := Loadout.all() # the guns this player carries, by slot (the host k
 var last_weapon := -1     # the gun held before this one (the last-weapon key goes back to it)
 var inventory := Inventory.new() # a copy of what the host says we carry: for the wheel and the HUD, never trusted
 var wheel := ItemWheel.new()     # the item wheel, while its key is held
+var status := PlayerStatus.new() # wounds and what is being put on, as the host says (a copy, for the HUD and the view)
 var view: Viewmodel
 var aiming := false
 var sprinting := false
@@ -131,6 +133,13 @@ func close_wheel() -> void:
 			inventory.select_throwable(item)
 
 
+## Sprinting off while something is being put on cancels it (the host is told; the item stays in the pack).
+func check_use_cancel(running: bool) -> void:
+	if running and status.is_using():
+		status.cancel_use()
+		use_cancelled.emit()
+
+
 ## The quick-heal key: the best heal carried. False if there is none.
 func try_quick_heal() -> bool:
 	var item := inventory.quick_heal()
@@ -226,6 +235,7 @@ func _physics_process(delta: float) -> void:
 		running = bot_sprint and bot_move != Vector3.ZERO and not aiming
 	else:
 		running = running and move.can_sprint() and not wants_crouch # winded or crouched: a walk
+	check_use_cancel(running and move_speed > 0.1)
 	sprinting = (running or debug_sprint) and not aiming
 	var speed := move.speed(weapons.current, running, aiming)
 	velocity.x = dir.x * speed

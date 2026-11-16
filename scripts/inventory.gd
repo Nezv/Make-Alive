@@ -18,17 +18,17 @@ const MOLOTOV := &"molotov"
 const FLASHBANG := &"flashbang"
 const LURE := &"lure"
 
-## Per item: name, kind, cap (most of it carried). The order here is the order things are listed in
+## Per item: name, kind, cap (most of it carried), use (seconds it takes to use: 0 is at once). The order here is the order things are listed in
 ## (throwables fill the wheel's two throwable wedges in it). Throwables are only handed out from S093 on.
 const ITEMS := {
-	MEDKIT: { "name": "Medkit", "kind": Kind.MEDICAL, "cap": 2 },
-	BANDAGE: { "name": "Bandage", "kind": Kind.MEDICAL, "cap": 5 },
-	PAINKILLERS: { "name": "Painkillers", "kind": Kind.MEDICAL, "cap": 3 },
-	PLANK: { "name": "Plank", "kind": Kind.MATERIAL, "cap": 8 },
-	FRAG: { "name": "Frag grenade", "kind": Kind.THROWABLE, "cap": 3 },
-	MOLOTOV: { "name": "Molotov", "kind": Kind.THROWABLE, "cap": 3 },
-	FLASHBANG: { "name": "Flashbang", "kind": Kind.THROWABLE, "cap": 3 },
-	LURE: { "name": "Noise lure", "kind": Kind.THROWABLE, "cap": 3 },
+	MEDKIT: { "name": "Medkit", "kind": Kind.MEDICAL, "cap": 2, "use": 3.0 },
+	BANDAGE: { "name": "Bandage", "kind": Kind.MEDICAL, "cap": 5, "use": 1.5 },
+	PAINKILLERS: { "name": "Painkillers", "kind": Kind.MEDICAL, "cap": 3, "use": 1.0 },
+	PLANK: { "name": "Plank", "kind": Kind.MATERIAL, "cap": 8, "use": 0.0 },
+	FRAG: { "name": "Frag grenade", "kind": Kind.THROWABLE, "cap": 3, "use": 0.0 },
+	MOLOTOV: { "name": "Molotov", "kind": Kind.THROWABLE, "cap": 3, "use": 0.0 },
+	FLASHBANG: { "name": "Flashbang", "kind": Kind.THROWABLE, "cap": 3, "use": 0.0 },
+	LURE: { "name": "Noise lure", "kind": Kind.THROWABLE, "cap": 3, "use": 0.0 },
 }
 ## What the quick-heal key reaches for, in turn.
 const QUICK_HEAL := [MEDKIT, BANDAGE]
@@ -53,6 +53,11 @@ static func kind_of(item: StringName) -> int:
 
 static func cap_of(item: StringName) -> int:
 	return ITEMS[item].cap if valid(item) else 0
+
+
+## Seconds it takes to use `item` (0: at once, like a throw).
+static func use_time(item: StringName) -> float:
+	return ITEMS[item].use if valid(item) else 0.0
 
 
 func count(item: StringName) -> int:

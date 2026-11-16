@@ -21,6 +21,7 @@ var prompt_label: Label
 var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
 var inventory_label: Label ## what is carried besides guns, small, bottom left
+var status_label: Label    ## wounds and what is being put on, above it
 var wheel_view: ItemWheelView ## the item wheel, while its key is held
 var objective_label: Label  ## the current objective and its clock, top centre
 var countdown_label: Label  ## big numerals while the extraction clock runs
@@ -107,6 +108,7 @@ void fragment() {
 	stamina_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stamina_fill.size = STAMINA_SIZE
 	stamina_bar.add_child(stamina_fill)
+	status_label = _label(17, Control.PRESET_BOTTOM_LEFT, Vector2(28, -132))
 	inventory_label = _label(15, Control.PRESET_BOTTOM_LEFT, Vector2(28, -104))
 	inventory_label.modulate.a = 0.85
 	wheel_view = ItemWheelView.new()
@@ -377,6 +379,17 @@ func set_inventory(inv: Inventory) -> void:
 	for id in inv.keys():
 		parts.append("Key %s" % id)
 	inventory_label.text = "  ·  ".join(parts)
+
+
+## "BLEEDING x2" and what is being put on, with the seconds left. Nothing when all is well.
+func set_status(status: PlayerStatus) -> void:
+	var parts: Array[String] = []
+	if status.bleed > 0:
+		parts.append("BLEEDING x%d" % status.bleed)
+	if status.is_using():
+		parts.append("%s  %.1f s" % [Inventory.item_name(status.using), status.use_left])
+	status_label.text = "   ·   ".join(parts)
+	status_label.modulate = Color("ff6a5a") if status.bleed > 0 else Color.WHITE
 
 
 ## The item wheel is up (or not): drawn round the middle of the screen.

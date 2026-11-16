@@ -37,6 +37,7 @@ func test_lootbox_gives_medkit_once() -> void:
 	assert_eq(g.players[1].inventory.count(Inventory.MEDKIT), 1, "the medkit goes in the pack, to be used when needed")
 	assert_eq(g.players[1].health.hp, 50)
 	assert_true(g.use_item(1, Inventory.MEDKIT))
+	g.tick_status(Inventory.use_time(Inventory.MEDKIT))
 	assert_eq(g.players[1].health.hp, 50 + Config.MEDKIT_HEAL)
 	g.host_interact(1, g.lootbox.iid)
 	assert_eq(g.players[1].inventory.count(Inventory.MEDKIT), 0, "second click gives nothing")

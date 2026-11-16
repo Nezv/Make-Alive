@@ -50,7 +50,7 @@ var looked_at: Interactable = null
 var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellets (tests seed it)
 
 # Host-only
-var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve }
+var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve, inventory: Inventory, status: PlayerStatus }
 var _pending_shots: Array = []
 var _next_zombie := 1
 var _step_t := 0.0       ## seconds since players were last checked for sprinting footsteps
@@ -168,6 +168,7 @@ func _build_world() -> void:
 	local_player.landed.connect(_on_local_landed)
 	local_player.shoved.connect(_on_local_shove)
 	local_player.item_requested.connect(_on_local_item)
+	local_player.use_cancelled.connect(_on_local_use_cancelled)
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
@@ -214,7 +215,7 @@ func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
 		return
 	p.pos = pos
 	p.yaw = yaw
-	p.action = action
+	p.action = action & PlayerWire.ACTION_BODY # the host adds bleeding and healing itself
 
 
 ## The sender swung a shove from `origin` along `dir`.
@@ -291,6 +292,13 @@ func client_ammo_used(type: int, rounds: int) -> void:
 func client_interact(iid: int, weapon: int = -1, rounds: int = -1) -> void:
 	if is_host:
 		host_interact(multiplayer.get_remote_sender_id(), iid, weapon, rounds)
+
+
+## The sender started something that stops them using an item (a sprint).
+@rpc("any_peer", "call_remote", "reliable")
+func client_cancel_use() -> void:
+	if is_host:
+		cancel_use(multiplayer.get_remote_sender_id())
 
 
 ## A player used an item from their inventory (Inventory ids travel as strings).
@@ -400,6 +408,13 @@ func inventory_changed(state: Dictionary, popup := "") -> void:
 		local_player.inventory.apply_state(state)
 		if popup != "":
 			hud.gain(popup)
+
+
+## Your wounds and what you are using changed (PlayerStatus.get_state).
+@rpc("authority", "call_remote", "reliable")
+func status_changed(state: Dictionary) -> void:
+	if local_player:
+		local_player.status.apply_state(state)
 
 
 ## A short line for one player (the HUD's rising text): "Can't carry any more".
@@ -539,7 +554,7 @@ func _add_player(id: int, player_name_: String) -> void:
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
 		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
-		"reserve": map.starting_ammo(), "inventory": Inventory.new() }
+		"reserve": map.starting_ammo(), "inventory": Inventory.new(), "status": PlayerStatus.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
 	health.died.connect(func(): hooks.on_player_died(id))
@@ -575,6 +590,7 @@ func respawn_player(id: int, reason: String) -> void:
 		p.pos = Vector3(at.x, map.ground_y(at) + 0.1, at.z)
 	p.step_pos = p.pos
 	(p.health as Health).reset()
+	clear_status(id)
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
 
@@ -679,29 +695,91 @@ func _sync_inventory(id: int, popup := "") -> void:
 		_send_to(id, &"inventory_changed", [(players[id].inventory as Inventory).get_state(), popup])
 
 
-## Could this player use `item` right now? They must be alive and have one; a heal is only for the hurt.
+## Could this player start using `item` right now? They must be alive, have one and not be busy with
+## another; a heal is for the hurt or the bleeding, painkillers for when the last dose is wearing off.
 func can_use_item(id: int, item: StringName) -> bool:
 	if not players.has(id) or rules.out.has(id) or not Inventory.valid(item):
 		return false
 	var health: Health = players[id].health
-	if health.is_dead() or (players[id].inventory as Inventory).count(item) <= 0:
+	var status: PlayerStatus = players[id].status
+	if health.is_dead() or status.is_using() or (players[id].inventory as Inventory).count(item) <= 0:
 		return false
 	match Inventory.kind_of(item):
 		Inventory.Kind.MATERIAL:
 			return false # planks go up on a barricade, they are not used from the pack
 		Inventory.Kind.MEDICAL:
-			return item == Inventory.PAINKILLERS or health.hp < health.max_hp
+			if item == Inventory.PAINKILLERS:
+				return health.temp < Config.PAINKILLERS_TEMP * Config.PAINKILLERS_REUSE
+			return health.hp < health.max_hp or status.bleed > 0
 	return true
 
 
-## A player uses an item: it leaves their inventory and `on_item_used` says what it does.
+## A player starts using an item. A throw is at once; the medical things take their time
+## (`Inventory.use_time`) and only leave the pack when they are done: a hit or a sprint cancels them.
 func use_item(id: int, item: StringName) -> bool:
 	if not can_use_item(id, item):
 		return false
-	(players[id].inventory as Inventory).remove(item)
+	var seconds := Inventory.use_time(item)
+	if seconds <= 0.0:
+		_finish_use(id, item)
+	else:
+		(players[id].status as PlayerStatus).begin_use(item, seconds)
+		_sync_status(id)
+	return true
+
+
+## What a player was using is cancelled (a hit, a sprint). The item stays in the pack. False if they were not using anything.
+func cancel_use(id: int) -> bool:
+	if not players.has(id):
+		return false
+	var status: PlayerStatus = players[id].status
+	var item := status.using
+	if not status.cancel_use():
+		return false
+	_sync_status(id)
+	hooks.on_item_use_cancelled(id, item)
+	return true
+
+
+## The item is on: it leaves the pack and `on_item_used` does what it does.
+func _finish_use(id: int, item: StringName) -> void:
+	if not (players[id].inventory as Inventory).remove(item):
+		return
 	_sync_inventory(id)
 	hooks.on_item_used(id, item)
-	return true
+
+
+## Tell a player their wounds and what they are using.
+func _sync_status(id: int) -> void:
+	if players.has(id):
+		_send_to(id, &"status_changed", [(players[id].status as PlayerStatus).get_state()])
+
+
+## A new life (or a death with no way back): no wounds, nothing being used.
+func clear_status(id: int) -> void:
+	if players.has(id):
+		(players[id].status as PlayerStatus).reset()
+		_sync_status(id)
+
+
+## Host, every physics tick: wounds bleed, painkillers wear off, what is being used gets nearer done.
+func tick_status(delta: float) -> void:
+	for id: int in players.keys():
+		var p: Dictionary = players[id]
+		var health: Health = p.health
+		if health.is_dead() or rules.out.has(id):
+			continue
+		health.decay_temp(delta)
+		var lost: int = (p.status as PlayerStatus).bleed_damage(delta)
+		if lost > 0:
+			hooks.on_player_damaged(id, lost, null)
+			health.damage(lost) # (not damage_player: bleeding must not cancel the bandage)
+			if health.is_dead():
+				continue # it killed them: they have a new life, or are out
+		var done: StringName = (p.status as PlayerStatus).step_use(delta)
+		if done != &"":
+			_sync_status(id)
+			_finish_use(id, done)
 
 
 ## Host: everything a player carries goes on the ground where they stand, for the others to loot.
@@ -759,6 +837,13 @@ func loot_backpack(id: int, pack: Backpack) -> int:
 ## Say something short to one player (the host included).
 func notice_to(id: int, text: String) -> void:
 	_send_to(id, &"notice", [text])
+
+
+func _on_local_use_cancelled() -> void:
+	if is_host:
+		cancel_use(my_id)
+	else:
+		client_cancel_use.rpc_id(1)
 
 
 func _on_local_item(item: StringName) -> void:
@@ -844,11 +929,21 @@ func _on_local_landed(height: float) -> void:
 		client_fell.rpc_id(1, height)
 
 
-func damage_player(id: int, amount: int, by: Zombie = null) -> void:
+## `bleed_roll` (0..1) decides whether a zombie's hit also opens a wound; -1 rolls it (tests pin it).
+func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) -> void:
 	if not players.has(id):
 		return
 	hooks.on_player_damaged(id, amount, by)
+	var status: PlayerStatus = players[id].status
+	var bleeds := false
+	if amount > 0:
+		cancel_use(id) # a hit knocks the bandage off
+		if by != null:
+			bleeds = status.hurt(rng.randf() if bleed_roll < 0.0 else bleed_roll)
 	(players[id].health as Health).damage(amount)
+	if bleeds and status.bleed > 0: # (a hit that killed them leaves a clean new life, no wound)
+		_sync_status(id)
+		hooks.on_player_bleeding(id, status.bleed)
 
 
 func heal_player(id: int, amount: int) -> void:
@@ -1122,6 +1217,7 @@ func _physics_process(delta: float) -> void:
 	players[1].yaw = local_player.yaw
 	players[1].action = local_player.action_bits()
 	_footsteps(delta)
+	tick_status(delta)
 
 	director.step(delta)
 	rules.step(delta)
@@ -1140,13 +1236,23 @@ func _physics_process(delta: float) -> void:
 		_apply_snapshot(snap[0], snap[1])
 
 
+## What a player's body is doing as everyone else sees it: what their own game said plus what the host knows.
+func _action_bits(p: Dictionary) -> int:
+	var bits: int = p.action
+	if (p.status as PlayerStatus).bleed > 0:
+		bits |= PlayerWire.ACTION_BLEED
+	if (p.status as PlayerStatus).is_using():
+		bits |= PlayerWire.ACTION_HEAL
+	return bits
+
+
 ## Host: where everyone and everything is right now, as [players, zombies] (see PlayerWire and
 ## ZombieWire for what each entry holds). Sent Config.TICK_RATE times a second; must fit one packet.
 func build_snapshot() -> Array:
 	var pd := []
 	for id: int in players:
 		var p: Dictionary = players[id]
-		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon, "action": p.action })
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).total(), "kills": p.kills, "weapon": p.weapon, "action": _action_bits(p) })
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
@@ -1215,7 +1321,9 @@ func _process(delta: float) -> void:
 
 	_tick_mission_view(delta)
 	hud.set_objective(mission_view, zombies.size())
+	local_player.status.tick_view(delta)
 	hud.set_inventory(local_player.inventory)
+	hud.set_status(local_player.status)
 	hud.set_wheel(local_player.wheel)
 	hud.set_countdown(mission_view)
 	_update_extraction()
