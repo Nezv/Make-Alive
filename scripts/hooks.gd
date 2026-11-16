@@ -29,6 +29,7 @@ func on_low_hp(player_id: int) -> void:
 ## `by` is the zombie that did it (null for other causes).
 func on_player_damaged(player_id: int, amount: int, by: Zombie) -> void:
 	fired.emit(&"on_player_damaged", [player_id, amount, by])
+	game.score.add(player_id, "damage", amount)
 
 
 func on_player_died(player_id: int) -> void:
@@ -52,6 +53,7 @@ func on_player_downed(player_id: int) -> void:
 
 func on_player_revived(player_id: int, by_player: int) -> void:
 	fired.emit(&"on_player_revived", [player_id, by_player])
+	game.score.add(by_player, "revives")
 
 
 # --- Mission ----------------------------------------------------------------------
@@ -200,11 +202,15 @@ func on_zombie_hit(zombie: Zombie, part: int, damage: int, by_player: int) -> vo
 ## An arm or leg just came off (the zombie is still alive).
 func on_limb_severed(zombie: Zombie, part: int, by_player: int) -> void:
 	fired.emit(&"on_limb_severed", [zombie, part, by_player])
+	game.score.add(by_player, "severs")
 
 
 ## Called just before the zombie is removed and turned into a ragdoll.
 func on_zombie_killed(zombie: Zombie, by_player: int, headshot: bool) -> void:
 	fired.emit(&"on_zombie_killed", [zombie, by_player, headshot])
+	game.score.add(by_player, "kills")
+	if headshot:
+		game.score.add(by_player, "headshots")
 	if not game.map.infinite_ammo: # a few of the dead had ammo on them (which ones is seeded by their id)
 		var drop := AmmoBox.roll_drop(zombie.zid, Characters.outfit_for(zombie.zid, zombie.type))
 		if not drop.is_empty():

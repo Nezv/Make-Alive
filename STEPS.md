@@ -294,13 +294,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Look: a safe room door or a lit military tent, a hand-painted arrow before it
 - [x] HUD toast and a short calm from the director
 
-### [ ] S026 · Scoring and end screen
+### [x] S026 · Scoring and end screen
 > needs: S022 | size: M | test: `tests/test_scoring.gd`
-- [ ] Host counts per player: kills, headshots, limbs severed, damage taken, revives, shots fired and hit, distance
-- [ ] End screen: EXTRACTED in green or MISSION FAILED in red slamming in, mission time, a row per player with counters ticking up
-- [ ] Titles: most headshots, medic, survivor with least damage, last one standing
-- [ ] Best time per mission and difficulty saved to `user://records.cfg`
-- [ ] Buttons: retry (host), back to lobby
+- [x] Host counts per player: kills, headshots, limbs severed, damage taken, revives, shots fired and hit, distance
+- [x] End screen: EXTRACTED in green or MISSION FAILED in red slamming in, mission time, a row per player with counters ticking up
+- [x] Titles: most headshots, medic, survivor with least damage, last one standing
+- [x] Best time per mission and difficulty saved to `user://records.cfg`
+- [x] Buttons: retry (host), back to lobby
+  - Until the lobby exists (S122) the second button goes back to the menu
 
 ### [ ] S027 · Difficulty
 > needs: S023 | size: S | test: `tests/test_difficulty.gd`

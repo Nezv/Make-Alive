@@ -3,6 +3,7 @@ extends CanvasLayer
 ## In-game overlay: crosshair, health, info, kill feed, extraction bar, toasts, perf, pause menu.
 
 signal leave_pressed
+signal retry_pressed
 
 const GAIN_AT := Vector2(-420, -116)
 const GAIN_COLOR := Color("9be29b")
@@ -27,6 +28,12 @@ var end_panel: PanelContainer
 var end_title: Label
 var end_detail: Label
 var end_button: Button
+var retry_button: Button     ## only the host may start the match again
+var end_titles: Label
+var score_rows: Array[Label] = []
+var _rows_box: VBoxContainer
+var _score: Dictionary = {}
+var _score_t := 0.0
 var _last_second := -1
 var _ended := false
 var _match_t := 0.0
@@ -159,8 +166,8 @@ func _build_end() -> void:
 	add_child(fade)
 	end_panel = PanelContainer.new()
 	end_panel.set_anchors_preset(Control.PRESET_CENTER)
-	end_panel.custom_minimum_size = Vector2(460, 0)
-	end_panel.position = Vector2(-230, -110)
+	end_panel.custom_minimum_size = Vector2(760, 0)
+	end_panel.position = Vector2(-380, -170)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	end_panel.add_child(v)
@@ -171,10 +178,25 @@ func _build_end() -> void:
 	end_detail = Label.new()
 	end_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(end_detail)
+	_rows_box = VBoxContainer.new()
+	v.add_child(_rows_box)
+	end_titles = Label.new()
+	end_titles.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	end_titles.modulate = Color("ffd27a")
+	v.add_child(end_titles)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 12)
+	v.add_child(buttons)
+	retry_button = Button.new()
+	retry_button.text = "Retry"
+	retry_button.visible = false
+	retry_button.pressed.connect(func(): retry_pressed.emit())
+	buttons.add_child(retry_button)
 	end_button = Button.new()
 	end_button.text = "Back to the menu"
 	end_button.pressed.connect(func(): leave_pressed.emit())
-	v.add_child(end_button)
+	buttons.add_child(end_button)
 	end_panel.visible = false
 	add_child(end_panel)
 
@@ -194,6 +216,41 @@ func set_countdown(view: Dictionary) -> void:
 		last_beep_pitch = Config.EXTRACT_BEEP_PITCH * pow(Config.EXTRACT_BEEP_STEP, Config.EXTRACT_BEEPS - whole)
 		Sfx.play_ui("beep", 0.0, last_beep_pitch)
 	_last_second = whole
+
+
+## The host's numbers for the end screen (Score.summary): a row per player, counted up.
+func set_final_score(summary: Dictionary) -> void:
+	_score = summary
+	_score_t = 0.0
+	for r in score_rows:
+		r.free()
+	score_rows.clear()
+	for row: Dictionary in summary.get("rows", []):
+		var l := Label.new()
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_rows_box.add_child(l)
+		score_rows.append(l)
+	var lines := []
+	var titles: Dictionary = summary.get("titles", {})
+	for title: String in titles:
+		lines.append("%s: %s" % [title, titles[title]])
+	end_titles.text = "   ·   ".join(lines)
+	var whole := floori(float(summary.get("seconds", _match_t)))
+	end_detail.text = "Time %d:%02d%s" % [whole / 60, whole % 60, "   NEW BEST" if summary.get("best", false) else ""]
+	_write_rows(0.0)
+
+
+## The rows with every counter at `share` (0..1) of its final value.
+func _write_rows(share: float) -> void:
+	var rows: Array = _score.get("rows", [])
+	for i in mini(rows.size(), score_rows.size()):
+		var r: Dictionary = rows[i]
+		var n := func(key: String) -> int: return roundi(float(r.get(key, 0)) * share)
+		var shots: int = r.get("shots", 0)
+		var accuracy := roundi(100.0 * float(r.get("hits", 0)) / shots * share) if shots > 0 else 0
+		score_rows[i].text = "%s    %d kills · %d heads · %d limbs · %d%% hit · %d hurt · %d revives · %d m" % [
+			r.get("name", "Survivor"), n.call("kills"), n.call("headshots"), n.call("severs"), accuracy,
+			n.call("damage"), n.call("revives"), n.call("distance")]
 
 
 ## The mission is over: fade, then the end screen with how long it took.
@@ -340,6 +397,10 @@ func _process(delta: float) -> void:
 		if fade.color.a >= 0.8 and not end_panel.visible:
 			end_panel.visible = true
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if end_panel.visible and _score_t < Config.SCORE_TICK_TIME: # the counters tick up once it is shown
+			_score_t = minf(Config.SCORE_TICK_TIME, _score_t + delta)
+			var u := _score_t / Config.SCORE_TICK_TIME
+			_write_rows(1.0 - (1.0 - u) * (1.0 - u))
 	else:
 		_match_t += delta
 	stamina_bar.modulate.a = move_toward(stamina_bar.modulate.a, 0.0 if _stamina >= 0.999 else 1.0, delta / STAMINA_FADE)

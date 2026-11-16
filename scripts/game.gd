@@ -9,6 +9,7 @@ extends Node
 ## Gameplay reactions live in GameHooks (scripts/hooks.gd), not here.
 
 signal leave_requested
+signal retry_requested ## the host wants the same match again (main.gd starts it)
 
 enum GoreFx { HIT, SEVER, DIE }
 
@@ -34,6 +35,8 @@ var extraction: ExtractionZone = null ## the open way out's look, while its obje
 var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host, debug)
 var hooks: GameHooks
 var director: HordeDirector
+var score := Score.new() ## what each player did this match (host)
+var final_score_view := {} ## the end screen's numbers as this peer was sent them (Score.summary)
 var rules: MissionRules  ## the objective list being played (host runs it; see `mission_view` for what peers know)
 ## The mission as this peer was last told it (MissionRules.state); the clock is counted along locally.
 var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason": "", "id": "", "kind": "", "text": "",
@@ -75,6 +78,7 @@ func _ready() -> void:
 	Settings.changed.connect(_on_setting_changed)
 	hud = Hud.new()
 	hud.leave_pressed.connect(func(): leave_requested.emit())
+	hud.retry_pressed.connect(func(): retry_requested.emit())
 	add_child(hud)
 
 
@@ -82,6 +86,7 @@ func _ready() -> void:
 
 func start_host(player_name_: String) -> void:
 	is_host = true
+	hud.retry_button.visible = true
 	my_id = 1
 	_build_world()
 	map.roll_weapons(rng)
@@ -436,6 +441,7 @@ func _add_player(id: int, player_name_: String) -> void:
 		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
+	score.join(id, players[id].name)
 	health.died.connect(func(): hooks.on_player_died(id))
 	respawn_player(id, "spawn")
 	_send_names()
@@ -575,11 +581,31 @@ func _footsteps(delta: float) -> void:
 		var from: Vector3 = p.step_pos
 		var over_ground := Vector2(pos.x - from.x, pos.z - from.z).length() / _step_t
 		p.step_pos = pos
+		if over_ground < Config.SPRINT_SPEED * 2.0:
+			score.add(id, "distance", over_ground * _step_t)
 		var crouched: bool = int(p.action) & PlayerWire.ACTION_CROUCH != 0
 		# (faster than anyone runs = a respawn or a teleport, not footsteps)
 		if over_ground >= Config.NOISE_SPRINT_SPEED and over_ground < Config.SPRINT_SPEED * 2.0 and not crouched:
 			make_noise(pos, Config.NOISE_SPRINT, id)
 	_step_t = 0.0
+
+
+## Host: the mission just ended. Save the time if it was won and send everyone the end screen.
+func match_over(won: bool) -> void:
+	if not is_host:
+		return
+	var seconds := rules.elapsed
+	var new_best := won and Records.submit(mission if mission != "" else map_name, seconds)
+	var summary := score.summary(won, seconds, new_best)
+	final_score.rpc(summary)
+	final_score(summary)
+
+
+## The end screen's numbers (Score.summary), sent once when the mission ends.
+@rpc("authority", "call_remote", "reliable")
+func final_score(summary: Dictionary) -> void:
+	final_score_view = summary
+	hud.set_final_score(summary)
 
 
 ## Host: a player landed after falling `height` metres. Above the safe height it costs HP.
@@ -728,12 +754,17 @@ func resolve_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Wea
 	var d := Weapons.def(weapon)
 	var pellets: int = d.pellets
 	var cone: float = d.pellet_spread
+	var landed := false
 	for i in pellets:
-		_trace_bullet(shooter, origin, Weapons.scatter(dir, cone, rng), d)
+		landed = _trace_bullet(shooter, origin, Weapons.scatter(dir, cone, rng), d) or landed
+	score.add(shooter, "shots")
+	if landed:
+		score.add(shooter, "hits")
 
 
 ## Trace a bullet and apply it. Body-part hitboxes are Area3Ds; walls and closed doors block.
-func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -> void:
+## True if it hit a zombie.
+func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -> bool:
 	var space := get_viewport().get_world_3d().direct_space_state
 	var reach: float = d.range
 	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * reach,
@@ -741,12 +772,14 @@ func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -
 	q.collide_with_areas = true
 	var hit := space.intersect_ray(q)
 	if hit.is_empty():
-		return
+		return false
 	var collider: Object = hit.collider
 	if collider is Area3D and collider.has_meta("zombie"):
 		var z: Zombie = collider.get_meta("zombie")
 		if is_instance_valid(z) and zombies.has(z.zid):
 			hit_zombie(shooter, z, collider.get_meta("part"), hit.position, dir, d.damage)
+			return true
+	return false
 
 
 ## A bullet from `shooter` hit zombie `z` in `part`. Applies damage, fires hooks, and tells

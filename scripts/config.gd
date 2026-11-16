@@ -175,6 +175,7 @@ const EXTRACT_WIND := Vector3(1.4, 0.0, 0.6) # m/s the column leans with
 const EXTRACT_BEEPS := 5           # the last seconds of the countdown each beep, higher and higher
 const EXTRACT_BEEP_PITCH := 1.0    # the first of them; each next one a semitone and a half up
 const EXTRACT_BEEP_STEP := 1.09
+const SCORE_TICK_TIME := 1.5      # seconds the end screen's counters take to tick up
 const END_FADE_TIME := 1.6         # seconds to fade to white (or red) at the end
 const FX_MAX_CHIPS := 220    # lit debris boxes
 const FX_MAX_GLOWS := 260    # sparks and flashes

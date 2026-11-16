@@ -22,6 +22,7 @@ var respawn := true       ## the dead come back; off, a dead player is out until
 var out := {}             ## player id -> true: dead (no respawn) or downed, so not counted and not needed
 var checkpoint := ""      ## the last checkpoint zone reached: where the dead come back
 var reached := {}         ## checkpoint zone id -> true, each counts once
+var elapsed := 0.0        ## seconds since the mission began
 
 
 func _init(owner_game: Game) -> void:
@@ -36,6 +37,7 @@ func start(defs: Array, respawn_ := true) -> void:
 	reason = ""
 	checkpoint = ""
 	reached = {}
+	elapsed = 0.0
 	index = -1
 	status = Status.IDLE
 	if defs.is_empty():
@@ -68,6 +70,7 @@ func inside(zone: String) -> Array:
 func step(delta: float) -> void:
 	if status != Status.RUNNING:
 		return
+	elapsed += delta
 	_step_objective(delta)
 	if status != Status.FAILED:
 		_check_checkpoints()
@@ -136,6 +139,9 @@ func interacted(player_id: int, iid: int) -> void:
 func set_out(player_id: int, is_out: bool) -> void:
 	if is_out:
 		out[player_id] = true
+		var left := alive()
+		if left.size() == 1:
+			game.score.last_out = left[0] # everyone else is out: this one is the last standing
 	else:
 		out.erase(player_id)
 	if status == Status.RUNNING and not game.players.is_empty() and alive().is_empty():
@@ -150,6 +156,7 @@ func fail(why: String) -> void:
 	counting = false
 	game.hooks.on_mission_failed(why)
 	_changed()
+	game.match_over(false)
 
 
 ## Seconds shown beside the objective: what is left to hold or survive, else what is left of the limit.
@@ -217,6 +224,7 @@ func _complete(by_player: int) -> void:
 		counting = false
 		limit_left = -1.0
 		_changed()
+		game.match_over(true)
 	else:
 		_begin()
 

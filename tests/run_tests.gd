@@ -2,10 +2,15 @@ extends Node
 ## Test runner. Finds res://tests/test_*.gd, runs every test_* method, prints a report,
 ## and exits with code 1 if anything failed. Optional filter: `-- --filter=zombie`.
 
+const RECORDS := "user://test_run_records.cfg"
+
+
 func _ready() -> void:
 	Settings.path = "user://test_run_settings.cfg" # never read or write the player's own file
 	Settings.apply_to_engine = false
 	Settings.reset_to_defaults(false)
+	Records.path = RECORDS # nor the player's best times
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RECORDS))
 	var filter := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--filter="):
@@ -61,4 +66,5 @@ func _ready() -> void:
 	var secs := (Time.get_ticks_msec() - started) / 1000.0
 	print("\n%d passed, %d failed, %d asserts, %.1fs" % [passed, failed, total_asserts, secs])
 	print("TESTS %s" % ("FAILED" if failed > 0 or passed == 0 else "OK"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(RECORDS))
 	get_tree().quit(1 if failed > 0 or passed == 0 else 0)
