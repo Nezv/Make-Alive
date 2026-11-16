@@ -20,6 +20,16 @@ var prompt_label: Label
 var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
 var objective_label: Label  ## the current objective and its clock, top centre
+var countdown_label: Label  ## big numerals while the extraction clock runs
+var last_beep_pitch := 0.0  ## pitch of the last countdown beep (tests)
+var fade: ColorRect         ## the end: everything fades to white (or red)
+var end_panel: PanelContainer
+var end_title: Label
+var end_detail: Label
+var end_button: Button
+var _last_second := -1
+var _ended := false
+var _match_t := 0.0
 var stamina_bar: ColorRect  ## the trough; only there while stamina is not full
 var stamina_fill: ColorRect
 var scope: ColorRect
@@ -110,6 +120,12 @@ void fragment() {
 	objective_label = _label(20, Control.PRESET_CENTER_TOP, Vector2(-400, 22))
 	objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	objective_label.size.x = 800
+	countdown_label = _label(120, Control.PRESET_CENTER, Vector2(-200, -230))
+	countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	countdown_label.size.x = 400
+	countdown_label.add_theme_color_override("font_color", Color("9bf0a4"))
+	countdown_label.add_theme_constant_override("shadow_offset_y", 4)
+	countdown_label.visible = false
 
 	feed_box = VBoxContainer.new()
 	feed_box.position = Vector2(24, 20)
@@ -120,6 +136,7 @@ void fragment() {
 	prompt_label.size.x = 600
 
 	_build_pause()
+	_build_end()
 
 
 func _label(font_size: int, preset: int, offset: Vector2) -> Label:
@@ -132,6 +149,63 @@ func _label(font_size: int, preset: int, offset: Vector2) -> Label:
 	l.position = offset
 	add_child(l)
 	return l
+
+
+func _build_end() -> void:
+	fade = ColorRect.new()
+	fade.color = Color(1, 1, 1, 0)
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(fade)
+	end_panel = PanelContainer.new()
+	end_panel.set_anchors_preset(Control.PRESET_CENTER)
+	end_panel.custom_minimum_size = Vector2(460, 0)
+	end_panel.position = Vector2(-230, -110)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	end_panel.add_child(v)
+	end_title = Label.new()
+	end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	end_title.add_theme_font_size_override("font_size", 44)
+	v.add_child(end_title)
+	end_detail = Label.new()
+	end_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(end_detail)
+	end_button = Button.new()
+	end_button.text = "Back to the menu"
+	end_button.pressed.connect(func(): leave_pressed.emit())
+	v.add_child(end_button)
+	end_panel.visible = false
+	add_child(end_panel)
+
+
+## The extraction clock: big numerals while it runs, a beep for each of the last seconds.
+func set_countdown(view: Dictionary) -> void:
+	var left: float = view.get("left", -1.0)
+	var on: bool = view.get("kind", "") == "extract" and view.get("counting", false) \
+		and view.get("status", 0) == MissionRules.Status.RUNNING and left > 0.0
+	countdown_label.visible = on
+	if not on:
+		_last_second = -1
+		return
+	var whole := ceili(left)
+	countdown_label.text = str(whole)
+	if whole != _last_second and whole <= Config.EXTRACT_BEEPS:
+		last_beep_pitch = Config.EXTRACT_BEEP_PITCH * pow(Config.EXTRACT_BEEP_STEP, Config.EXTRACT_BEEPS - whole)
+		Sfx.play_ui("beep", 0.0, last_beep_pitch)
+	_last_second = whole
+
+
+## The mission is over: fade, then the end screen with how long it took.
+func show_end(won: bool, reason: String) -> void:
+	if _ended:
+		return
+	_ended = true
+	fade.color = Color(1, 1, 1, 0) if won else Color(0.45, 0, 0, 0)
+	end_title.text = "EXTRACTED" if won else "MISSION FAILED"
+	end_title.add_theme_color_override("font_color", Color("7be08a") if won else Color("ff5555"))
+	var whole := floori(_match_t)
+	end_detail.text = ("Time %d:%02d" % [whole / 60, whole % 60]) + ("" if won else "\n" + reason)
 
 
 func _build_pause() -> void:
@@ -261,6 +335,13 @@ func _process(delta: float) -> void:
 	_toast_t -= delta
 	toast_label.modulate.a = clampf(_toast_t / 0.4, 0.0, 1.0)
 	_dmg_t -= delta
+	if _ended:
+		fade.color.a = move_toward(fade.color.a, 0.9, delta / Config.END_FADE_TIME)
+		if fade.color.a >= 0.8 and not end_panel.visible:
+			end_panel.visible = true
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		_match_t += delta
 	stamina_bar.modulate.a = move_toward(stamina_bar.modulate.a, 0.0 if _stamina >= 0.999 else 1.0, delta / STAMINA_FADE)
 	if _gain_t > 0.0:
 		_gain_t = maxf(0.0, _gain_t - delta)
@@ -270,7 +351,7 @@ func _process(delta: float) -> void:
 	var low := _last_hp > 0 and float(_last_hp) <= Config.PLAYER_HP * Config.LOW_HP_FRACTION
 	var pulse := 0.12 + 0.08 * sin(Time.get_ticks_msec() * 0.008) if low else 0.0 # heartbeat when hurt
 	damage.color.a = maxf(clampf(_dmg_t, 0.0, 0.3), pulse)
-	pause_panel.visible = Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
+	pause_panel.visible = Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _ended
 	perf_label.visible = Settings.get_value("show_draws")
 	perf_label.text = "%d fps · %d draws · ping %d ms" % [
 		Engine.get_frames_per_second(),

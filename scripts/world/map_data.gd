@@ -16,7 +16,10 @@ extends RefCounted
 ##                     box: [centre, size]           an upright box
 ##                     polygon: [Vector2(x, z), ...]  with an optional floor range y: [low, high]
 ##   doors, lootboxes, ammo_crates, weapon_spots   [{ iid, at, yaw }]   `iid` is the same on every peer
-##                     ammo_crates may add `uses` (takes before it is empty)
+##                     ammo_crates may add `uses` (takes before it is empty) and `unlock` (the id of
+##                     the checkpoint zone that opens it; locked until then)
+##                     a checkpoint zone may add `look` { at, yaw, kind: tent | door } and
+##                     `arrow` { at, yaw }: what it looks like and the arrow painted on the way (CheckpointLook)
 ##   ammo_boxes      [{ iid, at, yaw, ammo, rounds }] a carton of one calibre ("9 mm"...); `rounds`
 ##                                                   missing = a full carton of that calibre
 ##   starting_ammo   { "9 mm": 45, "12 gauge": 16 }  the reserve a player starts with, by calibre name
@@ -164,6 +167,9 @@ func _read_interactables(dict: Dictionary) -> void:
 				if seen.has(e.iid):
 					_error("%s reuses iid %d (already %s)" % [where, e.iid, seen[e.iid]])
 				seen[e.iid] = where
+			var unlock: String = e.get("unlock", "")
+			if unlock != "" and (not zones.has(unlock) or zones[unlock].kind != "checkpoint"):
+				_error("%s is unlocked by '%s', which is no checkpoint zone" % [where, unlock])
 			if list_name == "ammo_boxes" and _need(e, "ammo", where) and Weapons.ammo_id(e.ammo) < 0:
 				_error("%s has no calibre '%s'" % [where, e.ammo])
 
@@ -305,6 +311,14 @@ func build_interactables(root: Node3D) -> Dictionary:
 	return out
 
 
+## The look of every checkpoint zone that has one (a lit tent or a safe-room door, an arrow), under `root`.
+func build_checkpoints(root: Node3D) -> void:
+	for id: String in zone_ids("checkpoint"):
+		var z: Dictionary = zones[id]
+		if z.has("look") or z.has("arrow"):
+			root.add_child(CheckpointLook.build(id, z))
+
+
 func _make(list_name: String, e: Dictionary) -> Interactable:
 	match list_name:
 		"doors":
@@ -314,6 +328,8 @@ func _make(list_name: String, e: Dictionary) -> Interactable:
 		"ammo_crates":
 			var crate := AmmoCrate.new()
 			crate.uses = e.get("uses", Config.AMMO_CRATE_USES)
+			crate.unlock = e.get("unlock", "")
+			crate.locked = crate.unlock != ""
 			return crate
 		"ammo_boxes":
 			var box := AmmoBox.new()

@@ -134,10 +134,12 @@ func test_the_player_really_crouches_capsule_and_camera() -> void:
 	var g := await new_game()
 	var lp := g.local_player
 	await frames(3)
+	await _drawn(lp)
 	var standing_eye := lp.camera.global_position.y - lp.global_position.y
 	assert_near(lp.capsule.height, Config.PLAYER_HEIGHT, 0.001)
 	lp.debug_crouch = true
 	await seconds(Config.CROUCH_TIME + 0.2)
+	await _drawn(lp)
 	assert_near(lp.capsule.height, Config.CROUCH_HEIGHT, 0.01)
 	assert_near(lp.body_shape.position.y, Config.CROUCH_HEIGHT / 2.0, 0.01, "still standing on the floor")
 	var crouched_eye := lp.camera.global_position.y - lp.global_position.y
@@ -147,6 +149,14 @@ func test_the_player_really_crouches_capsule_and_camera() -> void:
 	await seconds(Config.CROUCH_TIME + 0.2)
 	assert_near(lp.capsule.height, Config.PLAYER_HEIGHT, 0.01)
 	assert_eq(lp.action_bits() & PlayerWire.ACTION_CROUCH, 0)
+
+
+## The camera is placed when a frame is drawn, not on physics ticks: under load several ticks can
+## pass without one, so wait for drawn frames before reading where it is.
+func _drawn(lp: LocalPlayer) -> void:
+	for i in 3:
+		await get_tree().process_frame
+	lp.velocity = Vector3.ZERO
 
 
 func test_you_cannot_stand_up_under_something_low() -> void:

@@ -20,6 +20,8 @@ var counting := false     ## `progress` is running right now (peers count along)
 var wave := 0             ## SURVIVE: how many of the objective's waves have been sent
 var respawn := true       ## the dead come back; off, a dead player is out until something brings them back
 var out := {}             ## player id -> true: dead (no respawn) or downed, so not counted and not needed
+var checkpoint := ""      ## the last checkpoint zone reached: where the dead come back
+var reached := {}         ## checkpoint zone id -> true, each counts once
 
 
 func _init(owner_game: Game) -> void:
@@ -32,6 +34,8 @@ func start(defs: Array, respawn_ := true) -> void:
 	respawn = respawn_
 	out = {}
 	reason = ""
+	checkpoint = ""
+	reached = {}
 	index = -1
 	status = Status.IDLE
 	if defs.is_empty():
@@ -64,6 +68,21 @@ func inside(zone: String) -> Array:
 func step(delta: float) -> void:
 	if status != Status.RUNNING:
 		return
+	_step_objective(delta)
+	if status != Status.FAILED:
+		_check_checkpoints()
+
+
+## Any checkpoint zone a player still in the fight walks into counts, once, objective or not.
+func _check_checkpoints() -> void:
+	for zone: String in game.map.data.zone_ids("checkpoint"):
+		if not reached.has(zone) and not inside(zone).is_empty():
+			reached[zone] = true
+			checkpoint = zone
+			game.hooks.on_checkpoint_reached(zone)
+
+
+func _step_objective(delta: float) -> void:
 	var o := current()
 	if limit_left >= 0.0:
 		limit_left -= delta
@@ -148,7 +167,7 @@ func seconds_left() -> float:
 ## What every peer needs to show the mission: small, sent only when something changes.
 func state() -> Dictionary:
 	var o := current()
-	var s := { "index": index, "status": status, "reason": reason, "id": "", "kind": "", "text": "",
+	var s := { "index": index, "status": status, "reason": reason, "id": "", "kind": "", "text": "", "zone": "",
 		"left": seconds_left(), "counting": counting or (limit_left >= 0.0 and seconds_left() == limit_left),
 		"wave": wave, "has_marker": false, "marker": Vector3.ZERO }
 	if o.is_empty():
@@ -156,6 +175,7 @@ func state() -> Dictionary:
 	s.id = o.id
 	s.kind = o.kind
 	s.text = o.text
+	s.zone = o.zone
 	var zone: String = o.zone
 	if game.map.data.zones.has(zone):
 		s.has_marker = true
@@ -188,10 +208,7 @@ func _begin() -> void:
 
 func _complete(by_player: int) -> void:
 	var o := current()
-	var zone: String = o.zone
 	game.hooks.on_objective_reached(o.id, by_player)
-	if o.kind == "reach" and game.map.data.zones.has(zone) and game.map.data.zones[zone].kind == "checkpoint":
-		game.hooks.on_checkpoint_reached(zone)
 	if o.kind == "extract":
 		game.hooks.on_extracted(alive())
 	index += 1

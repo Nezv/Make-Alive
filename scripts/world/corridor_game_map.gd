@@ -9,6 +9,7 @@ func _init() -> void:
 	root = built.root
 	use_data(MapAreas.CORRIDOR)
 	var made := data.build_interactables(root) # ids come from the data, identical on every peer
+	data.build_checkpoints(root)
 	door = made.doors[0]
 	lootbox = made.lootboxes[0]
 	interactables = made.all

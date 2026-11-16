@@ -13,6 +13,8 @@ const OPEN_ANGLE := -1.7
 
 var uses := Config.AMMO_CRATE_USES
 var open_left := 0.0 ## seconds the lid still stays up after a take
+var unlock := ""     ## the checkpoint zone that opens it ("" = always open)
+var locked := false
 var lid: Node3D
 
 
@@ -41,7 +43,16 @@ func _init() -> void:
 
 
 func prompt() -> String:
+	if locked:
+		return "Locked: reach the checkpoint"
 	return "" if uses <= 0 else "Right-click: take ammo (%d left)" % uses
+
+
+## Host: the checkpoint was reached.
+func open_lock() -> void:
+	if locked:
+		locked = false
+		_notify_changed()
 
 
 ## Host: one take. False when the crate is empty.
@@ -55,10 +66,11 @@ func use() -> bool:
 
 
 func get_state() -> Dictionary:
-	return { "uses": uses }
+	return { "uses": uses, "locked": locked }
 
 
 func apply_state(state: Dictionary) -> void:
+	locked = state.get("locked", locked)
 	var left: int = state.get("uses", uses)
 	if left < uses:
 		open_left = Config.AMMO_CRATE_OPEN_TIME # someone just took from it

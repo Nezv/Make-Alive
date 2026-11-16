@@ -30,6 +30,7 @@ var local_player: LocalPlayer
 var hud: Hud
 var gore: Gore
 var fx: Fx
+var extraction: ExtractionZone = null ## the open way out's look, while its objective is up
 var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host, debug)
 var hooks: GameHooks
 var director: HordeDirector
@@ -255,6 +256,19 @@ func send_mission_state() -> void:
 	mission_state(state)
 
 
+## Build the extraction zone's look when its objective comes up, and take it away after.
+func _update_extraction() -> void:
+	var zone: String = mission_view.get("zone", "")
+	var want: bool = mission_view.kind == "extract" and mission_view.status == MissionRules.Status.RUNNING and map.data.zones.has(zone)
+	if extraction != null and (not want or extraction.zone != zone):
+		extraction.queue_free()
+		extraction = null
+	if want and extraction == null:
+		var c := map.data.zone_center(zone)
+		extraction = ExtractionZone.create(map.data, zone, fx, map.ground_y(c))
+		world.add_child(extraction)
+
+
 ## Between two messages from the host every peer counts the objective's clock down itself.
 func _tick_mission_view(delta: float) -> void:
 	var left: float = mission_view.left
@@ -448,6 +462,11 @@ func respawn_player(id: int, reason: String) -> void:
 		return
 	var p: Dictionary = players[id]
 	p.pos = map.player_spawn_point(p.slot)
+	if rules.checkpoint != "": # past a checkpoint: back there, around its middle
+		var c := map.data.zone_center(rules.checkpoint)
+		var a: float = p.slot * TAU / 8.0
+		var at := Vector3(c.x + cos(a) * 1.2, 0, c.z + sin(a) * 1.2)
+		p.pos = Vector3(at.x, map.ground_y(at) + 0.1, at.z)
 	p.step_pos = p.pos
 	(p.health as Health).reset()
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
@@ -910,8 +929,15 @@ func _process(delta: float) -> void:
 
 	_tick_mission_view(delta)
 	hud.set_objective(mission_view)
+	hud.set_countdown(mission_view)
+	_update_extraction()
+	var status: int = mission_view.status
+	if status == MissionRules.Status.WON or status == MissionRules.Status.FAILED:
+		hud.show_end(status == MissionRules.Status.WON, mission_view.reason)
 	if brain != null:
 		brain.step(delta)
+	if hud.end_panel.visible:
+		return # the match is over: no shooting at the end screen
 	_update_weapon()
 
 	if not is_host:

@@ -18,12 +18,14 @@ const CORRIDOR := {
 	"zombie_closets": [{ "id": "open_end", "at": Vector3(40.2, 0.1, 0), "radius": 2.4 }],
 	"horde_routes": [{ "closet": "open_end", "points": [Vector3(40.2, 0, 0), Vector3(14, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 26)] }],
 	"zones": [
-		{ "id": "corner", "kind": "checkpoint", "box": [Vector3(0, 1.5, 0), Vector3(6, 3, 6)] },
+		{ "id": "corner", "kind": "checkpoint", "box": [Vector3(0, 1.5, 0), Vector3(6, 3, 6)],
+			"look": { "at": Vector3(-1.6, 0, -1.9), "yaw": 0.0, "kind": "tent" },
+			"arrow": { "at": Vector3(0.6, 0, 7.0), "yaw": 0.0 } },
 		{ "id": "exit", "kind": "extraction", "box": [Vector3(31, 1.5, 0), Vector3(6, 3, 6)] },
 	],
 	"doors": [{ "iid": 1, "at": Vector3(14, 0, 0), "yaw": 0.0 }],
 	"lootboxes": [{ "iid": 2, "at": Vector3(2.4, 0, 22), "yaw": -PI / 2.0 }],
-	"ammo_crates": [{ "iid": 3, "at": Vector3(-2.4, 0, 22), "yaw": PI / 2.0 }],
+	"ammo_crates": [{ "iid": 3, "at": Vector3(-2.4, 0, 22), "yaw": PI / 2.0, "unlock": "corner" }],
 	"ammo_boxes": [
 		{ "iid": 4, "at": Vector3(-2.3, 0, 19.6), "yaw": 0.4, "ammo": "7.62" },
 		{ "iid": 5, "at": Vector3(2.3, 0, 19.2), "yaw": -0.7, "ammo": "12 gauge" },

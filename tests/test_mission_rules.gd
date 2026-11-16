@@ -62,9 +62,9 @@ func test_reaching_a_zone_completes_it_and_moves_on() -> void:
 	assert_eq(count(calls, &"on_objective_reached"), 1)
 	assert_eq(calls[0], [&"on_objective_reached", ["a", 1]])
 	assert_eq(count(calls, &"on_checkpoint_reached"), 1, "the corner is a checkpoint zone")
-	assert_eq(calls[1][1], ["corner"])
+	assert_eq(calls.filter(func(c: Array) -> bool: return c[0] == &"on_checkpoint_reached")[0][1], ["corner"])
 	assert_eq(count(calls, &"on_extraction_ready"), 1, "the next objective is the way out")
-	assert_eq(calls[2][1], ["exit"])
+	assert_eq(calls.filter(func(c: Array) -> bool: return c[0] == &"on_extraction_ready")[0][1], ["exit"])
 	assert_eq(g.mission_view.id, "b")
 
 

@@ -145,6 +145,7 @@ func test_the_crate_gives_the_held_guns_calibre_a_few_times() -> void:
 	var g := await new_game("corridor", "", true)
 	var calls := spy(g)
 	var crate: AmmoCrate = _of(g, AmmoCrate)[0]
+	crate.locked = false # (the corridor's crate opens at the checkpoint)
 	assert_eq(crate.uses, Config.AMMO_CRATE_USES)
 	assert_true(crate.prompt().contains(str(crate.uses)), crate.prompt())
 	_reach(g, crate)
@@ -180,6 +181,7 @@ func test_the_crate_gives_the_held_guns_calibre_a_few_times() -> void:
 func test_the_crate_wastes_no_use_on_a_full_player() -> void:
 	var g := await new_game("corridor", "", true)
 	var crate: AmmoCrate = _of(g, AmmoCrate)[0]
+	crate.locked = false
 	_reach(g, crate)
 	g.give_ammo(1, A.MM762, 100000)
 	g.host_interact(1, crate.iid, Weapons.AK47)

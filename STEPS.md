@@ -258,13 +258,13 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Fail conditions: everyone dead or downed, timer out
 - [x] Corridor gets a tiny objective list as the test bed
 
-### [ ] S022 · Extraction zone
+### [x] S022 · Extraction zone
 > needs: S021 | size: M | test: `tests/test_extraction.gd` | see: `--host --map=corridor --bot`
-- [ ] Zone opens with `on_extraction_ready`
-- [ ] Rule: every alive player inside starts the countdown, anyone leaving pauses it, downed players must be carried in or revived
-- [ ] Zone look: green flare smoke column rising 30 m and leaning with the wind, ground ring of pulsing light strips, particles drifting up inside
-- [ ] Countdown: big numerals on the HUD, beeps that rise in pitch for the last five
-- [ ] Success: fade to white, `on_extracted`, end screen
+- [x] Zone opens with `on_extraction_ready`
+- [x] Rule: every alive player inside starts the countdown, anyone leaving pauses it, downed players must be carried in or revived
+- [x] Zone look: green flare smoke column rising 30 m and leaning with the wind, ground ring of pulsing light strips, particles drifting up inside
+- [x] Countdown: big numerals on the HUD, beeps that rise in pitch for the last five
+- [x] Success: fade to white, `on_extracted`, end screen
 
 ### [ ] S023 · Defend objective
 > needs: S021 | size: M | test: `tests/test_defend.gd`
@@ -287,12 +287,12 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Boarding: players enter the door zone, camera sits them inside, lift-off, the city falls away
 - [ ] Sound hooks named for S087
 
-### [ ] S025 · Checkpoints
+### [x] S025 · Checkpoints
 > needs: S021 | size: S | test: `tests/test_checkpoints.gd`
-- [ ] Checkpoint zone from map data, reached once
-- [ ] On reach: dead players respawn there, downed are revived, ammo crate unlocks
-- [ ] Look: a safe room door or a lit military tent, a hand-painted arrow before it
-- [ ] HUD toast and a short calm from the director
+- [x] Checkpoint zone from map data, reached once
+- [x] On reach: dead players respawn there, downed are revived, ammo crate unlocks
+- [x] Look: a safe room door or a lit military tent, a hand-painted arrow before it
+- [x] HUD toast and a short calm from the director
 
 ### [ ] S026 · Scoring and end screen
 > needs: S022 | size: M | test: `tests/test_scoring.gd`

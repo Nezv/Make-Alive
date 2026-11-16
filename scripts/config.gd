@@ -96,6 +96,7 @@ const ZOMBIE_RADIUS := 0.35
 const ZOMBIE_SEPARATION := 0.9 # zombies steer apart when closer than this
 const ZOMBIE_AGGRO_RANGE := 200.0
 const ZOMBIE_NOTICE_RANGE := 15.0 # a player this close beats any noise: the zombie goes for them
+const CHECKPOINT_CALM := 20.0   # seconds the director sends nobody after a checkpoint is reached
 const NOISE_INVESTIGATE_TIME := 12.0 # seconds a zombie stays interested in a noise it heard
 const NOISE_ARRIVE := 1.5        # metres from the spot at which it stops and stands there
 const NOISE_DOOR_BREAK := 40.0   # loudness = metres away it is heard (guns: Weapons.GUN_LOUDNESS)
@@ -158,13 +159,23 @@ const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than 
 
 # --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
 const BUDGET := {
-	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 10 },
+	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 11 }, # +1: the checkpoint's lamp
 	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 },
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
 const BUDGET_PACKET_BYTES := 1392  # a snapshot larger than this is split by the network and may stall
 
 # --- Effects (scripts/fx/fx.gd): every pool is made once at this size; the oldest entry is reused ---
+const EXTRACT_SMOKE_HEIGHT := 30.0 # metres the flare's smoke column climbs
+const EXTRACT_SMOKE_LIFE := 6.0    # seconds a puff of it lives
+const EXTRACT_PUFF_EVERY := 0.15   # seconds between puffs (about 40 alive)
+const EXTRACT_SPARK_EVERY := 0.25  # green sparks drifting up inside the zone
+const EXTRACT_PULSE := 1.2         # seconds per pulse of the ring
+const EXTRACT_WIND := Vector3(1.4, 0.0, 0.6) # m/s the column leans with
+const EXTRACT_BEEPS := 5           # the last seconds of the countdown each beep, higher and higher
+const EXTRACT_BEEP_PITCH := 1.0    # the first of them; each next one a semitone and a half up
+const EXTRACT_BEEP_STEP := 1.09
+const END_FADE_TIME := 1.6         # seconds to fade to white (or red) at the end
 const FX_MAX_CHIPS := 220    # lit debris boxes
 const FX_MAX_GLOWS := 260    # sparks and flashes
 const FX_MAX_SMOKE := 160    # smoke and dust puffs

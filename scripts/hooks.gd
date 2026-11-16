@@ -82,8 +82,17 @@ func on_mission_failed(reason: String) -> void:
 	game.announce.rpc("MISSION FAILED  ·  %s" % reason)
 
 
+## A checkpoint zone was reached (once each): the dead come back there, its crate opens, a breather.
 func on_checkpoint_reached(checkpoint_id: String) -> void:
 	fired.emit(&"on_checkpoint_reached", [checkpoint_id])
+	for id: int in game.rules.out.keys():
+		game.rules.set_out(id, false)
+		game.respawn_player(id, "checkpoint")
+	for it: Interactable in game.interactables.values():
+		if it is AmmoCrate and (it as AmmoCrate).unlock == checkpoint_id:
+			(it as AmmoCrate).open_lock()
+	game.director.calm(Config.CHECKPOINT_CALM)
+	game.announce.rpc("CHECKPOINT REACHED")
 
 
 # --- Right-click ------------------------------------------------------------------
@@ -159,7 +168,7 @@ func on_right_click_ammo_box(player_id: int, box: AmmoBox) -> void:
 ## The military crate: a couple of cartons of whatever the gun in the player's hands is fed with.
 func on_right_click_ammo_crate(player_id: int, crate: AmmoCrate) -> void:
 	fired.emit(&"on_right_click_ammo_crate", [player_id, crate])
-	if crate.uses <= 0 or not game.players.has(player_id):
+	if crate.locked or crate.uses <= 0 or not game.players.has(player_id):
 		return
 	var type := Weapons.ammo_of(game.players[player_id].weapon)
 	var carton: int = Weapons.AMMO[type].box

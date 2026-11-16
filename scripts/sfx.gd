@@ -49,6 +49,8 @@ static func _builtin() -> void:
 		register("gunshot", "Guns", _gunshot)
 	if not _defs.has("dry_fire"):
 		register("dry_fire", "Guns", _dry_fire)
+	if not _defs.has("beep"):
+		register("beep", "UI", _beep)
 	if not _defs.has("breath"):
 		register("breath", "World", _breath)
 
@@ -115,6 +117,11 @@ static func _dry_fire() -> PackedFloat32Array:
 	var tick := exp_tail(high_pass(noise(0.05, Hiss.WHITE, 5), 2500.0), 140.0)
 	var ring := exp_tail(fm(0.05, 1900.0, 2730.0, 1.5), 90.0)
 	return soft_clip(mix([tick, ring], [0.9, 0.35]), 1.5)
+
+
+## A short electronic beep (the extraction countdown); played at rising pitches.
+static func _beep() -> PackedFloat32Array:
+	return envelope(mix([tone(0.14, 1320.0, Wave.SQUARE), tone(0.14, 2640.0)], [0.25, 0.2]), 0.004, 0.03, 0.7, 0.05)
 
 
 ## One heavy breath, in and out: band-passed noise that swells twice, the second lower.
