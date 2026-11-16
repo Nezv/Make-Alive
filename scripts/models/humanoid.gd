@@ -16,7 +16,7 @@ extends Node3D
 ##   forearm_extras, thigh_extras, shin_extras (limb extras go on both sides)
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
-enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL }
+enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP }
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
@@ -297,6 +297,8 @@ func _phase_rate(speed: float) -> float:
 			return maxf(1.5, PI * speed / (2.0 * HIP_HEIGHT * sin(_stride_amp())))
 		Anim.CRAWL:
 			return 2.0 + speed * 5.0
+		Anim.CROUCH:
+			return 2.0 + speed * 3.0
 	return 2.0
 
 
@@ -465,6 +467,31 @@ func _write_goal(speed: float) -> void:
 			_goal[J.KNEE_L] = -0.3
 			_goal[J.KNEE_R] = -0.6
 			_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1
+
+		Anim.CROUCH: # a survivor on their haunches, gun up; the legs shuffle when they move
+			var shuffle := s * 0.25 * clampf(speed / 1.5, 0.0, 1.0)
+			_goal[J.HIPS_Y] = HIP_HEIGHT - 0.4
+			_goal[J.HIP_L] = 1.15 + shuffle
+			_goal[J.HIP_R] = 0.75 - shuffle
+			_goal[J.KNEE_L] = -1.7
+			_goal[J.KNEE_R] = -1.75
+			_goal[J.SPINE_PITCH] = 0.3
+			_goal[J.NECK_PITCH] = -0.25
+			_goal[J.SH_L_X] = 0.9
+			_goal[J.SH_R_X] = 1.0
+			_goal[J.EL_L] = 0.7
+			_goal[J.EL_R] = 0.5
+
+		Anim.JUMP: # a survivor off the ground: knees tucked, gun held in
+			_goal[J.HIP_L] = 0.7
+			_goal[J.HIP_R] = 0.35
+			_goal[J.KNEE_L] = -1.1
+			_goal[J.KNEE_R] = -0.7
+			_goal[J.SPINE_PITCH] = 0.12
+			_goal[J.SH_L_X] = 0.9
+			_goal[J.SH_R_X] = 1.0
+			_goal[J.EL_L] = 0.7
+			_goal[J.EL_R] = 0.5
 
 		Anim.CRAWL: # face down, dragging itself forward one arm at a time
 			_goal[J.HIPS_Y] = 0.22

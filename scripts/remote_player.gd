@@ -8,6 +8,7 @@ var tag: Label3D
 var buffer := SnapshotBuffer.new()
 var gun: GunModel
 var weapon_id := -1
+var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
 var _last_pos := Vector3.ZERO
 
 
@@ -42,6 +43,11 @@ func set_weapon(id: int) -> void:
 	rig.spine.add_child(gun)
 
 
+## What the body is doing (crouching, off the ground), as PlayerWire.ACTION_* bits.
+func set_action(bits: int) -> void:
+	action = bits
+
+
 func _process(delta: float) -> void:
 	if buffer.is_empty():
 		return
@@ -56,5 +62,9 @@ func _process(delta: float) -> void:
 		a = Humanoid.Anim.RUN
 	elif ground_speed > 0.3:
 		a = Humanoid.Anim.WALK
+	if action & PlayerWire.ACTION_AIR:
+		a = Humanoid.Anim.JUMP
+	elif action & PlayerWire.ACTION_CROUCH:
+		a = Humanoid.Anim.CROUCH
 	rig.set_anim(a)
 	rig.update(delta, ground_speed)

@@ -1,14 +1,17 @@
 class_name PlayerWire
-## Compact binary encoding of player snapshots, the partner of ZombieWire: 22 bytes per player.
+## Compact binary encoding of player snapshots, the partner of ZombieWire: 23 bytes per player.
 ## Names are not here: they change when someone joins or leaves, not 20 times a second, so they
 ## travel once through Game.player_names.
 ##
-## Layout per player: u32 id | f32 x,y,z | u16 yaw | u8 hp | u16 kills | u8 weapon
+## Layout per player: u32 id | f32 x,y,z | u16 yaw | u8 hp | u16 kills | u8 weapon | u8 action
+## `action` is bits (ACTION_*): what the body is doing, so others can draw it.
 
-const BYTES_EACH := 22
+const BYTES_EACH := 23
+const ACTION_CROUCH := 1
+const ACTION_AIR := 2 ## off the ground: jumping, falling, vaulting
 
 
-## `list`: Array of { id, pos: Vector3, yaw, hp, kills, weapon }.
+## `list`: Array of { id, pos: Vector3, yaw, hp, kills, weapon, action } (`action` may be left out).
 static func pack(list: Array) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(list.size() * BYTES_EACH)
@@ -23,6 +26,7 @@ static func pack(list: Array) -> PackedByteArray:
 		out.encode_u8(o + 18, clampi(p.hp, 0, 255))
 		out.encode_u16(o + 19, clampi(p.kills, 0, 65535))
 		out.encode_u8(o + 21, clampi(p.weapon, 0, 255))
+		out.encode_u8(o + 22, int(p.get("action", 0)) & 0xFF)
 		o += BYTES_EACH
 	return out
 
@@ -38,6 +42,7 @@ static func unpack(bytes: PackedByteArray) -> Array:
 			"hp": bytes.decode_u8(o + 18),
 			"kills": bytes.decode_u16(o + 19),
 			"weapon": bytes.decode_u8(o + 21),
+			"action": bytes.decode_u8(o + 22),
 		})
 		o += BYTES_EACH
 	return out

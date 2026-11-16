@@ -26,6 +26,8 @@ enum Kind { PRIMARY, SIDEARM, MELEE } ## which slots of a Loadout a weapon may g
 const GUN_KIND := [Kind.SIDEARM, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY]
 ## Seconds to holster the gun in hand and bring this one up, in id order: heavy guns are slower.
 const GUN_DRAW := [0.25, 0.3, 0.35, 0.35, 0.33, 0.48, 0.45, 0.55, 0.5]
+## How fast you sprint with each gun in hand, as a share of Config.SPRINT_SPEED, in id order.
+const GUN_SPRINT := [1.0, 1.0, 0.97, 0.95, 0.97, 0.88, 0.9, 0.85, 0.88]
 ## Which calibre each gun is fed with, in id order (the two shotguns share shells).
 const GUN_AMMO := [Ammo.MM9, Ammo.MM57, Ammo.MM58, Ammo.MM762, Ammo.MM9X39, Ammo.GAUGE12, Ammo.GAUGE12, Ammo.LAPUA338, Ammo.MM762R]
 
@@ -107,6 +109,10 @@ static func draw_time(id: int) -> float:
 	return GUN_DRAW[id]
 
 
+static func sprint_mult(id: int) -> float:
+	return GUN_SPRINT[id]
+
+
 ## The calibre (Ammo) gun `id` is fed with.
 static func ammo_of(id: int) -> int:
 	return GUN_AMMO[id]
@@ -134,10 +140,11 @@ static func kick(d: Dictionary, rng: RandomNumberGenerator, aiming: bool) -> Vec
 		recoil * m * side * rng.randf_range(-1.0, 1.0))
 
 
-## Cone half-angle a bullet may stray by. `moving` is 0 (standing) to 1 (sprinting).
-static func spread(d: Dictionary, aiming: bool, moving: float) -> float:
+## Cone half-angle a bullet may stray by. `moving` is 0 (standing) to 1 (sprinting),
+## `crouch` 0 (standing) to 1 (down): crouching steadies the gun.
+static func spread(d: Dictionary, aiming: bool, moving: float, crouch := 0.0) -> float:
 	var base: float = d.ads_spread if aiming else d.spread
-	return base * (1.0 + clampf(moving, 0.0, 1.0) * Config.MOVE_SPREAD)
+	return base * (1.0 + clampf(moving, 0.0, 1.0) * Config.MOVE_SPREAD) * lerpf(1.0, Config.CROUCH_SPREAD_MULT, clampf(crouch, 0.0, 1.0))
 
 
 ## `dir` nudged to a random direction within `angle` radians of itself.

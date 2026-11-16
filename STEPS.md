@@ -213,15 +213,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Respawn arrival: door kicked open or drop from a truck bed, not a pop
 - [ ] Dead players keep text chat and pings
 
-### [ ] S018 · Stamina and movement
+### [x] S018 · Stamina and movement
 > needs: none | size: M | test: `tests/test_movement.gd`
-- [ ] Stamina: sprint drains, walking refills, empty forces a walk and heavy breathing
-- [ ] Crouch: lower capsule and camera, quieter steps, tighter spread
-- [ ] Jump with coyote time, landing dip scaled by fall speed, fall damage above a height
-- [ ] Vault over waist-high cover when sprinting into it (hands on, legs over, 0.5 s)
-- [ ] Weight: heavy guns sprint slower
-- [ ] Remote players show crouch and jump
-- [ ] HUD stamina bar that only appears while it is not full
+- [x] Stamina: sprint drains, walking refills, empty forces a walk and heavy breathing
+- [x] Crouch: lower capsule and camera, quieter steps, tighter spread
+- [x] Jump with coyote time, landing dip scaled by fall speed, fall damage above a height
+- [x] Vault over waist-high cover when sprinting into it (hands on, legs over, 0.5 s)
+- [x] Weight: heavy guns sprint slower
+- [x] Remote players show crouch and jump
+- [x] HUD stamina bar that only appears while it is not full
 
 ### [ ] S019 · Shove
 > needs: S018 | size: M | test: `tests/test_shove.gd`

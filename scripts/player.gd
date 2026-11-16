@@ -1,5 +1,7 @@
 class_name LocalPlayer
 extends CharacterBody3D
+
+signal landed(height: float) ## the feet came down after falling this far (the host decides if it hurt)
 ## The player you control: physics movement, mouse look, first-person camera and guns.
 ## Movement runs at the physics rate; the camera is placed every rendered frame from the
 ## interpolated body transform, so it's smooth at 144 Hz.
@@ -10,6 +12,11 @@ var firing := false
 var move_speed := 0.0
 var camera: Camera3D
 var weapons := WeaponState.new()
+var move := MoveState.new() # stamina, crouch, coyote time, landing dip, vault
+var capsule: CapsuleShape3D
+var body_shape: CollisionShape3D
+var debug_crouch := false # tests and screenshots: hold the crouch
+var _breath_t := 0.0
 var loadout := Loadout.all() # the guns this player carries, by slot (the host keeps its own copy)
 var last_weapon := -1     # the gun held before this one (the last-weapon key goes back to it)
 var view: Viewmodel
@@ -30,13 +37,13 @@ var _aim_latched := false # Settings aim_toggle: right mouse flips this instead 
 func _ready() -> void:
 	collision_layer = Config.LAYER_PLAYER
 	collision_mask = Config.LAYER_WORLD | Config.LAYER_ZOMBIE # a horde can box you in
-	var cs := CollisionShape3D.new()
-	var cap := CapsuleShape3D.new()
-	cap.radius = Config.PLAYER_RADIUS
-	cap.height = Config.PLAYER_HEIGHT
-	cs.shape = cap
-	cs.position.y = Config.PLAYER_HEIGHT / 2.0
-	add_child(cs)
+	body_shape = CollisionShape3D.new()
+	capsule = CapsuleShape3D.new()
+	capsule.radius = Config.PLAYER_RADIUS
+	capsule.height = Config.PLAYER_HEIGHT
+	body_shape.shape = capsule
+	body_shape.position.y = Config.PLAYER_HEIGHT / 2.0
+	add_child(body_shape)
 
 	camera = Camera3D.new()
 	camera.top_level = true
@@ -146,34 +153,120 @@ func _physics_process(delta: float) -> void:
 		_aim_latched = false # reloading, swapping, using a door or leaving the window lowers the sights
 	var held := _aim_latched if toggle else Input.is_action_pressed("aim")
 	var want_aim := debug_aim or (captured and not bot and not aim_blocked and held)
-	aiming = want_aim and ready
+	aiming = want_aim and ready and not move.is_vaulting()
+	view.stow_goal = 1.0 if move.is_vaulting() else 0.0
+	if move.is_vaulting():
+		_vault_step(delta)
+		return
+	var wants_crouch := debug_crouch or (captured and not bot and Input.is_action_pressed("crouch"))
+	if not wants_crouch and move.crouch > 0.0 and not _room_to_stand():
+		wants_crouch = true # something low overhead keeps you down
 	var running := captured and not bot and Input.is_action_pressed("sprint") and input.y > 0 and not aiming
-	sprinting = (running or debug_sprint) and not aiming
-	var speed := Config.WALK_SPEED
-	if running:
-		speed = Config.SPRINT_SPEED
-	elif aiming:
-		speed *= Config.ADS_MOVE_MULT
 	var dir := Basis(Vector3.UP, yaw) * Vector3(input.x, 0, -input.y)
 	if bot:
 		dir = bot_move
 		running = bot_sprint and bot_move != Vector3.ZERO and not aiming
-		sprinting = running or debug_sprint
-		if running:
-			speed = Config.SPRINT_SPEED
+	else:
+		running = running and move.can_sprint() and not wants_crouch # winded or crouched: a walk
+	sprinting = (running or debug_sprint) and not aiming
+	var speed := move.speed(weapons.current, running, aiming)
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
-	if is_on_floor():
-		if captured and Input.is_action_just_pressed("jump"):
-			velocity.y = Config.JUMP_VELOCITY
-	else:
+	var fall_speed := maxf(0.0, -velocity.y)
+	if captured and not bot and Input.is_action_just_pressed("jump") and move.can_jump():
+		velocity.y = Config.JUMP_VELOCITY # also just after walking off an edge (coyote time)
+		move.jump()
+	elif not is_on_floor():
 		velocity.y -= Config.GRAVITY * delta
+	if running and not bot and is_on_floor() and try_vault(dir):
+		return
 	move_and_slide()
 	move_speed = Vector2(velocity.x, velocity.z).length()
+	# The bot is a test player: it never tires.
+	var fell := move.step(delta, running and not bot and move_speed > 0.1, is_on_floor(), wants_crouch, global_position.y, fall_speed)
+	if fell > 0.0:
+		landed.emit(fell)
+	capsule.height = move.height()
+	body_shape.position.y = capsule.height / 2.0
+	_breathe(delta)
+
+
+## What others should see this body doing, as PlayerWire.ACTION_* bits.
+func action_bits() -> int:
+	var bits := 0
+	if move.crouch > 0.5:
+		bits |= PlayerWire.ACTION_CROUCH
+	if move.is_vaulting() or move.air_time > 0.1:
+		bits |= PlayerWire.ACTION_AIR
+	return bits
+
+
+## Heavy breathing while winded, one breath at a time.
+func _breathe(delta: float) -> void:
+	if not move.winded:
+		_breath_t = 0.0
+		return
+	_breath_t -= delta
+	if _breath_t <= 0.0:
+		_breath_t = Config.BREATH_INTERVAL
+		Sfx.play_ui("breath", Config.BREATH_VOLUME)
+
+
+func _ray(from: Vector3, to: Vector3) -> Dictionary:
+	return get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, Config.LAYER_WORLD))
+
+
+## Is there headroom to stand up where we are?
+func _room_to_stand() -> bool:
+	var feet := global_position
+	return _ray(feet + Vector3(0, Config.CROUCH_HEIGHT - 0.1, 0), feet + Vector3(0, Config.PLAYER_HEIGHT + 0.05, 0)).is_empty()
+
+
+## Go over waist-high cover lying `dir` ahead, if there is some: low enough, thin enough, with
+## clear floor behind it. True when the vault has begun.
+func try_vault(dir: Vector3) -> bool:
+	var fwd := Vector3(dir.x, 0, dir.z).normalized()
+	if move.is_vaulting() or fwd == Vector3.ZERO or not is_inside_tree():
+		return false
+	var feet := global_position
+	var low := _ray(feet + Vector3(0, Config.VAULT_MIN_HEIGHT, 0), feet + Vector3(0, Config.VAULT_MIN_HEIGHT, 0) + fwd * Config.VAULT_REACH)
+	if low.is_empty():
+		return false # nothing in the way
+	var hit: Vector3 = low.position
+	var near := Vector2(hit.x - feet.x, hit.z - feet.z).length()
+	var far := near + Config.VAULT_MAX_DEPTH + Config.PLAYER_RADIUS + 0.2 # where the feet come down
+	var over := Vector3(0, Config.VAULT_MAX_HEIGHT + 0.15, 0)
+	if not _ray(feet + over, feet + over + fwd * (far + Config.PLAYER_RADIUS)).is_empty():
+		return false # a wall, or something tall right behind
+	var top := _ray(feet + over + fwd * (near + 0.1), feet + fwd * (near + 0.1))
+	if top.is_empty():
+		return false
+	var top_at: Vector3 = top.position
+	var height := top_at.y - feet.y
+	if height < Config.VAULT_MIN_HEIGHT or height > Config.VAULT_MAX_HEIGHT:
+		return false
+	var ground := _ray(feet + over + fwd * far, feet + fwd * far - Vector3(0, Config.FALL_SAFE_HEIGHT, 0))
+	if ground.is_empty():
+		return false
+	var land_at: Vector3 = ground.position
+	if land_at.y - feet.y > Config.VAULT_MIN_HEIGHT * 0.5:
+		return false # still on top of it: too deep to clear
+	move.start_vault(feet, land_at, height)
+	view.stow_goal = 1.0 # hands on the cover, not the gun
+	return true
+
+
+## Carried over the cover along MoveState's arc; nothing else moves the body meanwhile.
+func _vault_step(delta: float) -> void:
+	move.step(delta, false, false, false, global_position.y, 0.0)
+	global_position = move.vault_point()
+	velocity = Vector3.ZERO
+	move_speed = Config.WALK_SPEED
+	sprinting = false
 
 
 func _process(delta: float) -> void:
-	var origin := get_global_transform_interpolated().origin + Vector3(0, Config.EYE_HEIGHT, 0)
+	var origin := get_global_transform_interpolated().origin + Vector3(0, move.eye_height(), 0)
 	weapons.step(delta)
 	fire_buffer -= delta
 	punch = punch.lerp(Vector2.ZERO, 1.0 - exp(-Config.RECOIL_RECOVER * delta))

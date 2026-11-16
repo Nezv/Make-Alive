@@ -14,6 +14,7 @@ const CARRY_LOW_ROT := Vector3(-0.5, 0.55, 0.2)
 const RELOAD_SHIFT := Vector3(-0.03, 0.03, 0.03)
 const LOWERED_SHIFT := Vector3(0.0, -0.3, 0.05)     ## off-screen, while swapping guns
 const LOWERED_ROT := Vector3(-0.9, 0.0, 0.0)
+const STOW_TIME := 0.12                              ## seconds to drop the gun out of the way or bring it back
 const ELBOW_R := Vector3(0.36, -0.6, 0.15)           ## where the forearms come from (camera space)
 const ELBOW_L := Vector3(-0.22, -0.62, 0.1)
 const SLEEVE := Color(0.1, 0.12, 0.08)
@@ -29,6 +30,8 @@ var lower := 0.0
 var kick_pos := 0.0        ## 1 right after a shot, decays to 0
 var kick_rot := Vector3.ZERO ## (climb, sideways, roll): the random part of the recoil
 var dry := 0.0             ## 1 right after a click on an empty gun, runs down to 0
+var stow := 0.0            ## 0..1: the gun is down and out of the way (hands busy: vaulting)
+var stow_goal := 0.0       ## where `stow` is easing to; the player sets this, never the pose
 var bob := 0.0
 var flash: MeshInstance3D
 var light: OmniLight3D
@@ -149,6 +152,10 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	pos = pos.lerp(gun.hip + RELOAD_SHIFT, w)
 	rot = rot.lerp(gun.reload_rot, w)
 	w = _ease(lower)
+	pos = pos.lerp(gun.hip + LOWERED_SHIFT, w)
+	rot = rot.lerp(LOWERED_ROT, w)
+	stow = move_toward(stow, stow_goal, delta / STOW_TIME)
+	w = _ease(stow)
 	pos = pos.lerp(gun.hip + LOWERED_SHIFT, w)
 	rot = rot.lerp(LOWERED_ROT, w)
 

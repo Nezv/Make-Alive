@@ -6,6 +6,10 @@ signal leave_pressed
 
 const GAIN_AT := Vector2(-420, -116)
 const GAIN_COLOR := Color("9be29b")
+const STAMINA_SIZE := Vector2(190, 6)
+const STAMINA_COLOR := Color("d8e6f0")
+const STAMINA_WINDED := Color("ff7a5a")
+const STAMINA_FADE := 0.25 ## seconds
 
 var hp_label: Label
 var info_label: Label
@@ -15,6 +19,8 @@ var feed_box: VBoxContainer
 var prompt_label: Label
 var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
+var stamina_bar: ColorRect  ## the trough; only there while stamina is not full
+var stamina_fill: ColorRect
 var scope: ColorRect
 var damage: ColorRect
 var cross: Array[ColorRect] = []
@@ -24,6 +30,7 @@ var _hit_t := 0.0
 var _toast_t := 0.0
 var _dmg_t := 0.0
 var _gain_t := 0.0
+var _stamina := 1.0
 
 
 func _ready() -> void:
@@ -67,6 +74,19 @@ void fragment() {
 		cross.append(r)
 
 	hp_label = _label(32, Control.PRESET_BOTTOM_LEFT, Vector2(24, -64))
+	stamina_bar = ColorRect.new()
+	stamina_bar.color = Color(0, 0, 0, 0.55)
+	stamina_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stamina_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	stamina_bar.position = Vector2(28, -76)
+	stamina_bar.size = STAMINA_SIZE
+	stamina_bar.modulate.a = 0.0
+	add_child(stamina_bar)
+	stamina_fill = ColorRect.new()
+	stamina_fill.color = STAMINA_COLOR
+	stamina_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stamina_fill.size = STAMINA_SIZE
+	stamina_bar.add_child(stamina_fill)
 	weapon_label = _label(26, Control.PRESET_BOTTOM_RIGHT, Vector2(-420, -82))
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	weapon_label.size.x = 400
@@ -131,7 +151,7 @@ func _build_pause() -> void:
 	leave.pressed.connect(func(): leave_pressed.emit())
 	v.add_child(leave)
 	var help := Label.new()
-	help.text = "WASD move · Shift sprint · Space jump\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · 1-9 or mouse wheel change gun · Q last gun · Esc menu"
+	help.text = "WASD move · Shift sprint · Ctrl crouch · Space jump (sprint into low cover to vault it)\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · 1-9 or mouse wheel change gun · Q last gun · Esc menu"
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.modulate.a = 0.7
 	v.add_child(help)
@@ -160,6 +180,13 @@ func set_weapon(gun_name: String, rounds: int, reloading: bool, reserve := -1) -
 	weapon_label.text = "%s   %s / %s" % [gun_name, "RELOADING" if reloading else str(rounds), left]
 	var empty := rounds == 0 and not reloading
 	weapon_label.modulate = Color("ff5555") if empty else (Color("ffcc66") if reserve == 0 else Color.WHITE)
+
+
+## `share` 0..1 of a full bar; `winded` = ran dry and cannot sprint yet.
+func set_stamina(share: float, winded: bool) -> void:
+	_stamina = clampf(share, 0.0, 1.0)
+	stamina_fill.size.x = STAMINA_SIZE.x * _stamina
+	stamina_fill.color = STAMINA_WINDED if winded else STAMINA_COLOR
 
 
 ## Something was picked up: `text` ("+30  7.62") rises over the ammo count and fades.
@@ -207,6 +234,7 @@ func _process(delta: float) -> void:
 	_toast_t -= delta
 	toast_label.modulate.a = clampf(_toast_t / 0.4, 0.0, 1.0)
 	_dmg_t -= delta
+	stamina_bar.modulate.a = move_toward(stamina_bar.modulate.a, 0.0 if _stamina >= 0.999 else 1.0, delta / STAMINA_FADE)
 	if _gain_t > 0.0:
 		_gain_t = maxf(0.0, _gain_t - delta)
 		var done := 1.0 - _gain_t / Config.PICKUP_GAIN_TIME

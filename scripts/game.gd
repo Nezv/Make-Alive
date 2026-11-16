@@ -148,6 +148,7 @@ func _build_world() -> void:
 	local_player.name = "LocalPlayer"
 	local_player.bot = bot
 	local_player.set_loadout(_starting_loadout())
+	local_player.landed.connect(_on_local_landed)
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
@@ -172,7 +173,7 @@ func request_join(player_name_: String) -> void:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func client_state(pos: Vector3, yaw: float) -> void:
+func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
 	if not is_host:
 		return
 	var p = players.get(multiplayer.get_remote_sender_id())
@@ -180,6 +181,14 @@ func client_state(pos: Vector3, yaw: float) -> void:
 		return
 	p.pos = pos
 	p.yaw = yaw
+	p.action = action
+
+
+## The sender came down after falling `height` metres.
+@rpc("any_peer", "call_remote", "reliable")
+func client_fell(height: float) -> void:
+	if is_host:
+		player_fell(multiplayer.get_remote_sender_id(), height)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -373,7 +382,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1,
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0,
 		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	health.died.connect(func(): hooks.on_player_died(id))
@@ -472,6 +481,20 @@ func _ammo_used(id: int, type: int, rounds: int) -> void:
 		return
 	var have: int = players[id].reserve.get(type, 0)
 	players[id].reserve[type] = maxi(0, have - rounds)
+
+
+## Host: a player landed after falling `height` metres. Above the safe height it costs HP.
+func player_fell(id: int, height: float) -> void:
+	var hurt := MoveState.fall_damage(clampf(height, 0.0, 200.0))
+	if players.has(id) and hurt > 0:
+		damage_player(id, hurt)
+
+
+func _on_local_landed(height: float) -> void:
+	if is_host:
+		player_fell(my_id, height)
+	else:
+		client_fell.rpc_id(1, height)
 
 
 func damage_player(id: int, amount: int, by: Zombie = null) -> void:
@@ -707,6 +730,7 @@ func _physics_process(delta: float) -> void:
 	_now += delta
 	players[1].pos = local_player.global_position
 	players[1].yaw = local_player.yaw
+	players[1].action = local_player.action_bits()
 
 	director.step(delta)
 	zombie_list.assign(zombies.values())
@@ -730,7 +754,7 @@ func build_snapshot() -> Array:
 	var pd := []
 	for id: int in players:
 		var p: Dictionary = players[id]
-		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon })
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon, "action": p.action })
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
@@ -755,6 +779,7 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 			add_child(r)
 		(remotes[id] as RemotePlayer).buffer.push(e.pos, e.yaw)
 		(remotes[id] as RemotePlayer).set_weapon(e.weapon)
+		(remotes[id] as RemotePlayer).set_action(e.get("action", 0))
 	for id: int in remotes.keys():
 		if not seen.has(id):
 			(remotes[id] as Node).queue_free()
@@ -804,7 +829,7 @@ func _process(delta: float) -> void:
 		_send_timer -= delta
 		if _send_timer <= 0.0:
 			_send_timer = 1.0 / 30.0
-			client_state.rpc_id(1, local_player.global_position, local_player.yaw)
+			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits())
 
 
 ## Right mouse uses what you're looking at; with nothing in reach it aims instead.
@@ -818,7 +843,8 @@ func _update_weapon() -> void:
 	var ws := lp.weapons
 	var d := ws.def()
 	var auto: bool = d.auto
-	if lp.firing and (auto or bot or lp.fire_buffer > 0.0):
+	hud.set_stamina(lp.move.stamina_share(), lp.move.winded)
+	if lp.firing and (auto or bot or lp.fire_buffer > 0.0) and not lp.move.is_vaulting(): # hands are on the cover
 		if ws.rounds() == 0:
 			if not ws.start_reload() and ws.is_dry() and lp.fire_buffer > 0.0:
 				lp.fire_buffer = 0.0 # one click per pull, and no shot goes to the host
@@ -847,7 +873,7 @@ func _fire(d: Dictionary) -> void:
 	Sfx.play_ui("gunshot", d.volume, d.pitch * rng.randf_range(0.96, 1.04))
 	var cam := lp.camera
 	var origin := cam.global_position
-	var cone := 0.0 if bot else Weapons.spread(d, lp.aiming, lp.move_speed / Config.SPRINT_SPEED)
+	var cone := 0.0 if bot else Weapons.spread(d, lp.aiming, lp.move_speed / Config.SPRINT_SPEED, lp.move.crouch)
 	var dir := Weapons.scatter(-cam.global_basis.z, cone, rng)
 	if is_host:
 		_queue_shot(1, origin, dir, lp.weapons.current)

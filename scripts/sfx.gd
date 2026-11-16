@@ -49,6 +49,8 @@ static func _builtin() -> void:
 		register("gunshot", "Guns", _gunshot)
 	if not _defs.has("dry_fire"):
 		register("dry_fire", "Guns", _dry_fire)
+	if not _defs.has("breath"):
+		register("breath", "World", _breath)
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -113,6 +115,20 @@ static func _dry_fire() -> PackedFloat32Array:
 	var tick := exp_tail(high_pass(noise(0.05, Hiss.WHITE, 5), 2500.0), 140.0)
 	var ring := exp_tail(fm(0.05, 1900.0, 2730.0, 1.5), 90.0)
 	return soft_clip(mix([tick, ring], [0.9, 0.35]), 1.5)
+
+
+## One heavy breath, in and out: band-passed noise that swells twice, the second lower.
+static func _breath() -> PackedFloat32Array:
+	var breath_in := envelope(band_pass(noise(0.32, Hiss.PINK, 21), 900.0, 2600.0), 0.14, 0.1, 0.4, 0.08)
+	var breath_out := envelope(band_pass(noise(0.4, Hiss.PINK, 22), 500.0, 1700.0), 0.08, 0.16, 0.3, 0.16)
+	var buf := _blank(0.78)
+	for i in breath_in.size():
+		buf[i] = breath_in[i] * 2.2
+	var at := int(0.36 * RATE)
+	for i in breath_out.size():
+		if at + i < buf.size():
+			buf[at + i] += breath_out[i] * 2.6
+	return soft_clip(buf)
 
 
 # --- Sources ----------------------------------------------------------------------
