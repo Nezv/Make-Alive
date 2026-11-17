@@ -473,16 +473,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ## P05 · The real Joinville
 
-### [ ] S039 · Trace the OpenStreetMap tiles
+### [x] S039 · Trace the OpenStreetMap tiles
 > needs: none | size: L | test: `tests/test_city_osm.gd` | see: redraw `references/city_plan.png`
-- [ ] `tools/trace_osm.py` reads `references/1.png` to `9.png` into `scripts/world/city_osm.gd` (generated, never edited by hand)
-  - [ ] Each tile registered to `joinville.png` pixels by two named control points per tile, kept in the tool
-  - [ ] Building footprints: the brown-grey polygons, simplified to a few corners, area and centroid
-  - [ ] Street casings by colour class: red trunk, orange, yellow, white residential, grey pedestrian
-  - [ ] Water, parks, parking lots, forest stipple as polygons
-- [ ] Overlay picture `references/osm_on_reference.png` proves the registration by eye
-- [ ] Test: the terminal, the Prefeitura and the hospital footprints land inside their `CityData.POIS` lots
-- [ ] Gaps between tiles reported, not guessed
+- [x] `tools/trace_osm.py` reads `references/1.png` to `9.png` into `scripts/world/city_osm.gd` (generated, never edited by hand)
+  - [x] Each tile registered to `joinville.png` pixels by two named control points per tile, kept in the tool
+  - [x] Building footprints: the brown-grey polygons, simplified to a few corners, area and centroid
+  - [x] Street casings by colour class: red trunk, orange, yellow, white residential, grey pedestrian
+  - [x] Water, parks, parking lots, forest stipple as polygons
+- [x] Overlay picture `references/osm_on_reference.png` proves the registration by eye
+- [x] Test: the terminal, the Prefeitura and the hospital footprints land inside their `CityData.POIS` lots
+- [x] Gaps between tiles reported, not guessed
+  - The tiles are at four times joinville.png's zoom (their scale bars); `--register` finds each tile's place by cross-correlating its buildings with joinville.png's (match 0.64 to 0.77) and the control points are kept in `TILES`. 1301 footprints (convex, simplified), streets as 1-pixel cells per class, areas as polygons; the overlay is generated, not committed. The nine tiles cover the centre in an uneven patchwork: what their bounding box leaves uncovered is `CityOsm.GAPS`
 
 ### [ ] S040 · Street network 2
 > needs: S039 | size: L | test: `tests/test_city_map.gd` | see: `--city-plan`
