@@ -45,7 +45,11 @@ var aiming := false
 var sprinting := false
 var aim_blocked := false  # this right-click was spent on a door or lootbox
 var fire_buffer := 0.0    # > 0 for a moment after a click, so semi-auto clicks aren't lost
-var punch := Vector2.ZERO # recoil on top of where you're looking (climb, sideways); recovers
+var punch := Vector2.ZERO # recoil on top of where you're looking (climb, sideways); recovers on a spring
+var punch_vel := Vector2.ZERO
+var feel := CameraFeel.new() # bob, sway, tilt, FOV, shakes
+var strafe_input := 0.0
+var _mouse_accum := Vector2.ZERO
 var debug_aim := false    # tests and screenshots: hold the sights up / hold the sprint pose
 var debug_sprint := false
 var hide_view := false   # screenshots of the world without the gun in the way
@@ -131,7 +135,13 @@ func receive_weapon(id: int, rounds := -1, dropped := -1) -> void:
 func kick_view(k: Vector2) -> void:
 	pitch = clampf(pitch + k.x * Config.RECOIL_STAYS, -1.5, 1.5)
 	yaw += k.y * Config.RECOIL_STAYS
-	punch += k * (1.0 - Config.RECOIL_STAYS)
+	punch_vel += k * (1.0 - Config.RECOIL_STAYS) * Config.RECOIL_IMPULSE # it climbs, then the spring brings it back
+
+
+## The recoil spring: up, back down a little past rest, settled.
+func step_recoil(delta: float) -> void:
+	punch_vel += (-punch * Config.RECOIL_K - punch_vel * Config.RECOIL_D) * delta
+	punch += punch_vel * delta
 
 
 ## Hold the wheel key: the mouse moves its pointer instead of the view, until the key is let go.
@@ -202,6 +212,7 @@ func handle_event(event: InputEvent) -> void:
 			wheel.push(event.relative)
 		return
 	if event is InputEventMouseMotion:
+		_mouse_accum += event.relative
 		var sens: float = Settings.get_value("mouse_sensitivity") * camera.fov / base_fov() # slower when zoomed in
 		yaw -= event.relative.x * sens
 		pitch = clampf(pitch - event.relative.y * sens * (-1.0 if Settings.get_value("invert_y") else 1.0), -1.5, 1.5)
@@ -254,6 +265,7 @@ func _physics_process(delta: float) -> void:
 		firing = false
 	elif not bot:
 		firing = false
+	strafe_input = input.x
 
 	if status.downed and loadout.sidearm() >= 0 and weapons.current != loadout.sidearm():
 		var before := weapons.current
@@ -449,25 +461,28 @@ func _process(delta: float) -> void:
 	var origin := get_global_transform_interpolated().origin + Vector3(0, view_height(), 0)
 	if seat != null and is_instance_valid(seat):
 		origin = seat.global_position
-	if wash_shake > 0.0:
-		var ms := Time.get_ticks_msec() * 0.001
-		origin += Vector3(sin(ms * 41.0), sin(ms * 53.0 + 1.0), sin(ms * 37.0 + 2.0)) * wash_shake
 	weapons.step(delta)
 	shove_left = maxf(0.0, shove_left - delta)
 	fire_buffer -= delta
-	punch = punch.lerp(Vector2.ZERO, 1.0 - exp(-Config.RECOIL_RECOVER * delta))
+	step_recoil(delta)
 	if status.dead:
 		_place_spectator_camera(origin, delta)
 		return
 	_spectate_cam = Vector3.INF
 	_dead_t = 0.0
-	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, view_roll())), origin)
+	feel.scale = Settings.get_value("camera_motion")
+	feel.rumble = wash_shake
+	feel.step(delta, move_speed, sprinting, strafe_input, _mouse_accum, 1.0 + (1.0 - float(Weapons.GUN_SPRINT[weapons.current])) * 4.0)
+	_mouse_accum = Vector2.ZERO
+	var view_basis := Basis.from_euler(Vector3(pitch + punch.x + feel.angles.x, yaw + punch.y + feel.angles.y, view_roll() + feel.angles.z))
+	camera.global_transform = Transform3D(view_basis, origin + view_basis * feel.offset)
+	view.feel_sway = feel.sway
 	var healing := status.is_using() and Inventory.valid(status.using) # (a revive is hands on someone else)
 	view.heal_goal = 1.0 if healing else 0.0
 	view.heal_t = status.use_total - status.use_left if healing else 0.0
 	view.update(delta, move_speed, aiming, sprinting, weapons)
 	var zoom: float = weapons.def().ads_fov
-	camera.fov = lerpf(base_fov(), minf(zoom, base_fov()), Viewmodel._ease(view.aim))
+	camera.fov = lerpf(base_fov() + feel.fov_add, minf(zoom, base_fov()), Viewmodel._ease(view.aim))
 
 
 ## The camera of a dead player: behind and above whoever they watch, easing after them, or slowly

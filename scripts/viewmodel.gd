@@ -77,6 +77,7 @@ var _pending := -1
 var _light_t := 0.0
 var _eject_pending := false ## a pump or bolt gun throws its case when the action is worked
 var scope_break := 0.0     ## 0..1: working a bolt takes the eye off the scope
+var feel_sway := Vector2.ZERO ## the gun trailing the mouse on a spring (CameraFeel.sway, set by the player)
 var inspect_t := -1.0      ## seconds into looking the gun over (-1: not)
 var chamber_peek := 0.0    ## 0..1: the action held open to look in the chamber
 var _reload_done: Array[String] = []
@@ -460,6 +461,7 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	var calm := (1.0 - 0.85 * _ease(aim)) * (1.0 - clampf(move_speed / 2.0, 0.0, 1.0)) * (1.0 - _ease(reload_w))
 	pos += (Vector3(0.0, sin(_idle_t * 1.7) * 0.0035, 0.0) + _idle_off) * calm
 	rot += _idle_rot * calm
+	rot += Vector3(feel_sway.y, feel_sway.x, feel_sway.x * 0.5) * (1.0 - 0.7 * _ease(aim))
 	bob += delta * move_speed * 1.6
 	var amount := minf(move_speed / 5.0, 1.6) * (1.0 - 0.85 * aim)
 	pos += Vector3(cos(bob) * 0.012, absf(sin(bob)) * 0.015, 0.0) * amount

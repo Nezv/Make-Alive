@@ -422,15 +422,16 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Low ammo: the last rounds of a magazine sound thinner and click
   - `Viewmodel.handling` (each part once, `reload_events`, `cycle_events`) → `Sfx` "h_" sounds; `mag_dropped` → `Casings` (`Weapons.Casing.MAG`); `WeaponState.reload_empty`; `scope_break`; `inspect()` (F, `--pose=inspect`); idle breathing and grip shifts; `low_ammo_click` under `Config.LOW_AMMO_ROUNDS`
 
-### [ ] S035 · Camera feel
+### [x] S035 · Camera feel
 > needs: S018 | size: M | test: `tests/test_camera_feel.gd`
-- [ ] Walk and sprint bob as a figure eight, synced with footsteps
-- [ ] Weapon sway lags the mouse, spring back, more with heavy guns
-- [ ] Strafe tilt of a degree or two
-- [ ] Recoil as a spring: kick up, recover most of the way, horizontal wander by gun
-- [ ] FOV opens a little while sprinting, pinches on a sniper shot
-- [ ] Shake sources mixed and capped: explosions, hits taken, leaper landing, helicopter
-- [ ] All of it scaled by a setting, off at zero
+- [x] Walk and sprint bob as a figure eight, synced with footsteps
+- [x] Weapon sway lags the mouse, spring back, more with heavy guns
+- [x] Strafe tilt of a degree or two
+- [x] Recoil as a spring: kick up, recover most of the way, horizontal wander by gun
+- [x] FOV opens a little while sprinting, pinches on a sniper shot
+- [x] Shake sources mixed and capped: explosions, hits taken, leaper landing, helicopter
+- [x] All of it scaled by a setting, off at zero
+  - `CameraFeel` (`local_player.feel`: `step`, `add_shake`, `pinch`, `rumble`), the recoil spring (`punch_vel`, `step_recoil`), `Game.shake_near` / `got_hit` / `_fx_shake`, the "camera_motion" setting; recoil itself is gameplay and is not scaled by it
 
 ### [ ] S036 · HUD 2
 > needs: S011, S021 | size: L | test: `tests/test_hud.gd` | see: `--host --shot-at=2`

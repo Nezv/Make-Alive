@@ -517,6 +517,30 @@ func zombie_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> vo
 @rpc("authority", "call_remote", "reliable", 2)
 func world_fx(kind: int, pos: Vector3, dir: Vector3, arg: float) -> void:
 	fx.play(kind, pos, dir, arg)
+	_fx_shake(kind, pos, arg)
+
+
+## An explosion shakes whoever is near it.
+func _fx_shake(kind: int, pos: Vector3, arg: float) -> void:
+	if kind == Fx.Kind.BLAST:
+		shake_near(pos, Config.CAM_SHAKE_BLAST * maxf(arg, 0.3), Config.CAM_SHAKE_BLAST_RADIUS * maxf(arg, 0.3))
+
+
+## Every peer: a jolt for the local player if they are within `radius` of `pos`, weaker farther off.
+@rpc("authority", "call_remote", "reliable")
+func shake_near(pos: Vector3, amp: float, radius: float) -> void:
+	if local_player == null:
+		return
+	var d := local_player.global_position.distance_to(pos)
+	if d < radius:
+		local_player.feel.add_shake(amp * (1.0 - d / radius), 0.5)
+
+
+## The local player was hit: a jolt.
+@rpc("authority", "call_remote", "reliable")
+func got_hit(amount: int) -> void:
+	if local_player:
+		local_player.feel.add_shake(Config.CAM_SHAKE_HIT * clampf(amount / 15.0, 0.4, 1.5), 0.25)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -1206,6 +1230,7 @@ func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) 
 	if status.invuln > 0.0 or status.dead:
 		return # just got up (nothing can hurt them yet), or there is nothing left to hurt
 	hooks.on_player_damaged(id, amount, by)
+	_send_to(id, &"got_hit", [amount]) # their view jolts
 	if status.downed: # on the floor: the hit costs time, and can finish them
 		if amount > 0:
 			status.down_left -= amount * Config.DOWNED_DAMAGE_SECONDS
@@ -1334,6 +1359,8 @@ func zombie_bashes_door(_z: Zombie, d: Door) -> void:
 
 func zombie_leap_lands(z: Zombie) -> void:
 	hooks.on_zombie_leap_landed(z)
+	shake_near.rpc(z.global_position, Config.CAM_SHAKE_LEAP, Config.CAM_SHAKE_LEAP_RADIUS)
+	shake_near(z.global_position, Config.CAM_SHAKE_LEAP, Config.CAM_SHAKE_LEAP_RADIUS)
 	for id: int in players:
 		var pos: Vector3 = players[id].pos
 		if pos.distance_to(z.global_position) < Config.LEAP_HIT_RADIUS:
@@ -1542,6 +1569,7 @@ func _broadcast_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -
 func play_fx(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 	world_fx.rpc(kind, pos, dir, arg)
 	fx.play(kind, pos, dir, arg)
+	_fx_shake(kind, pos, arg)
 
 
 func _on_setting_changed(key: String) -> void:
@@ -2092,6 +2120,8 @@ func _update_weapon() -> void:
 func _fire(d: Dictionary) -> void:
 	var lp := local_player
 	lp.view.fire()
+	if d.scoped:
+		lp.feel.pinch()
 	var vary := GunVoice.variation(_own_shots)
 	var thin := lp.weapons.rounds() <= Config.LOW_AMMO_ROUNDS and int(d.mag) > 5 # the last of the magazine
 	Sfx.play_ui(GunVoice.sound(lp.weapons.current), d.volume + vary[1] - (2.5 if thin else 0.0), vary[0] * (1.04 if thin else 1.0))

@@ -142,6 +142,29 @@ const INSPECT_TIME := 2.2        # seconds looking the gun over takes
 const HANDLING_DB := -6.0        # how loud magazines, bolts, pumps and slings are
 const LOW_AMMO_ROUNDS := 3       # this few left in a magazine and each shot sounds thinner, with a click
 
+# --- Camera feel (scripts/camera_feel.gd) ---
+const CAM_BOB_RATE := TAU / WALK_SPEED # phase per metre: a step every half turn, two a second at a walk
+const CAM_BOB_X := 0.018         # metres side to side
+const CAM_BOB_Y := 0.022         # metres up and down
+const CAM_BOB_SPRINT := 1.6      # how much bigger sprinting is
+const CAM_SWAY_GAIN := 0.012     # how hard a mouse movement swings the gun back
+const CAM_SWAY_K := 120.0        # its spring
+const CAM_SWAY_D := 17.0         # and damping
+const CAM_SWAY_MAX := 0.08       # radians at most
+const CAM_TILT := 0.026          # radians of lean into a strafe (1.5 degrees)
+const CAM_SPRINT_FOV := 4.0      # degrees wider while sprinting
+const CAM_PINCH := -6.0          # degrees a sniper shot pinches the view
+const CAM_SHAKE_MAX := 0.06      # metres: every shake together never more than this
+const CAM_SHAKES_MAX := 8
+const CAM_SHAKE_HIT := 0.025     # a hit taken
+const CAM_SHAKE_BLAST := 0.06    # an explosion right beside you
+const CAM_SHAKE_BLAST_RADIUS := 25.0
+const CAM_SHAKE_LEAP := 0.03     # a leaper landing near
+const CAM_SHAKE_LEAP_RADIUS := 8.0
+const RECOIL_IMPULSE := 30.0     # the kick's spring: how fast it climbs
+const RECOIL_K := 400.0          # how hard it pulls back
+const RECOIL_D := 22.0           # damping (a little past the rest before it settles)
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc
