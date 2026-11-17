@@ -1605,6 +1605,7 @@ func _process(delta: float) -> void:
 	hud.set_inventory(local_player.inventory)
 	hud.set_status(local_player.status)
 	update_drips(delta)
+	update_reach()
 	if local_player.status.dead:
 		_update_spectating(delta)
 	hud.set_spectate(spectate_text())
@@ -1638,6 +1639,15 @@ func update_drips(delta: float) -> void:
 		var bleeding := r.action & PlayerWire.ACTION_BLEED != 0 and r.action & PlayerWire.ACTION_DEAD == 0
 		if _drips.step(id, r.global_position, bleeding, delta):
 			gore.splat(r.global_position, Vector3.ZERO, Config.BLEED_DRIP_SIZE)
+
+
+## A downed teammate reaches out when you, standing, come within `Config.REACH_RANGE`.
+func update_reach() -> void:
+	var me := local_player.status
+	var standing := not me.downed and not me.dead
+	for id: int in remotes:
+		var r: RemotePlayer = remotes[id]
+		r.helper_near = standing and r.global_position.distance_to(local_player.global_position) <= Config.REACH_RANGE
 
 
 ## Holding use beside a downed teammate gets them up: say so to the host once, and again when you let go.

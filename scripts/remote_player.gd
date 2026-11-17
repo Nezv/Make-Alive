@@ -10,6 +10,9 @@ var gun: GunModel
 var weapon_id := -1
 var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
 var hp := 100 ## from the last snapshot (temporary HP included)
+var helper_near := false ## (set by the game) a standing teammate is close enough to get them up
+var _was_downed := false
+var _getup_left := 0.0
 var _last_pos := Vector3.ZERO
 
 
@@ -58,12 +61,29 @@ func _process(delta: float) -> void:
 	var moved := Vector2(position.x - _last_pos.x, position.z - _last_pos.z).length()
 	_last_pos = position
 	var ground_speed := moved / delta if delta > 0.0 else 0.0
-	rig.set_anim(anim_for(action, ground_speed))
+	animate(delta, ground_speed)
+
+
+## Pick the rig's state and move it on: what the action bits say, a get-up after being downed, a
+## reaching hand while a teammate is near enough to help.
+func animate(delta: float, ground_speed: float) -> void:
+	var downed := action & PlayerWire.ACTION_DOWNED != 0
+	if _was_downed and not downed:
+		_getup_left = Config.GETUP_TIME
+	_was_downed = downed
+	var a := anim_for(action, ground_speed)
+	if _getup_left > 0.0 and not downed:
+		_getup_left = maxf(0.0, _getup_left - delta)
+		a = Humanoid.Anim.GETUP
+	rig.reach = 1.0 if downed and helper_near else 0.0
+	rig.set_anim(a)
 	rig.update(delta, ground_speed)
 
 
 ## The rig's state for a player's action bits and how fast they move over the ground.
 static func anim_for(bits: int, ground_speed: float) -> int:
+	if bits & PlayerWire.ACTION_DOWNED:
+		return Humanoid.Anim.CRAWL if ground_speed > 0.3 else Humanoid.Anim.DOWNED
 	if bits & PlayerWire.ACTION_AIR:
 		return Humanoid.Anim.JUMP
 	if bits & PlayerWire.ACTION_HEAL:

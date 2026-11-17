@@ -26,6 +26,18 @@ var director_label: Label  ## --director: the horde director's pace (host debug)
 var spectate_label: Label  ## while dead: who you are watching and when you come back
 var wheel_view: ItemWheelView ## the item wheel, while its key is held
 var bleed_drops: BleedDrops ## blood at the bottom of the screen while bleeding
+var ring: ProgressRing ## round the crosshair while a revive or a heal goes on
+var grey: ColorRect ## drains the colour out of the screen while downed
+const GREY_SHADER := """
+shader_type canvas_item;
+uniform float amount = 0.0;
+uniform sampler2D screen : hint_screen_texture, filter_linear;
+void fragment() {
+	vec3 c = texture(screen, SCREEN_UV).rgb;
+	float l = dot(c, vec3(0.299, 0.587, 0.114));
+	COLOR = vec4(mix(c, vec3(l) * 0.85, amount), 1.0);
+}
+"""
 var heartbeat := Heartbeat.new() ## when to thump while HP is low
 var objective_label: Label  ## the current objective and its clock, top centre
 var countdown_label: Label  ## big numerals while the extraction clock runs
@@ -59,6 +71,18 @@ var _stamina := 1.0
 
 
 func _ready() -> void:
+	grey = ColorRect.new()
+	grey.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grey.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var gs := Shader.new()
+	gs.code = GREY_SHADER
+	var gm := ShaderMaterial.new()
+	gm.shader = gs
+	grey.material = gm
+	grey.visible = false
+	add_child(grey) # first, so everything else on the HUD stays in colour
+	ring = ProgressRing.new()
+	add_child(ring)
 	damage = ColorRect.new()
 	damage.color = Color(0.8, 0, 0, 0)
 	damage.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -414,8 +438,33 @@ func set_status(status: PlayerStatus) -> void:
 	elif status.is_using():
 		parts.append("%s  %.1f s" % [Inventory.item_name(status.using), status.use_left])
 	status_label.text = "   ·   ".join(parts)
-	bleed_drops.bleed = 0 if status.dead else status.bleed
 	status_label.modulate = Color("ff6a5a") if status.bleed > 0 or status.downed else Color.WHITE
+	bleed_drops.bleed = 0 if status.dead else status.bleed
+	ring.set_progress(ring_for(status))
+	var g := grey_for(status)
+	grey.visible = g > 0.0
+	(grey.material as ShaderMaterial).set_shader_parameter("amount", g)
+
+
+## How grey the screen is: none standing, more and more as a downed player's clock runs out.
+static func grey_for(status: PlayerStatus) -> float:
+	if not status.downed or status.down_total <= 0.0:
+		return 0.0
+	return lerpf(Config.DOWNED_GREY_MIN, 0.9, clampf(1.0 - status.down_left / status.down_total, 0.0, 1.0))
+
+
+func grey_amount() -> float:
+	return (grey.material as ShaderMaterial).get_shader_parameter("amount")
+
+
+## How far along the ring round the crosshair is (-1: no ring): what you are putting on or the
+## teammate you are getting up, or being got up yourself.
+static func ring_for(status: PlayerStatus) -> float:
+	if status.is_using() and status.use_total > 0.0:
+		return 1.0 - status.use_left / status.use_total
+	if status.downed and status.revive_left > 0.0 and status.revive_total > 0.0:
+		return 1.0 - status.revive_left / status.revive_total
+	return -1.0
 
 
 ## The item wheel is up (or not): drawn round the middle of the screen.

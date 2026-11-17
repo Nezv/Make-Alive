@@ -30,7 +30,7 @@ extends Node3D
 ## Placing things on the round body: `chest(x, y)`, `back(x, y)`, `face(x, y)`.
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
-enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL }
+enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL, DOWNED, GETUP }
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
@@ -104,6 +104,7 @@ var is_zombie := false
 var anim: int = Anim.IDLE
 var anim_t := 0.0     ## seconds since the current anim started
 var phase := 0.0      ## walk-cycle phase
+var reach := 0.0      ## 0..1: a downed survivor's free arm reaching out to a teammate (a goal, eased like the rest)
 var flinch := Vector2.ZERO  ## (pitch, yaw) spring offset from being hit
 var segs := {}        ## name -> { name, part, parent, node, mesh, size, center, hitbox? }
 var severed_mask := 0
@@ -557,6 +558,8 @@ func _blend_rate() -> float:
 		Anim.STAGGER: return 24.0
 		Anim.LEAP: return 14.0
 		Anim.CRAWL: return 6.0
+		Anim.DOWNED: return 4.0 # a slow fall to the ground
+		Anim.GETUP: return 7.0
 	return 10.0
 
 
@@ -792,6 +795,45 @@ func _write_goal(speed: float) -> void:
 			_goal[J.EL_R] = 1.1 + cos(wrap) * 0.25
 			_goal[J.KNEE_L] = -0.1
 			_goal[J.HIP_L] = 0.05
+
+		Anim.DOWNED: # a survivor on the ground: half lying back, propped on the left arm, the right hand on the wound or reaching out
+			_goal[J.HIPS_Y] = 0.2
+			_goal[J.HIPS_PITCH] = -1.1
+			_goal[J.HIPS_ROLL] = 0.15
+			_goal[J.SPINE_PITCH] = 0.6 + sin(p * 0.6) * 0.03 # laboured breathing
+			_goal[J.SPINE_ROLL] = -0.15
+			_goal[J.NECK_PITCH] = 0.25
+			_goal[J.SH_L_X] = -0.55
+			_goal[J.SH_L_OUT] = 0.3
+			_goal[J.EL_L] = 0.1
+			_goal[J.SH_R_X] = lerpf(0.4, 2.0, reach)
+			_goal[J.SH_R_OUT] = lerpf(-0.25, 0.1, reach)
+			_goal[J.EL_R] = lerpf(1.4, 0.25, reach)
+			_goal[J.HIP_L] = 0.35
+			_goal[J.KNEE_L] = -0.15
+			_goal[J.HIP_R] = 0.6
+			_goal[J.KNEE_R] = -0.9
+
+		Anim.GETUP: # back on the feet: a knee and a hand on it first, then standing
+			var u := clampf(anim_t / Config.GETUP_TIME, 0.0, 1.0)
+			if u < 0.5:
+				_goal[J.HIPS_Y] = 0.45
+				_goal[J.HIP_L] = 1.4
+				_goal[J.KNEE_L] = -2.0
+				_goal[J.HIP_R] = -0.2
+				_goal[J.KNEE_R] = -1.6
+				_goal[J.SPINE_PITCH] = 0.55
+				_goal[J.SH_L_X] = 0.6
+				_goal[J.EL_L] = 0.5
+				_goal[J.SH_R_X] = 0.3
+				_goal[J.NECK_PITCH] = -0.2
+			else:
+				_crouch(0.35 * (1.0 - u) * 2.0)
+				_goal[J.SPINE_PITCH] = 0.3 * (1.0 - u) * 2.0
+				_goal[J.SH_L_X] = 0.9
+				_goal[J.SH_R_X] = 1.0
+				_goal[J.EL_L] = 0.7
+				_goal[J.EL_R] = 0.5
 
 		Anim.CRAWL: # face down, dragging itself forward one arm at a time
 			_goal[J.HIPS_Y] = 0.22

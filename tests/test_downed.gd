@@ -299,3 +299,101 @@ func test_everyone_can_see_who_is_down_and_a_player_finds_the_downed_teammate_be
 	(g.remotes[1] as Node3D).global_position = HERE + Vector3(9, 0, 0)
 	assert_eq(g.downed_teammate_near(), 0, "out of reach")
 	g.my_id = 1
+
+
+# --- How it looks ---------------------------------------------------------------------
+
+func test_going_down_drops_and_tilts_your_view_and_greys_it_as_the_clock_runs() -> void:
+	var g := await _two()
+	var lp := g.local_player
+	var standing := lp.view_height()
+	assert_near(lp.view_roll(), 0.0, 0.001)
+	g.damage_player(1, 9999)
+	lp.step_down_view(Config.DOWNED_FALL_TIME * 0.5)
+	assert_true(lp.view_height() < standing and lp.view_height() > Config.DOWNED_EYE, "on the way down, not a snap")
+	lp.step_down_view(Config.DOWNED_FALL_TIME)
+	assert_near(lp.view_height(), Config.DOWNED_EYE, 0.01, "on the floor")
+	assert_near(lp.view_roll(), Config.DOWNED_ROLL, 0.01, "tilted")
+	var s := lp.status
+	var early := Hud.grey_for(s)
+	assert_gt(early, 0.0, "some grey at once")
+	s.down_left = s.down_total * 0.1
+	assert_gt(Hud.grey_for(s), early, "greyer as the clock runs out")
+	assert_true(Hud.grey_for(s) <= 1.0)
+	g.hud.set_status(s)
+	assert_near(g.hud.grey_amount(), Hud.grey_for(s), 0.001)
+	g.start_revive(7, 1)
+	g.tick_status(Config.REVIVE_SECONDS + 0.1)
+	assert_eq(Hud.grey_for(lp.status), 0.0, "up again: colour back")
+	lp.step_down_view(Config.GETUP_TIME * 0.5)
+	assert_true(lp.view_height() > Config.DOWNED_EYE + 0.05 and lp.view_height() < standing, "getting up takes a moment")
+	lp.step_down_view(Config.GETUP_TIME)
+	assert_near(lp.view_height(), standing, 0.01)
+	assert_near(lp.view_roll(), 0.0, 0.01)
+
+
+func test_others_see_a_downed_player_fall_prop_up_crawl_reach_and_get_up() -> void:
+	assert_eq(RemotePlayer.anim_for(PlayerWire.ACTION_DOWNED, 0.0), Humanoid.Anim.DOWNED)
+	assert_eq(RemotePlayer.anim_for(PlayerWire.ACTION_DOWNED, 0.8), Humanoid.Anim.CRAWL, "crawling when they move")
+	assert_eq(RemotePlayer.anim_for(PlayerWire.ACTION_DOWNED | PlayerWire.ACTION_AIR, 0.0), Humanoid.Anim.DOWNED)
+	var r := RemotePlayer.create(7, "Guest")
+	add_child(r)
+	r.set_action(PlayerWire.ACTION_DOWNED)
+	for i in 6:
+		r.animate(0.05, 0.0)
+	var hips_mid: float = r.rig._cur[Humanoid.J.HIPS_Y]
+	assert_gt(hips_mid, 0.35, "falling, not dropped flat at once")
+	for i in 60:
+		r.animate(1.0 / 60.0, 0.0)
+	assert_lt(r.rig._cur[Humanoid.J.HIPS_Y], 0.35, "on the ground")
+	var arm: float = r.rig._cur[Humanoid.J.SH_R_X]
+	r.helper_near = true
+	for i in 40:
+		r.animate(1.0 / 60.0, 0.0)
+	assert_gt(r.rig._cur[Humanoid.J.SH_R_X], arm + 0.6, "reaching out to the teammate coming")
+	r.set_action(0)
+	r.animate(1.0 / 60.0, 0.0)
+	assert_eq(r.rig.anim, Humanoid.Anim.GETUP, "back up, not a pop")
+	for i in int(Config.GETUP_TIME * 60.0) + 2:
+		r.animate(1.0 / 60.0, 0.0)
+	assert_eq(r.rig.anim, Humanoid.Anim.IDLE)
+	r.free()
+
+
+func test_the_game_tells_a_downed_remote_when_you_are_near_enough_to_help() -> void:
+	var g := await _two()
+	var r := RemotePlayer.create(7, "Guest")
+	g.remotes[7] = r
+	g.add_child(r)
+	r.set_action(PlayerWire.ACTION_DOWNED)
+	r.global_position = g.local_player.global_position + Vector3(Config.REACH_RANGE * 2.0, 0, 0)
+	g.update_reach()
+	assert_false(r.helper_near)
+	r.global_position = g.local_player.global_position + Vector3(Config.REACH_RANGE * 0.5, 0, 0)
+	g.update_reach()
+	assert_true(r.helper_near)
+	g.remotes.erase(7)
+	r.free()
+
+
+func test_a_revive_shows_a_progress_ring_to_both_players() -> void:
+	var s := PlayerStatus.new()
+	assert_eq(Hud.ring_for(s), -1.0, "nothing going on: no ring")
+	s.begin_use(&"revive", 4.0)
+	s.use_left = 1.0
+	assert_near(Hud.ring_for(s), 0.75, 0.001, "the helper")
+	var d := PlayerStatus.new()
+	d.downed = true
+	d.revive_total = 4.0
+	d.revive_left = 3.0
+	assert_near(Hud.ring_for(d), 0.25, 0.001, "the one being got up")
+	var heal := PlayerStatus.new()
+	heal.begin_use(I.BANDAGE, 2.0)
+	heal.use_left = 1.0
+	assert_near(Hud.ring_for(heal), 0.5, 0.001, "a heal has one too")
+	var g := await _two()
+	g.hud.set_status(s)
+	assert_true(g.hud.ring.visible)
+	assert_near(g.hud.ring.progress, 0.75, 0.001)
+	g.hud.set_status(PlayerStatus.new())
+	assert_false(g.hud.ring.visible)

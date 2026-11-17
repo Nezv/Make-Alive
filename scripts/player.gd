@@ -34,6 +34,7 @@ var spectate_yaw := 0.0            # ...facing this way
 var _spectate_cam := Vector3.INF   # where the camera is
 var _dead_t := 0.0
 var view: Viewmodel
+var down_pose := 0.0      # 0 standing .. 1 on the floor, downed (eases: see step_down_view)
 var aiming := false
 var sprinting := false
 var aim_blocked := false  # this right-click was spent on a door or lootbox
@@ -379,8 +380,27 @@ func _vault_step(delta: float) -> void:
 	sprinting = false
 
 
+## Going down drops the eyes to the floor and tilts the view (`Config.DOWNED_FALL_TIME`); getting up
+## brings them back (`GETUP_TIME`). 0 = standing, 1 = on the floor.
+func step_down_view(delta: float) -> void:
+	var goal := 1.0 if status.downed else 0.0
+	var time := Config.DOWNED_FALL_TIME if goal > down_pose else Config.GETUP_TIME
+	down_pose = move_toward(down_pose, goal, delta / time)
+
+
+## How high the eyes are above the feet now.
+func view_height() -> float:
+	return lerpf(move.eye_height(), Config.DOWNED_EYE, Viewmodel._ease(down_pose))
+
+
+## How far the view is tilted sideways now.
+func view_roll() -> float:
+	return Config.DOWNED_ROLL * Viewmodel._ease(down_pose)
+
+
 func _process(delta: float) -> void:
-	var origin := get_global_transform_interpolated().origin + Vector3(0, move.eye_height(), 0)
+	step_down_view(delta)
+	var origin := get_global_transform_interpolated().origin + Vector3(0, view_height(), 0)
 	weapons.step(delta)
 	shove_left = maxf(0.0, shove_left - delta)
 	fire_buffer -= delta
@@ -390,7 +410,7 @@ func _process(delta: float) -> void:
 		return
 	_spectate_cam = Vector3.INF
 	_dead_t = 0.0
-	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, 0)), origin)
+	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, view_roll())), origin)
 	var healing := status.is_using() and Inventory.valid(status.using) # (a revive is hands on someone else)
 	view.heal_goal = 1.0 if healing else 0.0
 	view.heal_t = status.use_total - status.use_left if healing else 0.0
