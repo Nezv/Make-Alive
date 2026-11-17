@@ -97,6 +97,20 @@ const CHAT_LINES := 8           # chat lines kept on screen
 const CHAT_SHOW := 15.0         # seconds a chat line stays
 const PING_TIME := 8.0          # seconds a ping marks its spot
 const PING_REACH := 80.0        # metres along the view a ping looks for something to mark
+
+# --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
+const HELI_MAX_MESHES := 12      # draws for the whole machine
+const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc
+const HELI_ROTOR_RPS := 4.5      # main rotor turns a second at full speed
+const HELI_WASH_HEIGHT := 14.0   # metres above the ground below which its downwash kicks up dust
+const HELI_WASH_RADIUS := 16.0   # metres round it the dust and the view shake reach
+const HELI_WASH_EVERY := 0.12    # seconds between dust rings
+const HELI_WASH_SHAKE := 0.04    # metres the view trembles right under it
+const HELI_GUNNER_RANGE := 45.0  # metres the door gunner reaches
+const HELI_GUNNER_INTERVAL := 0.35 # seconds between his shots
+const HELI_GUNNER_DAMAGE := 34
+const HELI_GUNNER_ALT := 15.0    # he fires once it is this low
+const HELI_BOARD_RADIUS := 2.2   # metres from the side door that count as aboard
 const SPECTATE_BACK := 3.2      # metres behind the player being followed...
 const SPECTATE_HEIGHT := 1.9    # ...and above their feet
 const SPECTATE_SMOOTH := 5.0    # how fast the spectator camera catches up (per second)

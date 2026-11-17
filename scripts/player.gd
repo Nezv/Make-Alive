@@ -39,6 +39,8 @@ var view: Viewmodel
 var down_pose := 0.0      # 0 standing .. 1 on the floor, downed (eases: see step_down_view)
 var arrive_left := 0.0    # > 0 while dropping off the truck bed after a respawn
 var typing := false       # the chat line is open: keys go to it, not to walking
+var seat: Node3D = null   # aboard the helicopter: the body rides here, nothing else moves it
+var wash_shake := 0.0     # metres the view trembles under the helicopter's downwash
 var aiming := false
 var sprinting := false
 var aim_blocked := false  # this right-click was spent on a door or lootbox
@@ -233,6 +235,12 @@ func handle_event(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if seat != null and is_instance_valid(seat): # sat in the cabin: carried, not walking
+		global_position = seat.global_position - Vector3(0, move.eye_height(), 0)
+		velocity = Vector3.ZERO
+		move_speed = 0.0
+		firing = false
+		return
 	var input := Vector2.ZERO
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if wheel.open and not captured:
@@ -437,6 +445,11 @@ func _process(delta: float) -> void:
 	step_down_view(delta)
 	step_arrival(delta)
 	var origin := get_global_transform_interpolated().origin + Vector3(0, view_height(), 0)
+	if seat != null and is_instance_valid(seat):
+		origin = seat.global_position
+	if wash_shake > 0.0:
+		var ms := Time.get_ticks_msec() * 0.001
+		origin += Vector3(sin(ms * 41.0), sin(ms * 53.0 + 1.0), sin(ms * 37.0 + 2.0)) * wash_shake
 	weapons.step(delta)
 	shove_left = maxf(0.0, shove_left - delta)
 	fire_buffer -= delta

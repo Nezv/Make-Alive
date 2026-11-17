@@ -18,8 +18,8 @@ extends Node3D
 enum Layer { CHIP, GLOW, SMOKE }
 enum Mark { HOLE, SCORCH, CRACK, PUDDLE }
 ## What travels on the wire. Append only: the numbers are the protocol.
-enum Kind { DUST, SPARKS, FLASH, SMOKE, BLAST, HOLE, CRACK, SPLASH, ARRIVAL }
-const NAMES := ["dust", "sparks", "flash", "smoke", "blast", "hole", "crack", "splash", "arrival"]
+enum Kind { DUST, SPARKS, FLASH, SMOKE, BLAST, HOLE, CRACK, SPLASH, ARRIVAL, TRACER }
+const NAMES := ["dust", "sparks", "flash", "smoke", "blast", "hole", "crack", "splash", "arrival", "tracer"]
 
 ## Counters (tests read these; handy for debugging too).
 var stats := { "played": 0, "bursts": 0, "lights": 0, "decals": 0, "trails": 0 }
@@ -283,6 +283,11 @@ func play(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 			burst(Layer.SMOKE, pos, Vector3.UP, 7, { "speed": 3.0 * s, "spread": 0.2, "life": 0.5, "size": 0.1 * s,
 				"size_end": 0.35 * s, "color": Color(0.75, 0.82, 0.88, 0.55), "gravity": 9.0 })
 			decal(Mark.PUDDLE, pos, Vector3.UP, 0.7 * s)
+		Kind.TRACER: # a bright streak along `dir` for `arg` metres (the door gun; S030 makes the real ones)
+			var n := clampi(int(arg / 2.0), 3, 24)
+			for k in n:
+				burst(Layer.GLOW, pos + dir.normalized() * arg * (k + 0.5) / n, dir, 1, { "speed": 0.0, "spread": 0.0,
+					"life": 0.07, "size": 0.06, "size_end": 0.03, "color": Color(1.0, 0.85, 0.45), "gravity": 0.0 })
 		Kind.ARRIVAL: # a survivor jumps down off a truck bed: a ring of dust kicked out round the feet
 			var feet := Vector3(pos.x, _floor(pos) + 0.05, pos.z)
 			for k in 8:

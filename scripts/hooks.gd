@@ -328,3 +328,13 @@ func on_door_broken(door: Door) -> void:
 ## `by_player` is 0 when no player caused it.
 func on_noise(position: Vector3, loudness: float, by_player: int) -> void:
 	fired.emit(&"on_noise", [position, loudness, by_player])
+
+
+## A player climbed into the landed helicopter.
+func on_heli_boarded(player_id: int) -> void:
+	fired.emit(&"on_heli_boarded", [player_id])
+
+
+## Everyone still standing is aboard: the helicopter lifts off with them.
+func on_heli_departed(player_ids: Array) -> void:
+	fired.emit(&"on_heli_departed", [player_ids])

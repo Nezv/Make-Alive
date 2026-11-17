@@ -26,6 +26,7 @@ extends Node
 ##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload, shove, heal (hurt, bleeding, a medkit going on) or downed
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --heli[=S]             host: the helicopter lands 16 m ahead of you in S seconds (8)
 ##   --feed                 host: you die in front of three zombies (the body, the zombies feeding, the death camera)
 ##   --wheel                host: carry a little of everything and hold the item wheel up (pointer on the bandage)
 ##   --director             host: show the horde director's pace (state, stress, heat) on the HUD
@@ -138,6 +139,10 @@ func _host(map_name := "city", mission := "") -> void:
 		_wheel()
 	if _args.has("feed"):
 		_feed()
+	if _args.has("heli"):
+		game.director.enabled = false
+		var at := game.local_player.global_position + Vector3(0, 0, -16)
+		game.call_heli(Vector3(at.x, game.map.ground_y(at), at.z), float(_args.get("heli", "8")) if str(_args.get("heli", "")).is_valid_float() else 8.0)
 	if _args.has("director"):
 		game.director_overlay = true
 	if _args.has("zones"):

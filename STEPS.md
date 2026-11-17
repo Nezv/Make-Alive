@@ -295,17 +295,18 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] HUD: wave number, zombies left, helicopter ETA
 - [x] Siren at each wave start, `on_horde_incoming` already exists
 
-### [ ] S024 · Helicopter
+### [x] S024 · Helicopter
 > needs: S022, S004 | size: L | test: `tests/test_helicopter.gd` | see: `--host --map=corridor --heli --shot-at=3,6,9`
-- [ ] Model from boxes in `props.gd`: military transport, sliding side doors, skids, tail rotor, nav lights
-- [ ] Rotor: blades as one spinning mesh, swapped for a translucent blur disc above a speed, blades droop when stopped
-- [ ] Flight as a path on the host, sent as (path id, time): approach high, circle once, flare nose-up, settle
-- [ ] Body language: banks into turns, nose dips when accelerating, sways in the hover, skids compress on touchdown
-- [ ] Rotor wash: ring of dust blown outward on the ground, nearby particles and smoke pushed, players' view shakes softly underneath
-- [ ] Lights: red and green nav lights, white strobe, red anti-collision beacon sweeping the ground
-- [ ] Door gunner silhouette firing tracers at the horde during the hover
-- [ ] Boarding: players enter the door zone, camera sits them inside, lift-off, the city falls away
-- [ ] Sound hooks named for S087
+- [x] Model from boxes in `props.gd`: military transport, sliding side doors, skids, tail rotor, nav lights
+- [x] Rotor: blades as one spinning mesh, swapped for a translucent blur disc above a speed, blades droop when stopped
+- [x] Flight as a path on the host, sent as (path id, time): approach high, circle once, flare nose-up, settle
+- [x] Body language: banks into turns, nose dips when accelerating, sways in the hover, skids compress on touchdown
+- [x] Rotor wash: ring of dust blown outward on the ground, nearby particles and smoke pushed, players' view shakes softly underneath
+- [x] Lights: red and green nav lights, white strobe, red anti-collision beacon sweeping the ground
+- [x] Door gunner silhouette firing tracers at the horde during the hover
+- [x] Boarding: players enter the door zone, camera sits them inside, lift-off, the city falls away
+- [x] Sound hooks named for S087
+  - `HeliFlight` (the path from landing point, heading and time), `Helicopter` (the look), `Game.call_heli` / `step_heli` / `heli_state`; the last wave of a defend objective calls it; `--heli`
 
 ### [x] S025 · Checkpoints
 > needs: S021 | size: S | test: `tests/test_checkpoints.gd`

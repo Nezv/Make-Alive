@@ -47,6 +47,11 @@ var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason":
 var remotes := {}        ## peer id -> RemotePlayer
 var _drips := BleedTrail.new() ## where bleeding players last dropped blood
 var pings := {}          ## player id -> { node: the marker, left: seconds }
+var heli: Helicopter = null ## the extraction helicopter, while one is coming, down or leaving
+var heli_flight: HeliFlight = null
+var heli_t := 0.0        ## seconds into its flight (every peer counts it itself)
+var _wash_t := 0.0
+var _gunner_t := 0.0
 var names := {}          ## peer id -> player name, on every peer (sent when someone joins or leaves)
 var zombies := {}        ## zombie id -> Zombie
 var zombie_list: Array[Zombie] = [] ## same zombies as an array, refreshed each host tick
@@ -213,7 +218,10 @@ func request_join(player_name_: String, version := 0) -> void:
 
 ## What a joining player must know about this match beyond the map: sent in `welcome`.
 func welcome_rules() -> Dictionary:
-	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION }
+	var r := { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION }
+	if heli != null:
+		r.heli = heli_state()
+	return r
 
 
 ## What is wrong when the other side runs build `theirs` ("" when it is the same as this one). A build that
@@ -375,6 +383,8 @@ func welcome(map_name_: String, mission_: String, interactable_states: Dictionar
 	_build_world()
 	for iid: int in interactable_states:
 		_apply_interact_state(iid, interactable_states[iid])
+	if match_rules.has("heli"):
+		apply_heli_state(match_rules.heli)
 	print("[client %d] joined host" % my_id)
 
 
@@ -607,7 +617,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "mag": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "mag": 0, "boarded": false, "last_shove": -100.0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo(), "inventory": Inventory.new(), "status": PlayerStatus.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
@@ -643,6 +653,7 @@ func respawn_player(id: int, reason: String) -> void:
 		var at := Vector3(c.x + cos(a) * 1.2, 0, c.z + sin(a) * 1.2)
 		p.pos = Vector3(at.x, map.ground_y(at) + 0.1, at.z)
 	p.step_pos = p.pos
+	p.boarded = false
 	(p.health as Health).reset()
 	clear_status(id)
 	rules.set_out(id, false) # (a downed player who bled out is back in the fight)
@@ -1619,6 +1630,7 @@ func _process(delta: float) -> void:
 	update_drips(delta)
 	update_reach()
 	step_pings(delta)
+	step_heli(delta)
 	if local_player.status.dead:
 		_update_spectating(delta)
 	hud.set_spectate(spectate_text())
@@ -1769,6 +1781,143 @@ func step_pings(delta: float) -> void:
 			pings.erase(id)
 		else:
 			mark.modulate.a = clampf(float(pg.left) / 1.0, 0.0, 1.0)
+
+
+# --- The helicopter ---------------------------------------------------------------------
+
+## Host: send the helicopter to land at `lz` in `eta` seconds (sooner than a whole flight: it joins it
+## part way). Every peer flies the same path from the same numbers.
+func call_heli(lz: Vector3, eta: float) -> void:
+	var heading := fposmod(lz.x * 0.37 + lz.z * 0.11 + 0.8, TAU) # from the spot, so it is the same every run
+	var state := { "lz": lz, "yaw": heading, "t": HeliFlight.LAND_AT - eta, "depart": INF }
+	heli_started.rpc(state)
+	apply_heli_state(state)
+
+
+@rpc("authority", "call_remote", "reliable")
+func heli_started(state: Dictionary) -> void:
+	apply_heli_state(state)
+
+
+## Where the flight stands now (for late joiners).
+func heli_state() -> Dictionary:
+	return { "lz": heli_flight.lz, "yaw": heli_flight.yaw, "t": heli_t, "depart": heli_flight.depart_at }
+
+
+func apply_heli_state(state: Dictionary) -> void:
+	if heli != null:
+		heli.queue_free()
+	heli_flight = HeliFlight.new(state.lz, state.yaw)
+	heli_flight.depart_at = state.get("depart", INF)
+	heli_t = state.t
+	heli = Helicopter.new()
+	heli.ground_y = (state.lz as Vector3).y
+	add_child(heli)
+	_wash_t = 0.0
+	_gunner_t = 0.0
+	step_heli(0.0)
+
+
+@rpc("authority", "call_remote", "reliable")
+func heli_departs(at: float) -> void:
+	if heli_flight != null:
+		heli_flight.depart_at = at
+
+
+## Every peer, every frame: fly it on, kick up dust under it; the host also runs the door gunner and
+## sees who has climbed in.
+func step_heli(delta: float) -> void:
+	if heli == null:
+		return
+	heli_t += delta
+	var pose := heli_flight.pose(heli_t)
+	heli.apply(pose, delta, heli_t)
+	if pose.phase == HeliFlight.Phase.GONE:
+		local_player.seat = null
+		local_player.wash_shake = 0.0
+		heli.queue_free()
+		heli = null
+		return
+	var alt := float(pose.pos.y) - heli_flight.lz.y
+	_heli_wash(delta, pose.pos, alt)
+	if is_host:
+		var low: bool = pose.phase == HeliFlight.Phase.LANDED or (pose.phase == HeliFlight.Phase.DESCEND and alt < Config.HELI_GUNNER_ALT)
+		if low:
+			_heli_gunner(delta)
+		if pose.phase == HeliFlight.Phase.LANDED:
+			_heli_boarding()
+
+
+func _heli_wash(delta: float, at: Vector3, alt: float) -> void:
+	var lp := local_player
+	if alt > Config.HELI_WASH_HEIGHT:
+		lp.wash_shake = 0.0
+		return
+	var strength := 1.0 - alt / Config.HELI_WASH_HEIGHT * 0.6
+	_wash_t -= delta
+	if _wash_t <= 0.0:
+		_wash_t = Config.HELI_WASH_EVERY
+		var ground := Vector3(at.x, heli_flight.lz.y + 0.1, at.z)
+		for k in 10:
+			var a := k * TAU / 10.0 + heli_t
+			var out := Vector3(cos(a), 0.05, sin(a))
+			fx.burst(Fx.Layer.SMOKE, ground + out * 2.0, out, 1, { "speed": 9.0 * strength, "spread": 0.2, "life": 0.9,
+				"size": 0.3, "size_end": 1.4, "color": Color(0.52, 0.5, 0.46, 0.35), "gravity": -0.3 })
+	var d := Vector2(lp.global_position.x - at.x, lp.global_position.z - at.z).length()
+	lp.wash_shake = Config.HELI_WASH_SHAKE * strength * (1.0 - d / Config.HELI_WASH_RADIUS) if d < Config.HELI_WASH_RADIUS else 0.0
+
+
+func _heli_gunner(delta: float) -> void:
+	_gunner_t -= delta
+	while _gunner_t <= 0.0:
+		_gunner_t += Config.HELI_GUNNER_INTERVAL
+		var muzzle := heli.gun_muzzle()
+		var best: Zombie = null
+		var best_d := Config.HELI_GUNNER_RANGE
+		for z: Zombie in zombies.values():
+			var dd := z.global_position.distance_to(muzzle)
+			if dd < best_d:
+				best = z
+				best_d = dd
+		if best == null:
+			return
+		var target := best.global_position + Vector3(0, 1.2, 0)
+		var dir := (target - muzzle).normalized()
+		play_fx(Fx.Kind.TRACER, muzzle, dir, muzzle.distance_to(target))
+		Sfx.play(Helicopter.SOUNDS.gunner, muzzle)
+		hit_zombie(0, best, Humanoid.Part.TORSO, target, dir, Config.HELI_GUNNER_DAMAGE)
+
+
+## Players at the door are in; once everyone still standing is, it lifts off.
+func _heli_boarding() -> void:
+	var door := heli.door_point()
+	var standing := 0
+	var aboard := 0
+	for id: int in players:
+		var p: Dictionary = players[id]
+		if rules.out.has(id):
+			continue
+		standing += 1
+		if not p.boarded and Vector2(p.pos.x - door.x, p.pos.z - door.z).length() <= Config.HELI_BOARD_RADIUS:
+			p.boarded = true
+			_send_to(id, &"heli_boarded", [])
+			hooks.on_heli_boarded(id)
+		if p.boarded:
+			aboard += 1
+	if standing > 0 and aboard == standing and heli_flight.depart_at == INF:
+		heli_flight.depart_at = heli_t
+		heli_departs.rpc(heli_t)
+		var ids := []
+		for id: int in players:
+			if players[id].boarded:
+				ids.append(id)
+		hooks.on_heli_departed(ids)
+
+
+@rpc("authority", "call_remote", "reliable")
+func heli_boarded() -> void:
+	if heli != null:
+		local_player.seat = heli.seat
 
 
 ## A downed teammate reaches out when you, standing, come within `Config.REACH_RANGE`.
