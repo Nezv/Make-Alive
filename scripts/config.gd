@@ -137,6 +137,11 @@ const SHOT_DB_VARY := 1.5        # ...and this many dB louder or softer
 const TAIL_DB := 5.0             # the room's answer is this much quieter than the shot
 const HILL_OPEN_Y := 40.0        # metres up the hill where a shot rings out in the open
 
+# --- Handling (viewmodel.gd) ---
+const INSPECT_TIME := 2.2        # seconds looking the gun over takes
+const HANDLING_DB := -6.0        # how loud magazines, bolts, pumps and slings are
+const LOW_AMMO_ROUNDS := 3       # this few left in a magazine and each shot sounds thinner, with a click
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc

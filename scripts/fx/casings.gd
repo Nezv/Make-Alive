@@ -10,6 +10,7 @@ const COLORS := {
 	Weapons.Casing.RIFLE: Color("c99a3e"),
 	Weapons.Casing.SHELL: Color("b0282a"),
 	Weapons.Casing.SNIPER: Color("c7a252"),
+	Weapons.Casing.MAG: Color("2a2b2d"),
 }
 ## [radius, length] per kind.
 const SIZES := {
@@ -17,6 +18,7 @@ const SIZES := {
 	Weapons.Casing.RIFLE: [0.0065, 0.039],
 	Weapons.Casing.SHELL: [0.011, 0.07],
 	Weapons.Casing.SNIPER: [0.0085, 0.069],
+	Weapons.Casing.MAG: [0.022, 0.15],
 }
 const BOUNCE := 0.35     ## share of the fall speed it bounces back with
 const GRAVITY := 9.8
@@ -79,6 +81,11 @@ func alive() -> int:
 	return _items.size()
 
 
+## Dropped magazines lying about.
+func mags() -> int:
+	return _items.filter(func(it: Dictionary) -> bool: return it.kind == Weapons.Casing.MAG).size()
+
+
 func bounces(i: int) -> int:
 	return _items[i].bounces
 
@@ -109,7 +116,7 @@ func step(delta: float) -> void:
 			p.y = floor_y
 			it.bounces = int(it.bounces) + 1
 			tinks += 1
-			Sfx.play("tink", p, 0.15, -6.0, 0.8 if it.kind == Weapons.Casing.SHELL else 1.0 + 0.15 * float(it.kind))
+			Sfx.play("tink", p, 0.15, -6.0, 0.45 if it.kind == Weapons.Casing.MAG else (0.8 if it.kind == Weapons.Casing.SHELL else 1.0 + 0.15 * float(it.kind)))
 			if int(it.bounces) >= 2: # down for good: lying on its side
 				v = Vector3.ZERO
 				it.rest = 0.0

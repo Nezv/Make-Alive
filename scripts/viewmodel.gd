@@ -61,6 +61,8 @@ var heal_t := 0.0          ## seconds into the heal: which pose the hands are at
 var bandage: MeshInstance3D ## the roll in the right hand while healing
 var bob := 0.0
 signal eject(at: Vector3, vel: Vector3, kind: int) ## a spent case leaves the port (the game drops it)
+signal handling(what: String) ## a part of handling the gun with its own sound: "mag_out", "bolt_back", "draw"...
+signal mag_dropped(at: Vector3, vel: Vector3) ## the old magazine falls out (the game drops it)
 signal smoke(at: Vector3, count: int, thin: bool) ## puffs at the muzzle, in the world (the game makes them)
 
 var flash: MuzzleFlash
@@ -74,6 +76,21 @@ var arm_l: Node3D
 var _pending := -1
 var _light_t := 0.0
 var _eject_pending := false ## a pump or bolt gun throws its case when the action is worked
+var scope_break := 0.0     ## 0..1: working a bolt takes the eye off the scope
+var inspect_t := -1.0      ## seconds into looking the gun over (-1: not)
+var chamber_peek := 0.0    ## 0..1: the action held open to look in the chamber
+var _reload_done: Array[String] = []
+var _was_reloading := false
+var _last_rounds := -1
+var _pump_fwd_in := -1.0
+var _cycle_armed := false
+var _cycle_done: Array[String] = []
+var _idle_t := 0.0
+var _idle_next := 0.0
+var _idle_goal := Vector3.ZERO
+var _idle_rot_goal := Vector3.ZERO
+var _idle_off := Vector3.ZERO
+var _idle_rot := Vector3.ZERO
 var _since_fire := 100.0
 var _hot := false
 var _wisp_t := 0.0
@@ -132,15 +149,20 @@ func show_weapon(id: int) -> void:
 		_swap(id)
 	else:
 		_pending = id
+		inspect_t = -1.0
+		handling.emit("holster")
 
 
 func _swap(id: int) -> void:
 	if gun:
 		gun.queue_free()
+	var first := gun == null
 	gun = Guns.build(id)
 	weapon_id = id
 	_pending = -1
 	pivot.add_child(gun)
+	if not first:
+		handling.emit("draw")
 	flash.shape = Weapons.flash_shape(id)
 	flash.mesh = MuzzleFlash.mesh_for(flash.shape) if flash.shape != Weapons.Flash.NONE else null
 	flash.position = gun.muzzle + Vector3(0, 0, -0.02)
@@ -153,6 +175,9 @@ func fire() -> void:
 	kick_pos = 1.0
 	kick_rot = Vector3(1.0, _rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0))
 	flash.fire(_rng)
+	inspect_t = -1.0
+	_cycle_armed = Weapons.def(weapon_id).cycle != Weapons.Cycle.BLOWBACK
+	_cycle_done.clear()
 	var suppressed := flash.shape == Weapons.Flash.NONE
 	_light_t = 0.0 if suppressed else Config.MUZZLE_LIGHT_TIME
 	heat += 1.0
@@ -238,9 +263,82 @@ static func heal_hands(t: float) -> Array:
 	return [(a[0] as Vector3).lerp(b[0], w), (a[1] as Vector3).lerp(b[1], w)]
 
 
+## A reload's parts for a magazine gun: [progress, what], each with its own sound; an empty one also
+## racks the charging handle at the end.
+static func reload_events(empty: bool) -> Array:
+	if empty:
+		return [[0.05, "mag_release"], [0.13, "mag_out"], [0.5, "mag_in"], [0.62, "mag_slap"], [0.86, "bolt_rack"]]
+	return [[0.06, "mag_release"], [0.16, "mag_out"], [0.6, "mag_in"], [0.74, "mag_slap"]]
+
+
+## The moves of a pump or a bolt after a shot: [seconds after the shot, what].
+static func cycle_events(d: Dictionary) -> Array:
+	var a := 0.18
+	var b: float = float(d.interval) - 0.12
+	if d.cycle == Weapons.Cycle.BOLT:
+		return [[a, "bolt_up"], [a + 0.3 * (b - a), "bolt_back"], [a + 0.6 * (b - a), "bolt_fwd"], [b - 0.05, "bolt_down"]]
+	if d.cycle == Weapons.Cycle.PUMP:
+		return [[a + 0.25 * (b - a), "pump_back"], [a + 0.65 * (b - a), "pump_fwd"]]
+	return []
+
+
+## Turn the gun over to look at it: a roll one way, the other, then the chamber. False while busy.
+func inspect() -> bool:
+	if gun == null or reload_w > 0.1 or aim > 0.1 or lower > 0.1:
+		return false
+	inspect_t = 0.0
+	handling.emit("inspect")
+	return true
+
+
+func _drop_mag() -> void:
+	if gun == null or gun.mag == null or not is_inside_tree():
+		return
+	mag_dropped.emit(gun.mag.global_position, pivot.global_basis * Vector3(0.2, -1.2, 0.3))
+
+
 ## 0 → 1 → 0 as `x` goes from `from` to `to`.
 static func _pulse(x: float, from: float, to: float) -> float:
 	return sin(clampf((x - from) / (to - from), 0.0, 1.0) * PI)
+
+
+## Each part of a reload, a pump or a bolt says so once (`handling`), as it happens.
+func _handling_events(d: Dictionary, ws: WeaponState, reloading: bool, style_mag: bool, empty: bool, u: float, delta: float) -> void:
+	if reloading and style_mag:
+		for ev: Array in reload_events(empty):
+			if u >= float(ev[0]) and not _reload_done.has(ev[1]):
+				_reload_done.append(ev[1])
+				handling.emit(ev[1])
+				if ev[1] == "mag_out":
+					_drop_mag()
+	if not style_mag and (reloading or _was_reloading):
+		var r := ws.rounds()
+		if _last_rounds >= 0 and r > _last_rounds:
+			for k in r - _last_rounds:
+				handling.emit("shell_in")
+		if _was_reloading and not reloading and d.cycle == Weapons.Cycle.PUMP and ws.since_shot > float(d.interval):
+			handling.emit("pump_back") # loaded: rack it
+			_pump_fwd_in = 0.15
+	if _pump_fwd_in >= 0.0:
+		_pump_fwd_in -= delta
+		if _pump_fwd_in < 0.0:
+			handling.emit("pump_fwd")
+	if not reloading:
+		_reload_done.clear()
+	_was_reloading = reloading
+	_last_rounds = ws.rounds()
+	if _cycle_armed:
+		var all_done := true
+		for ev: Array in cycle_events(d):
+			if _cycle_done.has(ev[1]):
+				continue
+			if ws.since_shot >= float(ev[0]):
+				_cycle_done.append(ev[1])
+				handling.emit(ev[1])
+			else:
+				all_done = false
+		if all_done:
+			_cycle_armed = false
 
 
 func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: WeaponState) -> void:
@@ -266,7 +364,9 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	var pos := gun.hip
 	var rot := Vector3.ZERO
 	var ads_pos := Vector3(-gun.sight.x, -gun.sight.y, -gun.ads_dist - gun.sight.z)
-	var w := _ease(aim)
+	# Working a bolt takes the eye off the scope for a moment.
+	scope_break = _pulse(ws.since_shot, 0.18, float(d.interval) - 0.12) if d.cycle == Weapons.Cycle.BOLT else 0.0
+	var w := _ease(aim) * (1.0 - 0.85 * scope_break)
 	pos = pos.lerp(ads_pos, w)
 	w = _ease(sprint)
 	pos = pos.lerp(CARRY_HIGH_POS if high else CARRY_LOW_POS, w)
@@ -296,8 +396,12 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 		cyc = _pulse(ws.since_shot, 0.0, minf(0.08, interval))
 	var u := ws.reload_progress() if reloading else 1.0
 	var style_mag: bool = d.reload_style == Weapons.Reload.MAG
-	if reloading and style_mag:
-		cyc = maxf(cyc, _pulse(u, 0.84, 0.97)) # rack it after the new magazine is in
+	var empty := ws.reload_empty
+	if reloading and style_mag and empty:
+		cyc = maxf(cyc, _pulse(u, 0.84, 0.97)) # an empty gun: rack it after the new magazine is in
+	if inspect_t >= 0.0:
+		cyc = maxf(cyc, 0.6 * chamber_peek)
+	_handling_events(d, ws, reloading, style_mag, empty, u, delta)
 	if gun.action:
 		gun.action.position = gun.action_travel * cyc
 	if _eject_pending and cyc >= 0.6: # the pump or the bolt is back: out it goes
@@ -308,8 +412,12 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	# Magazine: out, away, a fresh one back in.
 	var out := 0.0
 	if reloading and style_mag:
-		out = smoothstep(0.14, 0.34, u) - smoothstep(0.52, 0.76, u)
-		rot.x += 0.12 * _pulse(u, 0.74, 0.84) # the slap that seats it
+		if empty: # quicker with the magazine, then the charging handle
+			out = smoothstep(0.12, 0.3, u) - smoothstep(0.42, 0.6, u)
+			rot.x += 0.12 * _pulse(u, 0.6, 0.7) # the slap that seats it
+		else:
+			out = smoothstep(0.14, 0.34, u) - smoothstep(0.52, 0.76, u)
+			rot.x += 0.12 * _pulse(u, 0.74, 0.84)
 	if gun.mag:
 		gun.mag.position = gun.mag_out * out
 
@@ -327,6 +435,31 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 			shove_t = -1.0
 	dry = maxf(0.0, dry - delta / Config.DRY_FIRE_TIME)
 	rot += Vector3(-1.0, 0.0, 0.6) * Config.DRY_FIRE_TWITCH * sin(dry * PI) * (1.0 - 0.5 * aim)
+	# Looking the gun over: a roll one way, the other, then the chamber held open.
+	if inspect_t >= 0.0:
+		inspect_t += delta
+		if aiming or reloading or sprinting or inspect_t >= Config.INSPECT_TIME:
+			inspect_t = -1.0
+			chamber_peek = 0.0
+		else:
+			var k := inspect_t / Config.INSPECT_TIME
+			rot.z += 0.75 * _pulse(k, 0.0, 0.35) - 0.7 * _pulse(k, 0.3, 0.65)
+			chamber_peek = _pulse(k, 0.62, 0.98)
+			rot.y += 0.35 * chamber_peek
+			pos += Vector3(-0.04, 0.03, 0.03) * chamber_peek
+	# Idle life: breathing, and the hands shifting on the grip now and then.
+	_idle_t += delta
+	_idle_next -= delta
+	if _idle_next <= 0.0:
+		_idle_next = _rng.randf_range(2.5, 4.5)
+		_idle_goal = Vector3(_rng.randf_range(-0.006, 0.006), _rng.randf_range(-0.005, 0.005), _rng.randf_range(-0.004, 0.004))
+		_idle_rot_goal = Vector3(_rng.randf_range(-0.03, 0.03), _rng.randf_range(-0.03, 0.03), _rng.randf_range(-0.04, 0.04))
+	var settle := 1.0 - exp(-2.5 * delta)
+	_idle_off = _idle_off.lerp(_idle_goal, settle)
+	_idle_rot = _idle_rot.lerp(_idle_rot_goal, settle)
+	var calm := (1.0 - 0.85 * _ease(aim)) * (1.0 - clampf(move_speed / 2.0, 0.0, 1.0)) * (1.0 - _ease(reload_w))
+	pos += (Vector3(0.0, sin(_idle_t * 1.7) * 0.0035, 0.0) + _idle_off) * calm
+	rot += _idle_rot * calm
 	bob += delta * move_speed * 1.6
 	var amount := minf(move_speed / 5.0, 1.6) * (1.0 - 0.85 * aim)
 	pos += Vector3(cos(bob) * 0.012, absf(sin(bob)) * 0.015, 0.0) * amount

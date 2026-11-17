@@ -409,17 +409,18 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Small pitch and level variation per shot, seeded per shot index
   - `GunVoice` (`scripts/gun_voice.gd`: `RECIPES`, `sound(id)` + `_far` / `_sup`, `tail(place)`, `variation(i)`), `Game.place_at`; checked by measurement in the tests (length, loudness, brightness), not yet by ear
 
-### [ ] S034 · Handling animation and sound
+### [x] S034 · Handling animation and sound
 > needs: S033 | size: L | test: `tests/test_viewmodel.gd` | see: `--weapon=1..9 --pose=reload`
-- [ ] Reload has parts with their own sound and pose: mag release, mag out, new mag in, slap, bolt or charging handle
-  - [ ] Empty reload differs from a tactical reload
-  - [ ] The old magazine falls and stays on the floor a while
-  - [ ] Shotgun: shell in per round, pump at the end
-  - [ ] Bolt rifle: bolt up, back, forward, down, with the scope leaving the eye
-- [ ] Inspect animation on a key: roll the gun left and right, check the chamber
-- [ ] Idle life: slow breathing, micro-adjustments of the grip
-- [ ] Draw and holster with cloth and sling sounds
-- [ ] Low ammo: the last rounds of a magazine sound thinner and click
+- [x] Reload has parts with their own sound and pose: mag release, mag out, new mag in, slap, bolt or charging handle
+  - [x] Empty reload differs from a tactical reload
+  - [x] The old magazine falls and stays on the floor a while
+  - [x] Shotgun: shell in per round, pump at the end
+  - [x] Bolt rifle: bolt up, back, forward, down, with the scope leaving the eye
+- [x] Inspect animation on a key: roll the gun left and right, check the chamber
+- [x] Idle life: slow breathing, micro-adjustments of the grip
+- [x] Draw and holster with cloth and sling sounds
+- [x] Low ammo: the last rounds of a magazine sound thinner and click
+  - `Viewmodel.handling` (each part once, `reload_events`, `cycle_events`) → `Sfx` "h_" sounds; `mag_dropped` → `Casings` (`Weapons.Casing.MAG`); `WeaponState.reload_empty`; `scope_break`; `inspect()` (F, `--pose=inspect`); idle breathing and grip shifts; `low_ammo_click` under `Config.LOW_AMMO_ROUNDS`
 
 ### [ ] S035 · Camera feel
 > needs: S018 | size: M | test: `tests/test_camera_feel.gd`

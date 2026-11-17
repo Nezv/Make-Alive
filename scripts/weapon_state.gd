@@ -9,6 +9,7 @@ var current: int = Weapons.DEFAULT
 var ammo := {}            ## gun id -> rounds in its magazine
 var cooldown := 0.0       ## seconds until the next shot is allowed
 var reload_left := 0.0    ## > 0 while reloading
+var reload_empty := false ## this reload began with nothing in the gun (so it ends with the charging handle)
 var draw_left := Config.WEAPON_DRAW_TIME ## > 0 while the gun is still coming up
 var draw_total := Config.WEAPON_DRAW_TIME ## how long this swap takes in all (Weapons.draw_time of the new gun)
 var since_shot := 99.0    ## seconds since the last shot (drives slide / pump / bolt animation)
@@ -138,6 +139,7 @@ func start_reload() -> bool:
 		return false
 	var t: float = def().reload
 	reload_left = t
+	reload_empty = rounds() == 0
 	return true
 
 

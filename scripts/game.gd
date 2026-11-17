@@ -204,6 +204,8 @@ func _build_world() -> void:
 	add_child(local_player)
 	local_player.view.smoke.connect(muzzle_smoke) # (the viewmodel is made when the player enters the tree)
 	local_player.view.eject.connect(casings.spawn)
+	local_player.view.handling.connect(func(what: String): Sfx.play_ui("h_" + what, Config.HANDLING_DB))
+	local_player.view.mag_dropped.connect(func(at: Vector3, vel: Vector3): casings.spawn(at, vel, Weapons.Casing.MAG))
 	local_player.teleport(map.player_spawn())
 	if bot:
 		brain = Bot.new(self)
@@ -2080,7 +2082,7 @@ func _update_weapon() -> void:
 		else:
 			client_ammo_used.rpc_id(1, type, spent[type])
 	var scoped: bool = d.scoped
-	var through_scope := scoped and lp.view.aim > 0.9
+	var through_scope := scoped and lp.view.aim > 0.9 and lp.view.scope_break < 0.3
 	lp.view.visible = not through_scope and not lp.hide_view and not lp.status.dead
 	hud.set_scope(through_scope)
 	hud.set_aiming(lp.view.aim > 0.5)
@@ -2091,7 +2093,10 @@ func _fire(d: Dictionary) -> void:
 	var lp := local_player
 	lp.view.fire()
 	var vary := GunVoice.variation(_own_shots)
-	Sfx.play_ui(GunVoice.sound(lp.weapons.current), d.volume + vary[1], vary[0])
+	var thin := lp.weapons.rounds() <= Config.LOW_AMMO_ROUNDS and int(d.mag) > 5 # the last of the magazine
+	Sfx.play_ui(GunVoice.sound(lp.weapons.current), d.volume + vary[1] - (2.5 if thin else 0.0), vary[0] * (1.04 if thin else 1.0))
+	if thin:
+		Sfx.play_ui("low_ammo_click", d.volume - 4.0)
 	Sfx.play_ui(GunVoice.tail(place_at(lp.global_position)), d.volume - Config.TAIL_DB, vary[0])
 	var cam := lp.camera
 	var origin := cam.global_position

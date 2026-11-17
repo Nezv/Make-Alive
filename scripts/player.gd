@@ -217,6 +217,8 @@ func handle_event(event: InputEvent) -> void:
 		switch_last()
 	elif event.is_action_pressed("shove"):
 		try_shove()
+	elif event.is_action_pressed("inspect"):
+		view.inspect()
 	elif event.is_action_pressed("item_wheel"):
 		if not status.downed:
 			open_wheel()

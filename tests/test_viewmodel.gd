@@ -155,3 +155,169 @@ func test_right_click_on_a_door_opens_it_instead_of_aiming() -> void:
 	var g := await new_game()
 	assert_true(g.right_click_is_use(g.door), "looking at a door: right-click uses it")
 	assert_false(g.right_click_is_use(null), "looking at nothing: right-click aims")
+
+
+# --- Handling: reload parts, the bolt, inspect, idle life, swaps, the last rounds ---------
+
+func _events(vm: Viewmodel) -> Array:
+	var out := []
+	vm.handling.connect(func(what: String): out.append(what))
+	return out
+
+
+func _reload(vm: Viewmodel, w: WeaponState, rounds: int) -> void:
+	w.ammo[w.current] = rounds
+	assert_true(w.start_reload())
+	_run(vm, w, float(w.def().reload) + 0.1)
+
+
+func test_a_magazine_reload_is_parts_each_with_its_own_sound() -> void:
+	var a := _vm(Weapons.AK47)
+	var vm: Viewmodel = a[0]
+	var w: WeaponState = a[1]
+	_run(vm, w, 0.3)
+	var ev := _events(vm)
+	_reload(vm, w, 12)
+	assert_eq(ev, ["mag_release", "mag_out", "mag_in", "mag_slap"], "a tactical reload: a round is still in")
+	ev.clear()
+	_reload(vm, w, 0)
+	assert_eq(ev, ["mag_release", "mag_out", "mag_in", "mag_slap", "bolt_rack"], "an empty one racks the charging handle")
+	for what in ["mag_release", "mag_out", "mag_in", "mag_slap", "bolt_rack", "shell_in", "pump_back", "pump_fwd",
+			"bolt_up", "bolt_back", "bolt_fwd", "bolt_down", "holster", "draw", "inspect"]:
+		assert_true(Sfx.stream("h_" + what) != null, what + " has a sound")
+	vm.free()
+
+
+func test_the_old_magazine_falls_out() -> void:
+	var a := _vm(Weapons.AK47)
+	var vm: Viewmodel = a[0]
+	var dropped := [0]
+	vm.mag_dropped.connect(func(at: Vector3, vel: Vector3): dropped[0] += 1)
+	_run(vm, a[1], 0.3)
+	_reload(vm, a[1], 3)
+	assert_eq(dropped[0], 1)
+	vm.free()
+	var g := await new_game()
+	var lp := g.local_player
+	lp.weapons.switch_to(Weapons.AK47)
+	lp.weapons.step(1.0)
+	lp.weapons.ammo[Weapons.AK47] = 3
+	lp.weapons.start_reload()
+	for i in int(2.0 / DT):
+		lp.weapons.step(DT)
+		lp.view.update(DT, 0.0, false, false, lp.weapons)
+	assert_gt(g.casings.mags(), 0, "it lies on the floor")
+
+
+func test_a_shotgun_loads_shell_by_shell_and_pumps_at_the_end() -> void:
+	var a := _vm(Weapons.SPAS12)
+	var vm: Viewmodel = a[0]
+	var w: WeaponState = a[1]
+	_run(vm, w, 0.3)
+	var ev := _events(vm)
+	w.ammo[w.current] = 5
+	assert_true(w.start_reload())
+	_run(vm, w, float(w.def().reload) * 3.0 + 0.2)
+	assert_eq(ev.count("shell_in"), 3, "one each")
+	assert_eq(ev.slice(-2), ["pump_back", "pump_fwd"], "and racked at the end")
+	vm.free()
+
+
+func test_a_bolt_rifle_works_the_bolt_in_four_moves_and_the_scope_leaves_the_eye() -> void:
+	var a := _vm(Weapons.T5000)
+	var vm: Viewmodel = a[0]
+	var w: WeaponState = a[1]
+	_run(vm, w, 0.6, true)
+	var ev := _events(vm)
+	w.try_fire()
+	vm.fire()
+	var broke := 0.0
+	var off := 0.0
+	for i in int(float(w.def().interval) / DT):
+		w.step(DT)
+		vm.update(DT, 0.0, true, false, w)
+		broke = maxf(broke, vm.scope_break)
+		var s: Vector3 = vm.pivot.transform * vm.gun.sight
+		off = maxf(off, Vector2(s.x, s.y).length())
+	assert_eq(ev, ["bolt_up", "bolt_back", "bolt_fwd", "bolt_down"])
+	assert_gt(broke, 0.5, "the eye comes off the scope")
+	assert_gt(off, 0.02, "the sights leave the middle")
+	assert_lt(vm.scope_break, 0.05, "and back on it after")
+	vm.free()
+
+
+func test_inspect_rolls_the_gun_one_way_then_the_other_then_checks_the_chamber() -> void:
+	var a := _vm(Weapons.AK47)
+	var vm: Viewmodel = a[0]
+	var w: WeaponState = a[1]
+	_run(vm, w, 0.5)
+	var ev := _events(vm)
+	assert_true(vm.inspect())
+	assert_eq(ev, ["inspect"])
+	var rolls := []
+	var peek := 0.0
+	for i in int(Config.INSPECT_TIME / DT):
+		w.step(DT)
+		vm.update(DT, 0.0, false, false, w)
+		rolls.append(vm.pivot.rotation.z)
+		peek = maxf(peek, vm.chamber_peek)
+	assert_gt(rolls.max(), 0.3, "rolled one way")
+	assert_lt(rolls.min(), -0.3, "and the other")
+	assert_gt(peek, 0.5, "the chamber was checked")
+	assert_lt(vm.chamber_peek, 0.01, "and closed again")
+	assert_true(vm.inspect())
+	vm.fire()
+	assert_lt(vm.inspect_t, 0.0, "a shot ends it")
+	vm.free()
+
+
+func test_standing_still_the_hands_breathe_and_shift_on_the_grip() -> void:
+	var a := _vm(Weapons.AK47)
+	var vm: Viewmodel = a[0]
+	var w: WeaponState = a[1]
+	_run(vm, w, 0.5)
+	var ys := []
+	for i in int(5.0 / DT):
+		w.step(DT)
+		vm.update(DT, 0.0, false, false, w)
+		ys.append(vm.pivot.position.y)
+	assert_gt(ys.max() - ys.min(), 0.001, "it lives")
+	_run(vm, w, 0.6, true)
+	var aimed := []
+	for i in int(5.0 / DT):
+		w.step(DT)
+		vm.update(DT, 0.0, true, false, w)
+		aimed.append(vm.pivot.position.y)
+	assert_lt(aimed.max() - aimed.min(), (ys.max() - ys.min()) * 0.5, "steadier on the sights")
+	vm.free()
+
+
+func test_swapping_guns_sounds_the_holster_then_the_draw() -> void:
+	var a := _vm(Weapons.AK47)
+	var vm: Viewmodel = a[0]
+	var w: WeaponState = a[1]
+	_run(vm, w, 0.3)
+	var ev := _events(vm)
+	w.switch_to(Weapons.P19)
+	vm.show_weapon(Weapons.P19)
+	_run(vm, w, float(w.draw_total) + 0.1)
+	assert_eq(ev, ["holster", "draw"])
+	vm.free()
+
+
+func test_the_last_rounds_of_a_magazine_click() -> void:
+	var g := await new_game()
+	g.set_physics_process(false)
+	var lp := g.local_player
+	lp.weapons.switch_to(Weapons.AK47)
+	lp.weapons.step(1.0)
+	lp.weapons.ammo[Weapons.AK47] = 20
+	Sfx.last.clear()
+	lp.weapons.try_fire()
+	g._fire(Weapons.def(Weapons.AK47))
+	assert_false(Sfx.last.has("low_ammo_click"), "plenty left")
+	lp.weapons.ammo[Weapons.AK47] = 2
+	Sfx.last.clear()
+	lp.weapons.try_fire()
+	g._fire(Weapons.def(Weapons.AK47))
+	assert_true(Sfx.last.has("low_ammo_click"), "nearly dry: thinner, with a click")

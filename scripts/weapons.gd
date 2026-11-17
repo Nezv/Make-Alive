@@ -105,7 +105,7 @@ static func valid(id: int) -> bool:
 
 
 ## The spent case each gun throws (scripts/fx/casings.gd) and how: [port (gun space), direction, speed].
-enum Casing { PISTOL, RIFLE, SHELL, SNIPER }
+enum Casing { PISTOL, RIFLE, SHELL, SNIPER, MAG } ## (MAG: a dropped magazine, by the same pool)
 const GUN_CASING := [Casing.PISTOL, Casing.PISTOL, Casing.RIFLE, Casing.RIFLE, Casing.RIFLE, Casing.SHELL, Casing.SHELL, Casing.SNIPER, Casing.SNIPER]
 const GUN_EJECT := [
 	[Vector3(0.015, 0.05, -0.06), Vector3(1.0, 0.7, 0.2), 2.2],   # P19: up and right off the slide

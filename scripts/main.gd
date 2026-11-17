@@ -23,7 +23,7 @@ extends Node
 ##   --weapon=4             start holding gun 1-9 (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov)
 ##   --difficulty=hard      host: easy, normal (default), hard or nightmare (see scripts/difficulty.gd)
 ##   --limited-ammo         host: reloads take from a reserve (the map's starting_ammo) even on a test map
-##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload, shove, heal (hurt, bleeding, a medkit going on) or downed
+##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload, shove, inspect, heal (hurt, bleeding, a medkit going on) or downed
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
 ##   --heli[=S]             host: the helicopter lands 16 m ahead of you in S seconds (8)
@@ -287,6 +287,11 @@ func _pose(pose: String) -> void:
 				game.damage_player(1, 9999)
 				(game.players[1].status as PlayerStatus).down_left = Config.DOWNED_TIME * 0.2
 				game.local_player.status.down_left = Config.DOWNED_TIME * 0.2)
+	if pose == "inspect": # half way through looking the gun over when the first screenshot is taken
+		var at_i := float(str(_args.get("shot-at", "5")).split(",")[0])
+		get_tree().create_timer(maxf(0.5, at_i - Config.INSPECT_TIME * 0.45)).timeout.connect(func():
+			if game:
+				game.local_player.view.inspect())
 	if pose == "reload": # be 40% through a reload when the first screenshot is taken
 		var at := float(str(_args.get("shot-at", "5")).split(",")[0])
 		var t: float = p.weapons.def().reload

@@ -66,6 +66,11 @@ static func _builtin() -> void:
 		register("tink", "World", _tink)
 	if not _defs.has(GunVoice.sound(0)):
 		GunVoice.register_all()
+	if not _defs.has("low_ammo_click"):
+		register("low_ammo_click", "Guns", _low_ammo_click)
+		for what in ["mag_release", "mag_out", "mag_in", "mag_slap", "bolt_rack", "shell_in", "pump_back", "pump_fwd",
+				"bolt_up", "bolt_back", "bolt_fwd", "bolt_down", "holster", "draw", "inspect"]:
+			register("h_" + what, "Guns", func(): return _handling(what))
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -209,6 +214,32 @@ static func _tink() -> PackedFloat32Array:
 	var ring := exp_tail(fm(0.12, 4200.0, 6100.0, 2.2), 55.0)
 	var tick := exp_tail(high_pass(noise(0.03, Hiss.WHITE, 61), 3000.0), 160.0)
 	return soft_clip(mix([ring, tick], [0.6, 0.5]))
+
+
+## Handling sounds ("h_" + what): magazines, bolts, pumps, shells, cloth and sling.
+static func _handling(what: String) -> PackedFloat32Array:
+	var seed_ := what.hash() & 0xFFFF
+	var click := exp_tail(fm(0.05, 1800.0 + float(seed_ % 900), 2600.0, 1.8), 90.0)
+	var slide := envelope(band_pass(noise(0.16, Hiss.WHITE, seed_), 900.0, 4200.0), 0.02, 0.05, 0.5, 0.06)
+	var thump := exp_tail(sweep(0.12, 160.0, 70.0), 30.0)
+	var cloth := envelope(band_pass(noise(0.35, Hiss.PINK, seed_), 300.0, 2400.0), 0.08, 0.1, 0.6, 0.12)
+	match what:
+		"mag_release", "bolt_up", "bolt_down", "inspect":
+			return soft_clip(mix([click], [0.9]))
+		"mag_out", "mag_in", "bolt_back", "bolt_fwd", "pump_back", "pump_fwd", "bolt_rack":
+			return soft_clip(mix([slide, click], [0.7, 0.6]))
+		"mag_slap":
+			return soft_clip(mix([thump, click], [1.0, 0.7]), 1.4)
+		"shell_in":
+			return soft_clip(mix([exp_tail(fm(0.04, 900.0, 1400.0, 1.2), 80.0), slide], [0.7, 0.35]))
+		"holster", "draw":
+			return soft_clip(mix([cloth, click], [0.8, 0.35 if what == "draw" else 0.0]))
+	return click
+
+
+## The last rounds of a magazine: a thin, bright ping.
+static func _low_ammo_click() -> PackedFloat32Array:
+	return soft_clip(exp_tail(fm(0.08, 3600.0, 5200.0, 1.0), 60.0))
 
 
 # --- Sources ----------------------------------------------------------------------
