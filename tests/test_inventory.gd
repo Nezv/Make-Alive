@@ -230,6 +230,44 @@ func test_the_wheel_follows_the_mouse_and_picks_on_release() -> void:
 	assert_eq(wheel.finish(), &"", "released in the middle: nothing")
 
 
+func test_every_item_has_an_icon_drawn_from_boxes_and_no_two_look_alike() -> void:
+	var seen := {}
+	for item: StringName in I.ITEMS:
+		var boxes: Array = ItemIcons.boxes(item)
+		assert_true(boxes.size() >= 2, "%s is drawn from a few boxes" % item)
+		for b: Array in boxes:
+			var r: Rect2 = b[0]
+			assert_true(Rect2(-1, -1, 2, 2).encloses(r), "%s stays inside its square: %s" % [item, r])
+			assert_true(b[1] is Color)
+		var key := str(boxes)
+		assert_false(seen.has(key), "%s looks like %s" % [item, seen.get(key, "")])
+		seen[key] = item
+	assert_eq(ItemIcons.boxes(&"nothing").size(), 0, "an empty wedge has no icon")
+
+
+func test_the_lit_wedge_hops_and_settles_back_when_the_pointer_leaves() -> void:
+	var inv := Inventory.new()
+	inv.add(I.MEDKIT, 1)
+	inv.add(I.BANDAGE, 1)
+	var wheel := ItemWheel.new()
+	wheel.begin(inv)
+	var view := ItemWheelView.new()
+	view.wheel = wheel
+	view.step(0.5)
+	assert_eq(view.hop_of(0), 0.0, "nothing lit, nothing hops")
+	wheel.offset = Vector2(0, -Config.WHEEL_RADIUS)
+	view.step(Config.WHEEL_HOP_TIME / 2.0)
+	assert_true(view.hop_of(0) > 0.1, "the lit wedge's icon rises")
+	view.step(Config.WHEEL_HOP_TIME)
+	assert_near(view.hop_of(0), 1.0, 0.05, "and settles fully up")
+	assert_true(view.icon_scale(0) > view.icon_scale(1), "bigger than the others")
+	wheel.offset = Vector2(Config.WHEEL_RADIUS, -Config.WHEEL_RADIUS * 2.0).limit_length(Config.WHEEL_RADIUS)
+	view.step(Config.WHEEL_HOP_TIME * 3.0)
+	assert_near(view.hop_of(0), 0.0, 0.05, "the old one sinks back")
+	assert_true(view.hop_of(1) > 0.9, "the new one is up")
+	view.free()
+
+
 # --- In a match -----------------------------------------------------------------------
 
 func test_the_host_keeps_each_players_inventory_and_the_player_mirrors_it() -> void:

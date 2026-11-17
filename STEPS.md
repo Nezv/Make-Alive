@@ -174,7 +174,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Start: pistol only on missions, everything on test maps (`all_weapons`)
 - [x] Dropped guns sync to late joiners
 
-### [ ] S014 · Inventory and item wheel
+### [x] S014 · Inventory and item wheel
 > needs: S013 | size: L | test: `tests/test_inventory.gd` | see: `--host --map=corridor --wheel --shot-at=3`
 - [x] `scripts/inventory.gd`, no nodes: counted stacks with caps
   - [x] Medkit, bandage, painkillers
@@ -182,9 +182,9 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
   - [x] Keys and keycards by id
   - [x] Planks for barricades
 - [x] Host owns it, client gets its own inventory on change
-- [ ] Hold a key for a radial wheel: eight wedges, icons drawn from boxes, mouse direction picks, time slows nothing
-  - [x] Eight wedges (`ItemWheel`, `ItemWheelView`): hold Tab, the mouse moves a pointer instead of the view, release picks; names and counts for now
-  - [ ] Icons drawn from boxes instead of names, a little hop when a wedge is lit
+- [x] Hold a key for a radial wheel: eight wedges, icons drawn from boxes, mouse direction picks, time slows nothing
+  - [x] Eight wedges (`ItemWheel`, `ItemWheelView`): hold Tab, the mouse moves a pointer instead of the view, release picks
+  - [x] Icons drawn from boxes (`ItemIcons`), a little hop when a wedge is lit
 - [x] Quick-use keys for heal (H) and throwable (G)
 - [x] Drop on death as a backpack other players can loot
 - Medkit and bandage heal at once for now; painkillers and throwables are consumed with no effect until S015 and S093 write theirs in `GameHooks.on_item_used`.
