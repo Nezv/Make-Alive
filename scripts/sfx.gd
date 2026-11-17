@@ -59,6 +59,8 @@ static func _builtin() -> void:
 		register("breath", "World", _breath)
 	if not _defs.has("heartbeat"):
 		register("heartbeat", "UI", _heartbeat)
+	if not _defs.has("whiz"):
+		register("whiz", "Guns", _whiz)
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -175,6 +177,18 @@ static func _heartbeat() -> PackedFloat32Array:
 		if at + i < buf.size():
 			buf[at + i] += dub[i] * 1.1
 	return soft_clip(buf, 1.4)
+
+
+## A bullet going past your ear: a bright hiss that drops in pitch as it goes by.
+static func _whiz() -> PackedFloat32Array:
+	var hiss := band_pass(noise(0.22, Hiss.WHITE, 41), 1800.0, 6500.0)
+	var tone_ := sweep(0.22, 3200.0, 900.0)
+	var buf := mix([hiss, tone_], [0.9, 0.25])
+	var n := buf.size()
+	for i in n:
+		var x := float(i) / n
+		buf[i] *= sin(minf(x * 3.0, 1.0) * PI * 0.5) * (1.0 - x) * (1.0 - x) * 1.6
+	return soft_clip(buf)
 
 
 # --- Sources ----------------------------------------------------------------------

@@ -47,6 +47,9 @@ var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason":
 var remotes := {}        ## peer id -> RemotePlayer
 var _drips := BleedTrail.new() ## where bleeding players last dropped blood
 var pings := {}          ## player id -> { node: the marker, left: seconds }
+var tracers: Tracers      ## every bullet's streak (cosmetic, local)
+var whizzes := 0          ## near misses heard (tests)
+var _own_shots := 0
 var heli: Helicopter = null ## the extraction helicopter, while one is coming, down or leaving
 var heli_flight: HeliFlight = null
 var heli_t := 0.0        ## seconds into its flight (every peer counts it itself)
@@ -88,6 +91,8 @@ func _ready() -> void:
 	rules = MissionRules.new(self)
 	gore = Gore.new()
 	add_child(gore)
+	tracers = Tracers.new()
+	add_child(tracers)
 	fx = Fx.new()
 	add_child(fx)
 	Settings.changed.connect(_on_setting_changed)
@@ -1355,7 +1360,17 @@ func resolve_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Wea
 	score.add(shooter, "shots")
 	if landed:
 		score.add(shooter, "hits")
-	_tell_shot(shooter, weapon, origin, origin + dir * float(d.range))
+	_tell_shot(shooter, weapon, origin, _bullet_end(origin, dir, float(d.range)))
+
+
+## Where a bullet from `origin` along `dir` stops: the first wall or body, or its reach.
+func _bullet_end(origin: Vector3, dir: Vector3, reach: float) -> Vector3:
+	if not is_inside_tree():
+		return origin + dir * reach
+	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * reach, Config.LAYER_WORLD | Config.LAYER_HITBOX)
+	q.collide_with_areas = true
+	var hit := get_viewport().get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.position if not hit.is_empty() else origin + dir * reach
 
 
 ## Host: everyone but the shooter sees (and hears) their gun go off.
@@ -1370,18 +1385,41 @@ func _tell_shot(shooter: int, weapon: int, origin: Vector3, end: Vector3) -> voi
 ## Someone else fired: their gun flashes, a puff of smoke, the shot heard where they are. (`end` is
 ## where the bullet went, for the tracers to come.)
 @rpc("authority", "call_remote", "unreliable")
-func shot_seen(shooter: int, weapon: int, _origin: Vector3, _end: Vector3) -> void:
+func shot_seen(shooter: int, weapon: int, origin: Vector3, end: Vector3) -> void:
 	if not remotes.has(shooter):
 		return
 	var r: RemotePlayer = remotes[shooter]
 	r.fired(rng)
 	var at := r.muzzle_world()
+	tracers.fire(at, end, weapon)
+	_near_miss(origin, end)
 	if Weapons.flash_shape(weapon) == Weapons.Flash.NONE:
 		muzzle_smoke(at, 1, true)
 	else:
 		muzzle_smoke(at, 1, false)
 	var d := Weapons.def(weapon)
 	Sfx.play("gunshot", at, 0.04, d.volume, d.pitch)
+
+
+## Someone else's bullet from `origin` to `end`: if it passed close by your head, you hear it go by
+## and flinch.
+func _near_miss(origin: Vector3, end: Vector3) -> void:
+	var lp := local_player
+	if lp == null or lp.status.dead:
+		return
+	var ear := lp.camera.global_position
+	var line := end - origin
+	var length := line.length()
+	if length < 0.01:
+		return
+	var u := (ear - origin).dot(line) / (length * length)
+	if u <= 0.0 or u >= 1.0: # behind the shooter or short of you
+		return
+	if (origin + line * u).distance_to(ear) > Config.WHIZ_RADIUS:
+		return
+	whizzes += 1
+	Sfx.play("whiz", origin + line * u, 0.1)
+	lp.punch += Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)).normalized() * Config.WHIZ_FLINCH
 
 
 ## Puffs of smoke from a muzzle at `at`, drifting up and with the wind; `thin` for a suppressed gun or a
@@ -2032,6 +2070,10 @@ func _fire(d: Dictionary) -> void:
 		_queue_shot(1, origin, dir, lp.weapons.current)
 	else:
 		client_shoot.rpc_id(1, origin, dir, lp.weapons.current)
+	_own_shots += 1
+	var streak := _own_shots % Config.TRACER_OWN_EVERY == 0 # a clean view: only some of your own
+	if streak or d.scoped: # (a sniper's vapour line shows every time)
+		tracers.fire(lp.view.muzzle_world(), _bullet_end(origin, dir, float(d.range)), lp.weapons.current, streak)
 	if not bot:
 		lp.kick_view(Weapons.kick(d, rng, lp.aiming))
 

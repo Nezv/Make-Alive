@@ -360,14 +360,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Remote players flash too, cheaper tier
   - `MuzzleFlash` (shapes by `Weapons.flash_shape`), `Viewmodel.smoke` → `Game.muzzle_smoke`, `heat` / `wisp_left` / `shimmer`; the host tells the others who fired (`Game.shot_seen`, which S030 can draw tracers from)
 
-### [ ] S030 · Tracers and bullet whiz
+### [x] S030 · Tracers and bullet whiz
 > needs: S004 | size: M | test: `tests/test_tracers.gd` | see: `tools\play2.ps1`
-- [ ] Tracer: thin emissive streak from muzzle to hit, 40 m long segment moving at bullet speed, fades at the end
-- [ ] Every shot for others' guns, every third for your own (clean view)
-- [ ] Colour by calibre: yellow-white rifles, faint for pistols, a fan of short ones for shotguns
-- [ ] Sniper shot: a vapour trail line that lingers 0.6 s and wobbles apart
-- [ ] Near miss from a teammate's line: whiz sound and a tiny view flinch
-- [ ] Capped, pooled
+- [x] Tracer: thin emissive streak from muzzle to hit, 40 m long segment moving at bullet speed, fades at the end
+- [x] Every shot for others' guns, every third for your own (clean view)
+- [x] Colour by calibre: yellow-white rifles, faint for pistols, a fan of short ones for shotguns
+- [x] Sniper shot: a vapour trail line that lingers 0.6 s and wobbles apart
+- [x] Near miss from a teammate's line: whiz sound and a tiny view flinch
+- [x] Capped, pooled
+  - `Tracers` (`game.tracers`, one MultiMesh), fed by `Game._fire` (yours) and `shot_seen` (theirs, with where the bullet stopped: `_bullet_end`); `_near_miss` whizzes; a sniper's vapour line shows on every shot
 
 ### [ ] S031 · Shell casings
 > needs: S004 | size: M | test: `tests/test_casings.gd` | see: `--host --demo --weapon=4 --bot --shot-at=2`

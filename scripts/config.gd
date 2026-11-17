@@ -111,6 +111,20 @@ const HEAT_COOL := 2.5           # shots' worth of heat lost a second
 const HEAT_WISP_TIME := 2.0      # seconds a hot barrel shimmers and smokes after the burst
 const HEAT_WISP_EVERY := 0.12    # seconds between the wisp's puffs
 
+# --- Tracers and the whiz (scripts/fx/tracers.gd) ---
+const TRACER_SPEED := 400.0      # m/s the streak runs at
+const TRACER_LENGTH := 40.0      # metres long
+const TRACER_WIDTH := 0.025
+const TRACER_MAX := 96           # streaks at once (the oldest gives way)
+const TRACER_OWN_EVERY := 3      # your own gun shows one every this many shots (a clean view)
+const TRACER_SHOTGUN_REACH := 40.0 # metres a shotgun's fan runs at most
+const VAPOUR_TIME := 0.6         # seconds a sniper shot's vapour line hangs
+const VAPOUR_MAX := 6
+const VAPOUR_SEGS := 12
+const VAPOUR_WOBBLE := 0.25      # metres it drifts apart by the end
+const WHIZ_RADIUS := 1.5         # metres from your head a teammate's bullet whizzes
+const WHIZ_FLINCH := 0.012       # radians the view twitches
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc
