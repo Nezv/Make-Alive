@@ -9,7 +9,9 @@
 The format is the one described at the top of STEPS.md:
     ## Pnn · name            a phase
     ### [ ] Snnn · name      a step
-    > needs: ... | size: ... | test: ... | see: ...     the step's data
+    > needs: ... | size: ... | rounds: N | test: ... | see: ...     the step's data
+                             (rounds: look-and-fix rounds; such a step must have the features
+                              "Round 1" .. "Round N" and "Review", or the check fails)
     - [ ] text               a feature (indented: a sub-feature)
     - text                   a spec note of the node above it
 """
@@ -26,7 +28,7 @@ PHASE = re.compile(r"^## (P\d{2}) · (\S.*)$")
 STEP = re.compile(r"^### \[( |x)\] (S\d{3}) · (\S.*)$")
 BOX = re.compile(r"^(\s*)- \[( |x)\] (\S.*)$")
 NOTE = re.compile(r"^(\s*)- (\S.*)$")
-DATA_KEYS = ("needs", "size", "test", "see")
+DATA_KEYS = ("needs", "size", "rounds", "test", "see")
 SIZES = ("S", "M", "L")
 
 
@@ -57,7 +59,7 @@ def parse(text, path="STEPS.md"):
             if m.group(2) in step_ids:
                 raise StepsError(path, number, "duplicate id %s (first on line %d)" % (m.group(2), step_ids[m.group(2)]["line"]))
             step = {"id": m.group(2), "name": m.group(3), "done": m.group(1) == "x", "line": number,
-                    "needs": [], "size": "", "test": "", "see": "", "notes": [], "features": []}
+                    "needs": [], "size": "", "rounds": 0, "test": "", "see": "", "notes": [], "features": []}
             step_ids[step["id"]] = step
             phase["steps"].append(step)
             feature = None
@@ -111,6 +113,10 @@ def _read_data(step, body, path, number):
                         raise StepsError(path, number, "broken id '%s' in the needs of %s" % (need, step["id"]))
                     step["needs"].append(need)
             step["needs_line"] = number
+        elif key == "rounds":
+            if not value.isdigit() or int(value) < 1:
+                raise StepsError(path, number, "rounds of %s is '%s', expected a whole number of 1 or more" % (step["id"], value))
+            step["rounds"] = int(value)
         elif key == "size":
             if value not in SIZES:
                 raise StepsError(path, number, "size of %s is '%s', expected S, M or L" % (step["id"], value))
@@ -121,6 +127,13 @@ def _read_data(step, body, path, number):
 
 def _check(phases, by_id, path):
     for step in by_id.values():
+        # A step that must iterate says so in its features: one per round, then the review.
+        names = [f["name"] for f in step["features"]]
+        for k in range(1, step["rounds"] + 1):
+            if not any(n.startswith("Round %d " % k) or n == "Round %d" % k for n in names):
+                raise StepsError(path, step["line"], "%s has rounds: %d but no feature 'Round %d ...'" % (step["id"], step["rounds"], k))
+        if step["rounds"] and not any(n.startswith("Review") for n in names):
+            raise StepsError(path, step["line"], "%s has rounds but no 'Review ...' feature" % step["id"])
         for need in step["needs"]:
             if need not in by_id:
                 raise StepsError(path, step.get("needs_line", step["line"]), "%s needs %s, which does not exist" % (step["id"], need))
@@ -191,7 +204,7 @@ def tree(phases):
 
     return [{"id": p["id"], "n": p["name"], "c": [{
         "id": s["id"], "n": s["name"], "d": s["done"], "start": s["id"] in can_start,
-        "needs": s["needs"], "size": s["size"], "test": s["test"], "see": s["see"],
+        "needs": s["needs"], "size": s["size"], "rounds": s["rounds"], "test": s["test"], "see": s["see"],
         "notes": s["notes"], "c": [feature(f) for f in s["features"]],
     } for s in p["steps"]]} for p in phases]
 
@@ -345,7 +358,7 @@ function showTip(n, e) {
   let h = "";
   if (n.kind === "step") {
     const all = []; (function w(l) { for (const f of l) { all.push(f); w(f.c); } })(n.c);
-    h = `<h4>${n.id} · ${esc(n.n)}</h4><div><span class="k">${n.d ? "done" : n.start ? "can start now" : "blocked"} · size ${n.size || "?"} · ${all.filter(f => f.d).length} / ${all.length} features</span></div>`;
+    h = `<h4>${n.id} · ${esc(n.n)}</h4><div><span class="k">${n.d ? "done" : n.start ? "can start now" : "blocked"} · size ${n.size || "?"}${n.rounds ? " · " + n.rounds + " rounds" : ""} · ${all.filter(f => f.d).length} / ${all.length} features</span></div>`;
     h += `<div><span class="k">needs:</span> ${n.needs.length ? n.needs.map(i => `${i} ${esc(steps[i].n)} ${steps[i].d ? "✓" : "✗"}`).join(", ") : "none"}</div>`;
     if (n.test) h += `<div><span class="k">test:</span> ${rich(n.test)}</div>`;
     if (n.see) h += `<div><span class="k">see:</span> ${rich(n.see)}</div>`;

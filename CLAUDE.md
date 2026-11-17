@@ -74,6 +74,7 @@ Everything is code: no editor-made scenes. Most models are built from boxes in G
 - `scripts/player.gd`, `remote_player.gd`, `hud.gd`, `menu.gd` (all of central Joinville at night from `CityPicture`, forest as little trees on grey, the game's streets glowing red, no play-area outline, a clickable pin per mission, Start, training corridor, join, quit), `controls.gd` (key bindings), `main.gd` (entry + command-line options).
 
 ## Rules that keep it working
+- **Detail:** anything people look at is an element made alone on its rack, in look-and-fix rounds against references, to the level of the zombie models; never plain boxes. Places only assemble finished elements. See "Detail and iteration" in `STEPS.md`.
 - **Authority:** the host decides everything that matters (zombie HP, limbs, deaths, doors, loot, player HP). Clients send position, shots, right-clicks. Hooks run on the host only.
 - **Gore is cosmetic and local.** The host sends *what happened* (`zombie_fx`: HIT / SEVER / DIE with part, position, direction); each peer makes its own blood and ragdolls. Never sync ragdoll physics.
 - **Snapshots must fit one packet** (< ~1392 bytes): zombies go through `ZombieWire` (13 bytes each), players through `PlayerWire` (26 bytes each). Eight players and a full horde are 1000 bytes. Don't add fields casually; `tests/test_budget.gd` builds the worst case.
