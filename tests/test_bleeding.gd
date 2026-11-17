@@ -348,23 +348,23 @@ func test_putting_on_a_bandage_lowers_the_gun_and_the_hands_wrap_through_four_po
 func test_the_player_animates_what_is_being_put_on_and_stops_when_it_is_cancelled() -> void:
 	var g := await _game()
 	var lp := g.local_player
+	var why := func() -> String:
+		return "host: %s %.2f, player: %s %.2f, hp %d" % [_status(g).using, _status(g).use_left, lp.status.using, lp.status.use_left, g.players[1].health.hp]
 	g.give_item(1, I.BANDAGE)
 	g.damage_player(1, 20)
-	g.use_item(1, I.BANDAGE)
-	lp.status.use_left = 99.0 # (the player's copy counts down by itself: a slow frame must not finish it)
-	await frames(3)
-	assert_eq(lp.view.heal_goal, 1.0, "a bandage going on")
+	assert_true(g.use_item(1, I.BANDAGE), why.call())
+	lp.update_heal_view()
+	assert_eq(lp.view.heal_goal, 1.0, "a bandage going on: " + why.call())
 	g.damage_player(1, 1)
-	await frames(3)
-	assert_eq(lp.view.heal_goal, 0.0, "a hit knocks it off")
+	lp.update_heal_view()
+	assert_eq(lp.view.heal_goal, 0.0, "a hit knocks it off: " + why.call())
 	g.give_item(1, I.PAINKILLERS)
-	g.use_item(1, I.PAINKILLERS)
-	lp.status.use_left = 99.0
-	await frames(3)
-	assert_eq(lp.view.heal_goal, 1.0, "pills too")
+	assert_true(g.use_item(1, I.PAINKILLERS), why.call())
+	lp.update_heal_view()
+	assert_eq(lp.view.heal_goal, 1.0, "pills too: " + why.call())
 	_status(g).begin_use(&"revive", 3.0)
 	lp.status.apply_state(_status(g).get_state())
-	await frames(3)
+	lp.update_heal_view()
 	assert_eq(lp.view.heal_goal, 0.0, "getting someone up is not a heal")
 
 

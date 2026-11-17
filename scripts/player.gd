@@ -414,6 +414,13 @@ func _vault_step(delta: float) -> void:
 	sprinting = false
 
 
+## The hands go to what is being put on (a revive is hands on someone else, not this).
+func update_heal_view() -> void:
+	var healing := status.is_using() and Inventory.valid(status.using)
+	view.heal_goal = 1.0 if healing else 0.0
+	view.heal_t = status.use_total - status.use_left if healing else 0.0
+
+
 ## Where the view points: the first wall or floor along it, or a spot well ahead in the open.
 func look_point() -> Vector3:
 	var from := camera.global_position
@@ -477,9 +484,7 @@ func _process(delta: float) -> void:
 	var view_basis := Basis.from_euler(Vector3(pitch + punch.x + feel.angles.x, yaw + punch.y + feel.angles.y, view_roll() + feel.angles.z))
 	camera.global_transform = Transform3D(view_basis, origin + view_basis * feel.offset)
 	view.feel_sway = feel.sway
-	var healing := status.is_using() and Inventory.valid(status.using) # (a revive is hands on someone else)
-	view.heal_goal = 1.0 if healing else 0.0
-	view.heal_t = status.use_total - status.use_left if healing else 0.0
+	update_heal_view()
 	view.update(delta, move_speed, aiming, sprinting, weapons)
 	var zoom: float = weapons.def().ads_fov
 	camera.fov = lerpf(base_fov() + feel.fov_add, minf(zoom, base_fov()), Viewmodel._ease(view.aim))

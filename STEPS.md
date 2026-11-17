@@ -446,14 +446,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Built in code, no draw-call growth
   - Parts: `AmmoPanel`, `VitalsBar`, `Compass`, `ObjectiveText`, `WorldMarkers` (`HudParts` draws for them), all under `Hud.root` (`apply_scale`, the `hud_scale` setting); `Hud.set_gun`, `set_vitals`, `set_compass`, `set_prompt(text, action)`, `step_fades`; `RemotePlayer.step_tag` counts a downed teammate's time; `Controls.label_of`. A downed teammate's clock is counted on each peer from when they went down (the host's own is not sent)
 
-### [ ] S037 · Hit feedback
+### [x] S037 · Hit feedback
 > needs: S036 | size: M | test: `tests/test_hit_feedback.gd`
-- [ ] Hit marker: four ticks that snap in and ease out, red and larger for a kill, a skull tick for a headshot
-- [ ] Limb sever: a brief extra tick and a wet sound
-- [ ] Damage direction: red arc on the side the hit came from, fades over a second
-- [ ] Taking a hit: view punch away from the attacker, red edge flash, short muffling of sound
-- [ ] Low HP: pulsing dark red vignette, desaturation, heartbeat, blurred edges
-- [ ] Blood on the lens after a close kill: a few drops that run down and fade
+- [x] Hit marker: four ticks that snap in and ease out, red and larger for a kill, a skull tick for a headshot
+- [x] Limb sever: a brief extra tick and a wet sound
+- [x] Damage direction: red arc on the side the hit came from, fades over a second
+- [x] Taking a hit: view punch away from the attacker, red edge flash, short muffling of sound
+- [x] Low HP: pulsing dark red vignette, desaturation, heartbeat, blurred edges
+- [x] Blood on the lens after a close kill: a few drops that run down and fade
+  - `HitMarker`, `DamageArcs`, `LensBlood`, the `low_hp` shader on the HUD; `Game.hit_confirm(killed, headshot, severed, dist)` and `got_hit(amount, from)` (protocol 4); `Sfx.muffle` / `step_muffle` (a low-pass on Master); the `sever_wet` sound
 
 ### [ ] S038 · Other players' animations
 > needs: S016, S019 | size: L | test: `tests/test_remote_anim.gd` | see: `tools\play2.ps1`

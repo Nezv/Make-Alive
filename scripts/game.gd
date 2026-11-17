@@ -503,8 +503,14 @@ func notice(text: String) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func hit_confirm(_killed: bool) -> void:
+func hit_confirm(killed: bool, headshot := false, severed := false, dist := 99.0) -> void:
 	hud.hit_marker()
+	hud.hitmarker.show_hit(HitMarker.Kind.HEADSHOT if killed and headshot else (HitMarker.Kind.KILL if killed else HitMarker.Kind.HIT))
+	if severed:
+		hud.hitmarker.show_sever()
+		Sfx.play_ui("sever_wet", -4.0)
+	if killed and dist < Config.LENS_DIST:
+		hud.lens.splash()
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -538,9 +544,16 @@ func shake_near(pos: Vector3, amp: float, radius: float) -> void:
 
 ## The local player was hit: a jolt.
 @rpc("authority", "call_remote", "reliable")
-func got_hit(amount: int) -> void:
-	if local_player:
-		local_player.feel.add_shake(Config.CAM_SHAKE_HIT * clampf(amount / 15.0, 0.4, 1.5), 0.25)
+func got_hit(amount: int, from := Vector3.INF) -> void:
+	if local_player == null:
+		return
+	var lp := local_player
+	lp.feel.add_shake(Config.CAM_SHAKE_HIT * clampf(amount / 15.0, 0.4, 1.5), 0.25)
+	Sfx.muffle(Config.MUFFLE_TIME)
+	if from.is_finite(): # a red arc on that side, and the view knocked away from it
+		var rel := wrapf(Compass.bearing_of(from - lp.global_position) - (-lp.yaw), -PI, PI)
+		hud.arcs.add(rel)
+		lp.punch_vel += Vector2(0.4, sin(rel)) * Config.HIT_PUNCH * clampf(amount / 15.0, 0.4, 1.5)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -1230,7 +1243,7 @@ func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) 
 	if status.invuln > 0.0 or status.dead:
 		return # just got up (nothing can hurt them yet), or there is nothing left to hurt
 	hooks.on_player_damaged(id, amount, by)
-	_send_to(id, &"got_hit", [amount]) # their view jolts
+	_send_to(id, &"got_hit", [amount, by.global_position if by != null and is_instance_valid(by) else Vector3.INF]) # their view jolts
 	if status.downed: # on the floor: the hit costs time, and can finish them
 		if amount > 0:
 			status.down_left -= amount * Config.DOWNED_DAMAGE_SECONDS
@@ -1556,7 +1569,8 @@ func hit_zombie(shooter: int, z: Zombie, part: int, pos: Vector3, dir: Vector3,
 			players[shooter].kills += 1
 		_broadcast_fx(z.zid, GoreFx.DIE, part, pos, dir)
 	if players.has(shooter):
-		_send_to(shooter, &"hit_confirm", [result.killed])
+		var dist := (players[shooter].pos as Vector3).distance_to(z.global_position)
+		_send_to(shooter, &"hit_confirm", [result.killed, result.headshot, severed >= 0, dist])
 
 
 func _broadcast_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> void:
@@ -1765,6 +1779,7 @@ func _process(delta: float) -> void:
 	hud.set_status(local_player.status)
 	update_drips(delta)
 	update_reach()
+	Sfx.step_muffle(delta)
 	step_pings(delta)
 	step_heli(delta)
 	if local_player.status.dead:

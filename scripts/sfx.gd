@@ -18,6 +18,8 @@ const BUSES := ["Master", "Guns", "Zombies", "World", "UI", "Music"]
 
 static var stats := { "played": 0, "stolen": 0, "dropped": 0 }
 static var last: Array[String] = [] ## the names of the last sounds asked for (tests)
+static var _muffle_left := 0.0
+static var _muffle_total := 1.0
 static var _defs := {}    ## name -> { bus, build }
 static var _streams := {} ## name -> AudioStreamWAV
 static var _pool: Pool
@@ -66,6 +68,8 @@ static func _builtin() -> void:
 		register("tink", "World", _tink)
 	if not _defs.has(GunVoice.sound(0)):
 		GunVoice.register_all()
+	if not _defs.has("sever_wet"):
+		register("sever_wet", "Zombies", _sever_wet)
 	if not _defs.has("low_ammo_click"):
 		register("low_ammo_click", "Guns", _low_ammo_click)
 		for what in ["mag_release", "mag_out", "mag_in", "mag_slap", "bolt_rack", "shell_in", "pump_back", "pump_fwd",
@@ -103,6 +107,37 @@ static func _note(sound: String) -> void:
 	last.append(sound)
 	if last.size() > 16:
 		last.pop_front()
+
+
+## The world goes dull for `seconds` (a hit taken): a low-pass on the Master bus that opens back up.
+static func muffle(seconds: float) -> void:
+	_muffle_left = maxf(_muffle_left, seconds)
+	_muffle_total = maxf(seconds, 0.01)
+	step_muffle(0.0)
+
+
+static func muffle_amount() -> float:
+	return clampf(_muffle_left / _muffle_total, 0.0, 1.0)
+
+
+static func step_muffle(delta: float) -> void:
+	_muffle_left = maxf(0.0, _muffle_left - delta)
+	var bus := AudioServer.get_bus_index(&"Master")
+	if bus < 0:
+		return
+	var fx_i := -1
+	for i in AudioServer.get_bus_effect_count(bus):
+		if AudioServer.get_bus_effect(bus, i) is AudioEffectLowPassFilter:
+			fx_i = i
+	if fx_i < 0:
+		if muffle_amount() <= 0.0:
+			return
+		AudioServer.add_bus_effect(bus, AudioEffectLowPassFilter.new())
+		fx_i = AudioServer.get_bus_effect_count(bus) - 1
+	var lp := AudioServer.get_bus_effect(bus, fx_i) as AudioEffectLowPassFilter
+	var a := muffle_amount()
+	lp.cutoff_hz = lerpf(20000.0, Config.MUFFLE_CUTOFF, a * a)
+	AudioServer.set_bus_effect_enabled(bus, fx_i, a > 0.0)
 
 
 ## The node that owns the voices. Made on first use, lives under the scene tree's root.
@@ -235,6 +270,13 @@ static func _handling(what: String) -> PackedFloat32Array:
 		"holster", "draw":
 			return soft_clip(mix([cloth, click], [0.8, 0.35 if what == "draw" else 0.0]))
 	return click
+
+
+## A limb torn off: a wet tearing slap.
+static func _sever_wet() -> PackedFloat32Array:
+	var tear := envelope(band_pass(noise(0.22, Hiss.PINK, 71), 300.0, 2600.0), 0.005, 0.06, 0.4, 0.1)
+	var slap := exp_tail(low_pass(noise(0.1, Hiss.BROWN, 72), 500.0), 40.0)
+	return soft_clip(mix([tear, slap], [0.8, 1.0]), 1.5)
 
 
 ## The last rounds of a magazine: a thin, bright ping.

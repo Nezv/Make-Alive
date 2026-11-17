@@ -175,6 +175,16 @@ const HUD_OUTLINE_DIST := 25.0   # metres beyond which a teammate is outlined th
 const HUD_FADE_AFTER := 4.0      # seconds unchanged before a part fades
 const HUD_FADED := 0.35          # how faded
 
+# --- Hit feedback ---
+const HIT_MARKER_TIME := 0.3     # seconds the ticks stay
+const HIT_MARKER_SIZE := 8.0     # pixels long
+const DAMAGE_ARC_TIME := 1.0     # seconds the arc showing where a hit came from fades over
+const HIT_PUNCH := 1.4           # how hard a hit turns the view away (recoil-spring speed)
+const MUFFLE_TIME := 0.5         # seconds the world sounds dull after a hit
+const MUFFLE_CUTOFF := 700.0     # Hz at its dullest
+const LENS_DIST := 3.0           # metres: a kill this close leaves blood on the lens
+const LENS_BLOOD_TIME := 3.0     # seconds it takes to run off
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc
@@ -344,7 +354,7 @@ const BUDGET := {
 	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 },
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
-const PROTOCOL_VERSION := 3   # bump when anything on the wire changes: a client of another build is refused with a message
+const PROTOCOL_VERSION := 4   # bump when anything on the wire changes: a client of another build is refused with a message
 const PACKET_OVERHEAD := 64    # what the RPC itself and the player block's framing take of a snapshot packet
 const INTEREST_NEAR_SHARE := 0.7 # over budget: this share of the packet is the zombies nearest the client, every tick
 const INTEREST_FAR_TICKS := 6  # ...and the rest of them are sent in turn, each at least this often

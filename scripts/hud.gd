@@ -30,6 +30,26 @@ var vitals: VitalsBar
 var compass: Compass
 var objective_text: ObjectiveText
 var markers: WorldMarkers
+var hitmarker: HitMarker
+var arcs: DamageArcs
+var lens: LensBlood
+var low_hp: ColorRect     ## low HP: a pulsing dark red edge, greyed and blurred
+var _low := 0.0
+const LOW_HP_SHADER := """
+shader_type canvas_item;
+uniform float amount = 0.0;
+uniform sampler2D screen : hint_screen_texture, filter_linear_mipmap;
+void fragment() {
+	vec2 d = SCREEN_UV - 0.5;
+	float edge = smoothstep(0.25, 0.75, length(d) * 1.4);
+	float pulse = 0.75 + 0.25 * sin(TIME * 6.0);
+	vec3 c = textureLod(screen, SCREEN_UV, edge * 3.0 * amount).rgb;
+	float l = dot(c, vec3(0.299, 0.587, 0.114));
+	c = mix(c, vec3(l), amount * 0.6 * edge);
+	c = mix(c, vec3(0.35, 0.0, 0.0), edge * amount * pulse * 0.7);
+	COLOR = vec4(c, edge * amount);
+}
+"""
 var _scale := 1.0
 var _ammo_idle := 0.0
 var _vitals_idle := 0.0
@@ -236,6 +256,23 @@ func _build_hud2() -> void:
 	markers = WorldMarkers.new()
 	add_child(markers)
 	move_child(markers, 1) # under the rest
+	low_hp = ColorRect.new()
+	low_hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	low_hp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var lsh := Shader.new()
+	lsh.code = LOW_HP_SHADER
+	var lmat := ShaderMaterial.new()
+	lmat.shader = lsh
+	low_hp.material = lmat
+	low_hp.visible = false
+	add_child(low_hp)
+	move_child(low_hp, 1)
+	lens = LensBlood.new()
+	add_child(lens)
+	arcs = DamageArcs.new()
+	add_child(arcs)
+	hitmarker = HitMarker.new()
+	add_child(hitmarker)
 	# Everything under one root, so the HUD scale setting can scale it and it still fills the screen.
 	root = Control.new()
 	root.name = "Root"
@@ -286,6 +323,19 @@ func set_compass(heading: float, ticks: Array) -> void:
 
 
 ## Idle parts fade; a change brings them back at once.
+## Low HP: the edges of the screen pulse dark red, go grey and blur, more the lower it is.
+func step_low_hp(delta: float) -> void:
+	var line := Config.PLAYER_HP * Config.LOW_HP_FRACTION
+	var want := 0.0 if _last_hp <= 0 or _last_hp > line else 0.6 + 0.4 * (1.0 - float(_last_hp) / line)
+	_low = move_toward(_low, want, delta * 2.0)
+	low_hp.visible = _low > 0.0
+	(low_hp.material as ShaderMaterial).set_shader_parameter("amount", _low)
+
+
+func low_hp_amount() -> float:
+	return _low
+
+
 func step_fades(delta: float) -> void:
 	_ammo_idle += delta
 	_vitals_idle += delta
@@ -670,6 +720,7 @@ func push_feed(text: String) -> void:
 
 func _process(delta: float) -> void:
 	step_fades(delta)
+	step_low_hp(delta)
 	_hit_t -= delta
 	for r in cross:
 		r.color = Color(1, 0.2, 0.2) if _hit_t > 0.0 else Color(1, 1, 1, 0.85)
@@ -694,7 +745,7 @@ func _process(delta: float) -> void:
 		gain_label.position.y = GAIN_AT.y - Config.PICKUP_GAIN_RISE * (1.0 - (1.0 - done) * (1.0 - done))
 		gain_label.modulate.a = clampf(_gain_t / 0.35, 0.0, 1.0)
 	var low := _last_hp > 0 and float(_last_hp) <= Config.PLAYER_HP * Config.LOW_HP_FRACTION
-	var pulse := 0.12 + 0.08 * sin(Time.get_ticks_msec() * 0.008) if low else 0.0 # heartbeat when hurt
+	var pulse := 0.03 + 0.02 * sin(Time.get_ticks_msec() * 0.008) if low else 0.0 # a faint all-over pulse; the edges are low_hp's
 	damage.color.a = maxf(clampf(_dmg_t, 0.0, 0.3), pulse)
 	if heartbeat.step(delta, _last_hp if not _ended else 0):
 		Sfx.play_ui("heartbeat")

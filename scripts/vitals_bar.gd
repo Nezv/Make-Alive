@@ -13,7 +13,7 @@ var bleed := 0
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	position = Vector2(28, -92)
+	position = Vector2(120, -52) # beside the heart and its number
 	size = SIZE + Vector2(0, 14)
 
 
