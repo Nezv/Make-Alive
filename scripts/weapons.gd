@@ -28,6 +28,9 @@ const GUN_KIND := [Kind.SIDEARM, Kind.PRIMARY, Kind.PRIMARY, Kind.PRIMARY, Kind.
 const GUN_DRAW := [0.25, 0.3, 0.35, 0.35, 0.33, 0.48, 0.45, 0.55, 0.5]
 ## How fast you sprint with each gun in hand, as a share of Config.SPRINT_SPEED, in id order.
 const GUN_SPRINT := [1.0, 1.0, 0.97, 0.95, 0.97, 0.88, 0.9, 0.85, 0.88]
+## The muzzle flash's shape by kind of gun (scripts/fx/muzzle_flash.gd draws them); NONE is suppressed.
+enum Flash { NONE, ROUND, FORKED, BALL, JETS }
+const GUN_FLASH := [Flash.ROUND, Flash.ROUND, Flash.FORKED, Flash.FORKED, Flash.NONE, Flash.BALL, Flash.BALL, Flash.JETS, Flash.JETS]
 ## How far a shot is heard, in metres, in id order (the AS Val is suppressed as built), and the
 ## same with a suppressor fitted.
 const GUN_LOUDNESS := [35.0, 40.0, 55.0, 60.0, 14.0, 70.0, 70.0, 90.0, 80.0]
@@ -99,6 +102,10 @@ static func roll_loot(rng: RandomNumberGenerator) -> int:
 
 static func valid(id: int) -> bool:
 	return id >= 0 and id < COUNT
+
+
+static func flash_shape(id: int) -> int:
+	return GUN_FLASH[id] if id >= 0 and id < COUNT else Flash.ROUND
 
 
 static func def(id: int) -> Dictionary:

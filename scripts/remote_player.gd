@@ -11,6 +11,7 @@ var weapon_id := -1
 var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
 var hp := 100 ## from the last snapshot (temporary HP included)
 var mag := 0 ## rounds in their magazine, from the last snapshot (for spectators)
+var flash: MuzzleFlash ## on their gun's muzzle
 var helper_near := false ## (set by the game) a standing teammate is close enough to get them up
 var _was_downed := false
 var _getup_left := 0.0
@@ -46,6 +47,21 @@ func set_weapon(id: int) -> void:
 	gun = Guns.build(id)
 	gun.position = Vector3(0.2, 0.36, -0.3) - gun.grip
 	rig.spine.add_child(gun)
+	flash = MuzzleFlash.create(Weapons.flash_shape(id))
+	flash.position = gun.muzzle + Vector3(0, 0, -0.02)
+	gun.add_child(flash)
+
+
+## Their gun went off: the flash (no light: others' guns are the cheaper tier).
+func fired(rng: RandomNumberGenerator) -> void:
+	if flash:
+		flash.fire(rng)
+
+
+func muzzle_world() -> Vector3:
+	if gun == null or not gun.is_inside_tree():
+		return global_position + Vector3(0, 1.4, 0)
+	return gun.global_transform * gun.muzzle
 
 
 ## What the body is doing (crouching, off the ground), as PlayerWire.ACTION_* bits.
@@ -54,6 +70,8 @@ func set_action(bits: int) -> void:
 
 
 func _process(delta: float) -> void:
+	if flash:
+		flash.step(delta)
 	if buffer.is_empty():
 		return
 	var s := buffer.sample()

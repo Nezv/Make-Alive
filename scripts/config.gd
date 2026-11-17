@@ -98,6 +98,19 @@ const CHAT_SHOW := 15.0         # seconds a chat line stays
 const PING_TIME := 8.0          # seconds a ping marks its spot
 const PING_REACH := 80.0        # metres along the view a ping looks for something to mark
 
+# --- Muzzle flash and smoke (scripts/fx/muzzle_flash.gd, viewmodel.gd) ---
+const MUZZLE_FLASH_TIME := 0.03  # seconds the flash shows: a frame or two
+const MUZZLE_LIGHT_TIME := 0.05  # seconds the warm light lasts
+const MUZZLE_LIGHT_COLOR := Color(1.0, 0.6, 0.25)
+const MUZZLE_LIGHT_RANGE := 6.0
+const MUZZLE_LIGHT_ENERGY := 3.5
+const MUZZLE_SMOKE_LIFE := 0.8   # seconds a puff lives
+const MUZZLE_WIND := Vector3(0.5, 0.0, 0.2) # how the puffs drift
+const HEAT_SHOTS := 12           # shots close together that make a barrel hot
+const HEAT_COOL := 2.5           # shots' worth of heat lost a second
+const HEAT_WISP_TIME := 2.0      # seconds a hot barrel shimmers and smokes after the burst
+const HEAT_WISP_EVERY := 0.12    # seconds between the wisp's puffs
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc

@@ -28,6 +28,17 @@ const HEAL_POSES := [
 const HEAL_ELBOW_L := Vector3(-0.42, -0.36, -0.22)  ## the left forearm lies across the body
 const HEAL_ELBOW_R := Vector3(0.36, -0.42, -0.04)
 const BANDAGE := Color(0.92, 0.9, 0.84)
+const SHIMMER_SHADER := """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
+uniform sampler2D screen : hint_screen_texture, filter_linear;
+uniform float strength = 0.006;
+void fragment() {
+	vec2 wob = vec2(sin(TIME * 23.0 + UV.y * 31.0), cos(TIME * 19.0 + UV.x * 27.0)) * strength * (1.0 - UV.y);
+	ALBEDO = texture(screen, SCREEN_UV + wob).rgb;
+	ALPHA = smoothstep(0.0, 0.35, UV.x) * smoothstep(1.0, 0.65, UV.x) * smoothstep(0.0, 0.3, 1.0 - UV.y);
+}
+"""
 const SLEEVE := Color(0.1, 0.12, 0.08)
 const GLOVE := Color(0.05, 0.05, 0.05)
 
@@ -49,13 +60,21 @@ var heal_goal := 0.0       ## where `heal` is easing to (the player sets it from
 var heal_t := 0.0          ## seconds into the heal: which pose the hands are at
 var bandage: MeshInstance3D ## the roll in the right hand while healing
 var bob := 0.0
-var flash: MeshInstance3D
+signal smoke(at: Vector3, count: int, thin: bool) ## puffs at the muzzle, in the world (the game makes them)
+
+var flash: MuzzleFlash
+var shimmer: MeshInstance3D ## the air wobbling over a hot barrel
+var heat := 0.0            ## shots' worth of heat in the barrel, cooling
+var wisp_left := 0.0       ## seconds a hot barrel still shimmers and smokes after a burst
 var light: OmniLight3D
 var arm_r: Node3D
 var arm_l: Node3D
 
 var _pending := -1
-var _flash_t := 0.0
+var _light_t := 0.0
+var _since_fire := 100.0
+var _hot := false
+var _wisp_t := 0.0
 var _rng := RandomNumberGenerator.new()
 var _last_rot := Vector3.ZERO
 var _sway := Vector2.ZERO
@@ -73,22 +92,26 @@ func _init() -> void:
 	bandage.visible = false
 	add_child(bandage)
 
-	flash = MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.06
-	sphere.height = 0.12
-	sphere.radial_segments = 6
-	sphere.rings = 3
-	flash.mesh = sphere
-	flash.material_override = MeshKit.unshaded(Color("ffcc55"))
-	flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	flash.visible = false
+	flash = MuzzleFlash.create(Weapons.Flash.ROUND)
 	pivot.add_child(flash)
 	light = OmniLight3D.new()
-	light.light_color = Color("ffaa33")
-	light.omni_range = 8
+	light.light_color = Config.MUZZLE_LIGHT_COLOR
+	light.omni_range = Config.MUZZLE_LIGHT_RANGE
 	light.light_energy = 0
+	light.shadow_enabled = false
 	pivot.add_child(light)
+	shimmer = MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(0.1, 0.32)
+	shimmer.mesh = q
+	var sm := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = SHIMMER_SHADER
+	sm.shader = sh
+	shimmer.material_override = sm
+	shimmer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shimmer.visible = false
+	pivot.add_child(shimmer)
 
 
 ## A hand and a forearm. The node sits at the hand; the forearm runs back along +Z to the elbow.
@@ -116,16 +139,32 @@ func _swap(id: int) -> void:
 	weapon_id = id
 	_pending = -1
 	pivot.add_child(gun)
-	flash.position = gun.muzzle + Vector3(0, 0, -0.04)
-	light.position = flash.position
+	flash.shape = Weapons.flash_shape(id)
+	flash.mesh = MuzzleFlash.mesh_for(flash.shape) if flash.shape != Weapons.Flash.NONE else null
+	flash.position = gun.muzzle + Vector3(0, 0, -0.02)
+	light.position = gun.muzzle + Vector3(0, 0.05, -0.1)
+	shimmer.position = gun.muzzle + Vector3(0, 0.14, 0.12)
 
 
 ## A shot went off: kick the gun, with a different sideways twist every time.
 func fire() -> void:
 	kick_pos = 1.0
 	kick_rot = Vector3(1.0, _rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0))
-	var has_flash: bool = Weapons.def(weapon_id).flash
-	_flash_t = 0.05 if has_flash else 0.0
+	flash.fire(_rng)
+	var suppressed := flash.shape == Weapons.Flash.NONE
+	_light_t = 0.0 if suppressed else Config.MUZZLE_LIGHT_TIME
+	heat += 1.0
+	_since_fire = 0.0
+	if heat >= Config.HEAT_SHOTS:
+		_hot = true
+	smoke.emit(muzzle_world(), 1 if suppressed else 2 + _rng.randi() % 2, suppressed)
+
+
+## Where the muzzle is in the world (for the smoke).
+func muzzle_world() -> Vector3:
+	if gun == null or not is_inside_tree():
+		return global_position if is_inside_tree() else Vector3.ZERO
+	return pivot.global_transform * gun.muzzle
 
 
 ## A shove: the gun is pulled back, driven forward with a roll and swings home past its rest.
@@ -311,10 +350,22 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	if bandage.visible:
 		bandage.transform = arm_r.transform
 
-	_flash_t -= delta
-	flash.visible = _flash_t > 0.0
-	flash.scale = Vector3.ONE * _rng.randf_range(0.7, 1.3)
-	light.light_energy = 4.0 if _flash_t > 0.0 else 0.0
+	flash.step(delta)
+	_light_t -= delta
+	light.light_energy = Config.MUZZLE_LIGHT_ENERGY if _light_t > 0.0 else 0.0
+	# A hot barrel: once the burst stops, the air over it wobbles and a thin wisp rises for a while.
+	_since_fire += delta
+	heat = maxf(0.0, heat - Config.HEAT_COOL * delta)
+	if _hot and _since_fire > 0.2:
+		_hot = false
+		wisp_left = Config.HEAT_WISP_TIME
+	if wisp_left > 0.0:
+		wisp_left = maxf(0.0, wisp_left - delta)
+		_wisp_t -= delta
+		if _wisp_t <= 0.0:
+			_wisp_t = Config.HEAT_WISP_EVERY
+			smoke.emit(muzzle_world(), 1, true)
+	shimmer.visible = wisp_left > 0.0
 
 
 func _place_arm(arm: Node3D, hand: Vector3, elbow: Vector3) -> void:
