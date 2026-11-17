@@ -89,7 +89,7 @@ func test_a_suppressed_gun_has_no_flash_or_light_only_a_thin_puff() -> void:
 	_run(vm, a[1], DT)
 	assert_false(vm.flash.visible)
 	assert_eq(vm.light.light_energy, 0.0)
-	assert_eq(puffs, [[1, true]])
+	assert_eq(puffs[0], [1, true], "the muzzle's: one thin puff (then the port's wisp)")
 	vm.free()
 
 
@@ -99,13 +99,13 @@ func test_every_shot_puffs_two_or_three_soft_clouds() -> void:
 	var puffs := []
 	vm.smoke.connect(func(at: Vector3, count: int, thin: bool): puffs.append([at, count, thin]))
 	vm.fire()
-	assert_eq(puffs.size(), 1)
+	assert_eq(puffs.size(), 2, "the muzzle's, then the ejection port's wisp")
 	assert_true(puffs[0][1] >= 2 and puffs[0][1] <= 3)
 	assert_false(puffs[0][2])
 	var g := await new_game()
 	var bursts: int = g.fx.stats.bursts
 	g.local_player.view.fire()
-	assert_eq(g.fx.stats.bursts, bursts + 1, "the game makes them (how many particles is the quality tier's call)")
+	assert_eq(g.fx.stats.bursts, bursts + 2, "the game makes them, muzzle and port (how many particles is the quality tier's call)")
 	vm.free()
 
 

@@ -48,6 +48,7 @@ var remotes := {}        ## peer id -> RemotePlayer
 var _drips := BleedTrail.new() ## where bleeding players last dropped blood
 var pings := {}          ## player id -> { node: the marker, left: seconds }
 var tracers: Tracers      ## every bullet's streak (cosmetic, local)
+var casings: Casings      ## spent cases on the floor (cosmetic, local)
 var whizzes := 0          ## near misses heard (tests)
 var _own_shots := 0
 var heli: Helicopter = null ## the extraction helicopter, while one is coming, down or leaving
@@ -93,6 +94,8 @@ func _ready() -> void:
 	add_child(gore)
 	tracers = Tracers.new()
 	add_child(tracers)
+	casings = Casings.new()
+	add_child(casings)
 	fx = Fx.new()
 	add_child(fx)
 	Settings.changed.connect(_on_setting_changed)
@@ -130,6 +133,7 @@ func _build_world() -> void:
 	if limited_ammo:
 		map.infinite_ammo = false
 	gore.ground = map.ground_y
+	casings.ground = map.ground_y
 	fx.ground = map.ground_y
 	world = map.root
 	add_child(world)
@@ -198,6 +202,7 @@ func _build_world() -> void:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
 	local_player.view.smoke.connect(muzzle_smoke) # (the viewmodel is made when the player enters the tree)
+	local_player.view.eject.connect(casings.spawn)
 	local_player.teleport(map.player_spawn())
 	if bot:
 		brain = Bot.new(self)
@@ -1427,8 +1432,8 @@ func _near_miss(origin: Vector3, end: Vector3) -> void:
 func muzzle_smoke(at: Vector3, count: int, thin: bool) -> void:
 	var drift := (Vector3.UP + Config.MUZZLE_WIND * 0.6).normalized()
 	fx.burst(Fx.Layer.SMOKE, at, drift, count, { "speed": 0.35 if thin else 0.6, "spread": 0.5,
-		"life": Config.MUZZLE_SMOKE_LIFE * (1.4 if thin else 1.0), "size": 0.04 if thin else 0.09,
-		"size_end": 0.18 if thin else 0.45, "color": Color(0.62, 0.62, 0.64, 0.22 if thin else 0.32), "gravity": -0.5 })
+		"life": Config.MUZZLE_SMOKE_LIFE * (1.4 if thin else 1.0), "size": 0.03 if thin else 0.06,
+		"size_end": 0.14 if thin else 0.28, "color": Color(0.62, 0.62, 0.64, 0.16 if thin else 0.22), "gravity": -0.5 })
 
 
 ## Trace a bullet and apply it. Body-part hitboxes are Area3Ds; walls and closed doors block.

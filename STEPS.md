@@ -370,14 +370,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Capped, pooled
   - `Tracers` (`game.tracers`, one MultiMesh), fed by `Game._fire` (yours) and `shot_seen` (theirs, with where the bullet stopped: `_bullet_end`); `_near_miss` whizzes; a sniper's vapour line shows on every shot
 
-### [ ] S031 · Shell casings
+### [x] S031 · Shell casings
 > needs: S004 | size: M | test: `tests/test_casings.gd` | see: `--host --demo --weapon=4 --bot --shot-at=2`
-- [ ] Casing mesh per class: brass pistol, brass rifle, red shotgun hull, long sniper case
-- [ ] Ejects from the port with the gun's own direction, speed and spin, timed with the action (bolt guns eject on the bolt pull, pumps on the pump)
-- [ ] Cheap physics: one bounce off the floor with a tumble, a second small one, then rest
-- [ ] Tink on each bounce by surface
-- [ ] Rests for a while, then sinks, capped by MultiMesh
-- [ ] A wisp of smoke from the ejection port
+- [x] Casing mesh per class: brass pistol, brass rifle, red shotgun hull, long sniper case
+- [x] Ejects from the port with the gun's own direction, speed and spin, timed with the action (bolt guns eject on the bolt pull, pumps on the pump)
+- [x] Cheap physics: one bounce off the floor with a tumble, a second small one, then rest
+- [x] Tink on each bounce by surface
+- [x] Rests for a while, then sinks, capped by MultiMesh
+- [x] A wisp of smoke from the ejection port
+  - `Casings` (`game.casings`), `Weapons.GUN_EJECT` / `casing_kind`, `Viewmodel.eject`; the tink's pitch is by kind of case until S032 gives floors their surface
 
 ### [ ] S032 · Surfaces and impacts
 > needs: S004 | size: L | test: `tests/test_impacts.gd` | see: `--host --fx-rack`

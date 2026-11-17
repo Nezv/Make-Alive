@@ -61,6 +61,8 @@ static func _builtin() -> void:
 		register("heartbeat", "UI", _heartbeat)
 	if not _defs.has("whiz"):
 		register("whiz", "Guns", _whiz)
+	if not _defs.has("tink"):
+		register("tink", "World", _tink)
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -189,6 +191,13 @@ static func _whiz() -> PackedFloat32Array:
 		var x := float(i) / n
 		buf[i] *= sin(minf(x * 3.0, 1.0) * PI * 0.5) * (1.0 - x) * (1.0 - x) * 1.6
 	return soft_clip(buf)
+
+
+## A spent case hitting the floor: a short bright metallic ring.
+static func _tink() -> PackedFloat32Array:
+	var ring := exp_tail(fm(0.12, 4200.0, 6100.0, 2.2), 55.0)
+	var tick := exp_tail(high_pass(noise(0.03, Hiss.WHITE, 61), 3000.0), 160.0)
+	return soft_clip(mix([ring, tick], [0.6, 0.5]))
 
 
 # --- Sources ----------------------------------------------------------------------

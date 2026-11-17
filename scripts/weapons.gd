@@ -104,6 +104,26 @@ static func valid(id: int) -> bool:
 	return id >= 0 and id < COUNT
 
 
+## The spent case each gun throws (scripts/fx/casings.gd) and how: [port (gun space), direction, speed].
+enum Casing { PISTOL, RIFLE, SHELL, SNIPER }
+const GUN_CASING := [Casing.PISTOL, Casing.PISTOL, Casing.RIFLE, Casing.RIFLE, Casing.RIFLE, Casing.SHELL, Casing.SHELL, Casing.SNIPER, Casing.SNIPER]
+const GUN_EJECT := [
+	[Vector3(0.015, 0.05, -0.06), Vector3(1.0, 0.7, 0.2), 2.2],   # P19: up and right off the slide
+	[Vector3(0.0, -0.06, 0.06), Vector3(0.05, -1.0, 0.15), 1.4],  # P90: straight down
+	[Vector3(0.035, 0.04, 0.12), Vector3(1.0, 0.5, 0.3), 3.0],    # Type 95: bullpup, behind the grip
+	[Vector3(0.035, 0.06, -0.1), Vector3(1.0, 0.55, 0.25), 3.2],  # AK47
+	[Vector3(0.03, 0.05, -0.08), Vector3(1.0, 0.5, 0.25), 2.6],   # AS Val
+	[Vector3(0.04, 0.06, -0.12), Vector3(1.0, 0.45, 0.2), 2.6],   # USAS-12
+	[Vector3(0.04, 0.05, -0.1), Vector3(1.0, 0.6, 0.1), 2.2],     # SPAS-12: flung by the pump
+	[Vector3(0.03, 0.07, -0.05), Vector3(0.8, 0.9, 0.3), 1.4],    # T-5000: pulled out by the bolt
+	[Vector3(0.035, 0.06, -0.08), Vector3(1.0, 0.6, 0.25), 2.8],  # Dragunov
+]
+
+
+static func casing_kind(id: int) -> int:
+	return GUN_CASING[id] if id >= 0 and id < COUNT else Casing.PISTOL
+
+
 static func flash_shape(id: int) -> int:
 	return GUN_FLASH[id] if id >= 0 and id < COUNT else Flash.ROUND
 

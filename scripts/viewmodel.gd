@@ -60,6 +60,7 @@ var heal_goal := 0.0       ## where `heal` is easing to (the player sets it from
 var heal_t := 0.0          ## seconds into the heal: which pose the hands are at
 var bandage: MeshInstance3D ## the roll in the right hand while healing
 var bob := 0.0
+signal eject(at: Vector3, vel: Vector3, kind: int) ## a spent case leaves the port (the game drops it)
 signal smoke(at: Vector3, count: int, thin: bool) ## puffs at the muzzle, in the world (the game makes them)
 
 var flash: MuzzleFlash
@@ -72,6 +73,7 @@ var arm_l: Node3D
 
 var _pending := -1
 var _light_t := 0.0
+var _eject_pending := false ## a pump or bolt gun throws its case when the action is worked
 var _since_fire := 100.0
 var _hot := false
 var _wisp_t := 0.0
@@ -158,6 +160,23 @@ func fire() -> void:
 	if heat >= Config.HEAT_SHOTS:
 		_hot = true
 	smoke.emit(muzzle_world(), 1 if suppressed else 2 + _rng.randi() % 2, suppressed)
+	if Weapons.def(weapon_id).cycle == Weapons.Cycle.BLOWBACK:
+		_eject()
+	else:
+		_eject_pending = true
+
+
+## The spent case flies out of the port the gun's own way, with a wisp of smoke.
+func _eject() -> void:
+	_eject_pending = false
+	if gun == null or not is_inside_tree():
+		return
+	var e: Array = Weapons.GUN_EJECT[weapon_id]
+	var at := pivot.global_transform * (e[0] as Vector3)
+	var vel := pivot.global_basis * (e[1] as Vector3).normalized() * float(e[2])
+	vel += Vector3(_rng.randf_range(-0.2, 0.2), _rng.randf_range(-0.2, 0.2), _rng.randf_range(-0.2, 0.2))
+	eject.emit(at, vel, Weapons.casing_kind(weapon_id))
+	smoke.emit(at, 1, true)
 
 
 ## Where the muzzle is in the world (for the smoke).
@@ -281,6 +300,8 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 		cyc = maxf(cyc, _pulse(u, 0.84, 0.97)) # rack it after the new magazine is in
 	if gun.action:
 		gun.action.position = gun.action_travel * cyc
+	if _eject_pending and cyc >= 0.6: # the pump or the bolt is back: out it goes
+		_eject()
 	if d.cycle == Weapons.Cycle.BOLT:
 		rot += Vector3(0.06, 0.0, -0.3) * cyc * (1.0 - aim)
 

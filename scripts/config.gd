@@ -125,6 +125,11 @@ const VAPOUR_WOBBLE := 0.25      # metres it drifts apart by the end
 const WHIZ_RADIUS := 1.5         # metres from your head a teammate's bullet whizzes
 const WHIZ_FLINCH := 0.012       # radians the view twitches
 
+# --- Spent casings (scripts/fx/casings.gd) ---
+const CASING_MAX := 160          # lying about at once (the oldest gives way)
+const CASING_REST := 20.0        # seconds one lies still before it sinks
+const CASING_SINK := 2.0         # seconds it takes to sink away
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc
