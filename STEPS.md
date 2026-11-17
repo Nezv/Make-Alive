@@ -433,17 +433,18 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] All of it scaled by a setting, off at zero
   - `CameraFeel` (`local_player.feel`: `step`, `add_shake`, `pinch`, `rumble`), the recoil spring (`punch_vel`, `step_recoil`), `Game.shake_near` / `got_hit` / `_fx_shake`, the "camera_motion" setting; recoil itself is gameplay and is not scaled by it
 
-### [ ] S036 · HUD 2
+### [x] S036 · HUD 2
 > needs: S011, S021 | size: L | test: `tests/test_hud.gd` | see: `--host --shot-at=2`
-- [ ] Bottom right: weapon name, magazine as individual pips or a number, reserve, fire mode
-- [ ] Bottom left: health bar with a bleed marker, stamina, item counts
-- [ ] Top: compass strip with bearings, objective and teammate ticks
-- [ ] Objective text with a typed-in reveal, strike-through and slide-out when done
-- [ ] World markers: objective diamond with distance, clamped to the screen edge with an arrow
-- [ ] Teammates: name over the head, outline through walls when far, downed icon with a timer
-- [ ] Interaction prompt with the bound key and a hold ring
-- [ ] Everything fades when not needed, HUD scale setting
-- [ ] Built in code, no draw-call growth
+- [x] Bottom right: weapon name, magazine as individual pips or a number, reserve, fire mode
+- [x] Bottom left: health bar with a bleed marker, stamina, item counts
+- [x] Top: compass strip with bearings, objective and teammate ticks
+- [x] Objective text with a typed-in reveal, strike-through and slide-out when done
+- [x] World markers: objective diamond with distance, clamped to the screen edge with an arrow
+- [x] Teammates: name over the head, outline through walls when far, downed icon with a timer
+- [x] Interaction prompt with the bound key and a hold ring
+- [x] Everything fades when not needed, HUD scale setting
+- [x] Built in code, no draw-call growth
+  - Parts: `AmmoPanel`, `VitalsBar`, `Compass`, `ObjectiveText`, `WorldMarkers` (`HudParts` draws for them), all under `Hud.root` (`apply_scale`, the `hud_scale` setting); `Hud.set_gun`, `set_vitals`, `set_compass`, `set_prompt(text, action)`, `step_fades`; `RemotePlayer.step_tag` counts a downed teammate's time; `Controls.label_of`. A downed teammate's clock is counted on each peer from when they went down (the host's own is not sent)
 
 ### [ ] S037 · Hit feedback
 > needs: S036 | size: M | test: `tests/test_hit_feedback.gd`

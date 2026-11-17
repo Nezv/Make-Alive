@@ -12,6 +12,8 @@ var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
 var hp := 100 ## from the last snapshot (temporary HP included)
 var mag := 0 ## rounds in their magazine, from the last snapshot (for spectators)
 var flash: MuzzleFlash ## on their gun's muzzle
+var display_name := ""
+var _down_left := -1.0 ## counted here from when they went down (a guess: the host knows the real clock)
 var helper_near := false ## (set by the game) a standing teammate is close enough to get them up
 var _was_downed := false
 var _getup_left := 0.0
@@ -25,6 +27,7 @@ static func create(id: int, player_name: String) -> RemotePlayer:
 	r.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	r.rig = Characters.survivor(id)
 	r.add_child(r.rig)
+	r.display_name = player_name
 	r.tag = Label3D.new()
 	r.tag.text = player_name
 	r.tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -69,7 +72,22 @@ func set_action(bits: int) -> void:
 	action = bits
 
 
+## The name over their head; a downed one's says how long they have left.
+func step_tag(delta: float) -> void:
+	if action & PlayerWire.ACTION_DOWNED:
+		if _down_left < 0.0:
+			_down_left = Config.DOWNED_TIME
+		_down_left = maxf(0.0, _down_left - delta)
+		tag.text = "%s\n✚ DOWN %d s" % [display_name, ceili(_down_left)]
+		tag.modulate = Color("ff7a6a")
+	elif _down_left >= 0.0 or tag.text != display_name:
+		_down_left = -1.0
+		tag.text = display_name
+		tag.modulate = Color.WHITE
+
+
 func _process(delta: float) -> void:
+	step_tag(delta)
 	if flash:
 		flash.step(delta)
 	if buffer.is_empty():

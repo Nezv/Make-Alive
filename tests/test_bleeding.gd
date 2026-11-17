@@ -351,6 +351,7 @@ func test_the_player_animates_what_is_being_put_on_and_stops_when_it_is_cancelle
 	g.give_item(1, I.BANDAGE)
 	g.damage_player(1, 20)
 	g.use_item(1, I.BANDAGE)
+	lp.status.use_left = 99.0 # (the player's copy counts down by itself: a slow frame must not finish it)
 	await frames(3)
 	assert_eq(lp.view.heal_goal, 1.0, "a bandage going on")
 	g.damage_player(1, 1)
@@ -358,6 +359,7 @@ func test_the_player_animates_what_is_being_put_on_and_stops_when_it_is_cancelle
 	assert_eq(lp.view.heal_goal, 0.0, "a hit knocks it off")
 	g.give_item(1, I.PAINKILLERS)
 	g.use_item(1, I.PAINKILLERS)
+	lp.status.use_left = 99.0
 	await frames(3)
 	assert_eq(lp.view.heal_goal, 1.0, "pills too")
 	_status(g).begin_use(&"revive", 3.0)

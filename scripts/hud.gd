@@ -24,6 +24,15 @@ var chat_edit: LineEdit ## the line you type in (the chat key opens it)
 var _chat: Array[String] = []
 var prompt_label: Label
 var weapon_label: Label
+var root: Control           ## everything, scaled by the HUD scale setting
+var ammo: AmmoPanel
+var vitals: VitalsBar
+var compass: Compass
+var objective_text: ObjectiveText
+var markers: WorldMarkers
+var _scale := 1.0
+var _ammo_idle := 0.0
+var _vitals_idle := 0.0
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
 var inventory_label: Label ## what is carried besides guns, small, bottom left
 var status_label: Label    ## wounds and what is being put on, above it
@@ -210,6 +219,82 @@ void fragment() {
 
 	_build_pause()
 	_build_end()
+	_build_hud2()
+
+
+func _build_hud2() -> void:
+	weapon_label.visible = false # (still written: the ammo panel draws it now)
+	objective_label.visible = false # (still written: the typed objective draws it now)
+	ammo = AmmoPanel.new()
+	add_child(ammo)
+	vitals = VitalsBar.new()
+	add_child(vitals)
+	compass = Compass.new()
+	add_child(compass)
+	objective_text = ObjectiveText.new()
+	add_child(objective_text)
+	markers = WorldMarkers.new()
+	add_child(markers)
+	move_child(markers, 1) # under the rest
+	# Everything under one root, so the HUD scale setting can scale it and it still fills the screen.
+	root = Control.new()
+	root.name = "Root"
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in get_children():
+		c.reparent(root, false)
+	add_child(root)
+	apply_scale(Settings.get_value("hud_scale"))
+	get_viewport().size_changed.connect(func(): apply_scale(_scale))
+	Settings.changed.connect(func(key: String):
+		if key == "hud_scale":
+			apply_scale(Settings.get_value(key)))
+
+
+## Draw the HUD `s` times bigger, laid out in a screen `1 / s` the size so it still fills it.
+func apply_scale(s: float) -> void:
+	_scale = s
+	var vp := get_viewport().get_visible_rect().size
+	root.scale = Vector2(s, s)
+	root.position = Vector2.ZERO
+	root.size = vp / s
+
+
+## How a gun fires, for the ammo panel.
+static func fire_mode(d: Dictionary) -> String:
+	match int(d.cycle):
+		Weapons.Cycle.PUMP: return "PUMP"
+		Weapons.Cycle.BOLT: return "BOLT"
+	return "AUTO" if d.auto else "SEMI"
+
+
+## The gun in hand: name, fire mode, magazine, reserve (-1: no limit).
+func set_gun(d: Dictionary, rounds: int, reloading: bool, reserve := -1) -> void:
+	set_weapon(d.name, rounds, reloading, reserve)
+	if ammo.set_gun(d, rounds, reloading, reserve):
+		_ammo_idle = 0.0
+
+
+## Health (and temporary HP above it), and a mark for each wound.
+func set_vitals(hp: int, temp: int, status: PlayerStatus) -> void:
+	if vitals.set_vitals(hp, temp, status.bleed) or hp < Config.PLAYER_HP or status.bleed > 0:
+		_vitals_idle = 0.0
+
+
+## The compass: which way you look (a bearing) and what to mark on it.
+func set_compass(heading: float, ticks: Array) -> void:
+	compass.set_view(heading, ticks)
+
+
+## Idle parts fade; a change brings them back at once.
+func step_fades(delta: float) -> void:
+	_ammo_idle += delta
+	_vitals_idle += delta
+	for pair in [[ammo, _ammo_idle], [vitals, _vitals_idle]]:
+		var node: Control = pair[0]
+		if float(pair[1]) < Config.HUD_FADE_AFTER:
+			node.modulate.a = 1.0
+		else:
+			node.modulate.a = move_toward(node.modulate.a, Config.HUD_FADED, delta * 1.5)
 
 
 func _label(font_size: int, preset: int, offset: Vector2) -> Label:
@@ -372,8 +457,12 @@ func set_info(players: int, zombies: int, kills: int) -> void:
 	info_label.text = "Survivors: %d\nZombies: %d\nKills: %d" % [players, zombies, kills]
 
 
-func set_prompt(text: String) -> void:
-	prompt_label.text = text
+## What right-click (or `action`'s key) would do now: "[RMB] Open door".
+func set_prompt(text: String, action := "") -> void:
+	if text == "" or action == "":
+		prompt_label.text = text
+	else:
+		prompt_label.text = "[%s] %s" % [Controls.label_of(action), text]
 
 
 ## Rounds in the magazine / rounds in reserve (`reserve` -1: no limit).
@@ -413,6 +502,11 @@ func set_objective(view: Dictionary, zombies := 0) -> void:
 		objective_label.text = "▸ %s   %s" % [text, _clock(left)]
 	else:
 		objective_label.text = "▸ %s" % text
+	# The typed line: what the objective is types in; its clock and counts show at once.
+	var full := objective_label.text
+	var main := ("▸ " + text) if status == MissionRules.Status.RUNNING and full.begins_with("▸ " + text) else full
+	objective_text.color = objective_label.modulate
+	objective_text.show_text(main, full.substr(main.length()))
 
 
 static func _clock(seconds: float) -> String:
@@ -575,6 +669,7 @@ func push_feed(text: String) -> void:
 
 
 func _process(delta: float) -> void:
+	step_fades(delta)
 	_hit_t -= delta
 	for r in cross:
 		r.color = Color(1, 0.2, 0.2) if _hit_t > 0.0 else Color(1, 1, 1, 0.85)

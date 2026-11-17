@@ -21,6 +21,7 @@ const DEFS := {
 	"invert_y": { "default": false },
 	"fov": { "default": Config.FOV, "min": 60.0, "max": 110.0 },
 	"camera_motion": { "default": 1.0, "min": 0.0, "max": 1.0 }, # bob, sway, tilt, shakes, FOV changes; 0 is none
+	"hud_scale": { "default": 1.0, "min": 0.75, "max": 1.5 },
 	"aim_toggle": { "default": false },          # false: hold right mouse to aim
 	"volume_master": { "default": 1.0, "min": 0.0, "max": 1.0 },
 	"volume_guns": { "default": 1.0, "min": 0.0, "max": 1.0 },

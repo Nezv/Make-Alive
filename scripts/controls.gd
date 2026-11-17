@@ -30,6 +30,13 @@ static func setup() -> void:
 			InputMap.action_add_event(action, m)
 
 
+## What to call the key or button `action` is on, for prompts: "RMB", "F".
+static func label_of(action: String) -> String:
+	if MOUSE.has(action):
+		return { MOUSE_BUTTON_LEFT: "LMB", MOUSE_BUTTON_RIGHT: "RMB", MOUSE_BUTTON_MIDDLE: "MMB" }.get(MOUSE[action], "Mouse")
+	return OS.get_keycode_string(key_of(action))
+
+
 ## The physical key `action` is on right now.
 static func key_of(action: String) -> int:
 	return _bound.get(action, KEYS.get(action, KEY_NONE))

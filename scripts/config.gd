@@ -165,6 +165,16 @@ const RECOIL_IMPULSE := 30.0     # the kick's spring: how fast it climbs
 const RECOIL_K := 400.0          # how hard it pulls back
 const RECOIL_D := 22.0           # damping (a little past the rest before it settles)
 
+# --- HUD 2 (hud.gd and its parts) ---
+const HUD_PIP_MAX := 40          # magazines this big or smaller show a pip a round, bigger a number
+const HUD_TYPE_RATE := 40.0      # letters a second the objective types in at
+const HUD_OBJECTIVE_OUT := 0.6   # seconds the old objective takes to slide away
+const HUD_OBJECTIVE_SLIDE := 24.0 # pixels it slides up
+const HUD_EDGE := 48.0           # pixels in from the edge a marker waits when off screen
+const HUD_OUTLINE_DIST := 25.0   # metres beyond which a teammate is outlined through walls
+const HUD_FADE_AFTER := 4.0      # seconds unchanged before a part fades
+const HUD_FADED := 0.35          # how faded
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc

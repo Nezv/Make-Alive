@@ -1697,6 +1697,7 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		var id: int = e.id
 		if id == my_id:
 			hud.set_hp(e.hp)
+			hud.set_vitals(mini(e.hp, Config.PLAYER_HP), maxi(0, e.hp - Config.PLAYER_HP), local_player.status)
 			hud.set_info(players_data.size(), zombies_data.size(), e.kills)
 			continue
 		seen[id] = true
@@ -1748,7 +1749,8 @@ func _process(delta: float) -> void:
 
 	_update_looked_at()
 	var downed_near := downed_teammate_near() if looked_at == null else 0
-	hud.set_prompt(looked_at.prompt() if looked_at else ("Hold right-click: revive %s" % names.get(downed_near, "them") if downed_near != 0 else ""))
+	hud.set_prompt(looked_at.prompt() if looked_at else ("Hold: revive %s" % names.get(downed_near, "them") if downed_near != 0 else ""), "interact")
+	_update_compass_and_markers()
 	if captured and Input.is_action_just_pressed("interact") and right_click_is_use(looked_at):
 		interact_with(looked_at)
 		local_player.aim_blocked = true
@@ -2054,6 +2056,24 @@ func heli_boarded() -> void:
 		local_player.seat = heli.seat
 
 
+## The compass strip and the markers over the world: the objective (unless the difficulty hides it) and
+## teammates.
+func _update_compass_and_markers() -> void:
+	var lp := local_player
+	var here := lp.global_position
+	var ticks := []
+	var marked: bool = mission_view.get("has_marker", false) and show_markers()
+	hud.markers.objective = mission_view.marker if marked else Vector3.INF
+	if marked:
+		ticks.append({ "bearing": Compass.bearing_of(mission_view.marker - here), "kind": "objective" })
+	for id: int in remotes:
+		var r := remotes[id] as RemotePlayer
+		if r.visible:
+			ticks.append({ "bearing": Compass.bearing_of(r.global_position - here), "kind": "mate" })
+	hud.set_compass(Compass.bearing_of(-lp.camera.global_basis.z), ticks)
+	hud.markers.update_from(self)
+
+
 ## A downed teammate reaches out when you, standing, come within `Config.REACH_RANGE`.
 func update_reach() -> void:
 	var me := local_player.status
@@ -2114,7 +2134,7 @@ func _update_weapon() -> void:
 	lp.view.visible = not through_scope and not lp.hide_view and not lp.status.dead
 	hud.set_scope(through_scope)
 	hud.set_aiming(lp.view.aim > 0.5)
-	hud.set_weapon(d.name, ws.rounds(), ws.is_reloading(), ws.reserve_rounds())
+	hud.set_gun(d, ws.rounds(), ws.is_reloading(), ws.reserve_rounds())
 
 
 func _fire(d: Dictionary) -> void:
