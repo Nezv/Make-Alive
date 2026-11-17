@@ -31,6 +31,8 @@ extends Node3D
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
 enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL, DOWNED, GETUP, FEED }
+## What a survivor's arms are doing on top of the legs' state (`upper`).
+enum Upper { NONE, AIM, RELOAD, SHOVE, THROW }
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
@@ -105,6 +107,10 @@ var anim: int = Anim.IDLE
 var anim_t := 0.0     ## seconds since the current anim started
 var phase := 0.0      ## walk-cycle phase
 var reach := 0.0      ## 0..1: a downed survivor's free arm reaching out to a teammate (a goal, eased like the rest)
+var upper: int = Upper.NONE ## a survivor's arms: an action layered over the legs
+var look_pitch := 0.0 ## where a survivor looks, up +, for the head and a shouldered gun
+var kick := 0.0       ## 1 right after a shot, settling (the gun climbs)
+var _upper_t := 0.0
 var flinch := Vector2.ZERO  ## (pitch, yaw) spring offset from being hit
 var segs := {}        ## name -> { name, part, parent, node, mesh, size, center, hitbox? }
 var severed_mask := 0
@@ -538,8 +544,17 @@ func hit_react(dir_local: Vector3, strength: float) -> void:
 	_flinch_vel += Vector2(dir_local.z, -dir_local.x) * strength * 9.0
 
 
+## The arms' action: restarted when it changes.
+func set_upper(u: int) -> void:
+	if u != upper:
+		upper = u
+		_upper_t = 0.0
+
+
 func update(delta: float, speed: float) -> void:
 	anim_t += delta
+	_upper_t += delta
+	kick = maxf(0.0, kick - kick * Config.REMOTE_KICK_DECAY * delta - delta * 0.2)
 	phase += delta * _phase_rate(speed)
 	_write_goal(speed)
 	var k := 1.0 - exp(-_blend_rate() * delta)
@@ -614,6 +629,55 @@ func _crouch(depth: float) -> void:
 	_goal[J.KNEE_L] = -2.0 * a
 	_goal[J.KNEE_R] = -2.0 * a
 	_goal[J.HIPS_Y] = HIP_HEIGHT * cos(a)
+
+
+## A survivor's arms, spine and head doing an action on top of whatever the legs do (`upper`), the
+## head and gun following the look (`look_pitch`), and a shot's kick.
+func _write_upper() -> void:
+	var t := _upper_t
+	var look := look_pitch
+	match upper:
+		Upper.AIM: # shouldered, the gun and the head on the look
+			_goal[J.SPINE_PITCH] = 0.05
+			_goal[J.SH_L_X] = 1.2 + look * 0.7
+			_goal[J.SH_R_X] = 1.25 + look * 0.7
+			_goal[J.EL_L] = 0.8
+			_goal[J.EL_R] = 0.5
+			_goal[J.NECK_PITCH] = -look * 0.7
+			_goal[J.NECK_YAW] = -0.1
+		Upper.RELOAD: # the gun tilted low, the left hand to the pouch and back
+			var reach := sin(clampf(fmod(t, 1.6) / 1.6, 0.0, 1.0) * PI)
+			_goal[J.SH_R_X] = 0.7
+			_goal[J.EL_R] = 0.9
+			_goal[J.SPINE_ROLL] = 0.15
+			_goal[J.SH_L_X] = lerpf(0.9, 0.1, reach)
+			_goal[J.SH_L_OUT] = 0.2 * reach
+			_goal[J.EL_L] = lerpf(0.7, 1.4, reach)
+			_goal[J.NECK_PITCH] = 0.3
+		Upper.SHOVE: # the stock driven out with a turn of the body
+			var thrust := sin(clampf(t / Config.SHOVE_TIME, 0.0, 1.0) * PI)
+			_goal[J.SPINE_YAW] = lerpf(0.3, -0.25, thrust)
+			_goal[J.SH_L_X] = 1.2 + thrust * 0.4
+			_goal[J.SH_R_X] = 1.3 + thrust * 0.4
+			_goal[J.EL_L] = lerpf(1.0, 0.2, thrust)
+			_goal[J.EL_R] = lerpf(1.0, 0.2, thrust)
+		Upper.THROW: # wind the arm back, then over and out
+			if t < 0.3:
+				_goal[J.SH_R_X] = -0.5
+				_goal[J.EL_R] = 1.6
+				_goal[J.SPINE_YAW] = 0.4
+				_goal[J.SPINE_PITCH] = -0.1
+			else:
+				_goal[J.SH_R_X] = 2.4
+				_goal[J.EL_R] = 0.2
+				_goal[J.SPINE_YAW] = -0.3
+				_goal[J.SPINE_PITCH] = 0.25
+			_goal[J.SH_L_X] = 1.0
+			_goal[J.EL_L] = 0.5
+	if kick > 0.0: # a shot: the muzzle climbs, the shoulders rock back
+		_goal[J.SH_R_X] += kick * 0.35
+		_goal[J.SH_L_X] += kick * 0.3
+		_goal[J.SPINE_PITCH] -= kick * 0.15
 
 
 func _write_goal(speed: float) -> void:
@@ -867,6 +931,9 @@ func _write_goal(speed: float) -> void:
 			_goal[J.EL_R] = 0.25 + maxf(0.0, s) * 0.9
 			_goal[J.HIP_L] = -0.05 + c * 0.1
 			_goal[J.HIP_R] = -0.05 - c * 0.1
+
+	if not is_zombie and (upper != Upper.NONE or kick > 0.0) and anim not in [Anim.HEAL, Anim.DOWNED, Anim.CRAWL, Anim.GETUP]:
+		_write_upper()
 
 	# Missing a leg: it can't stand, so every other state plays lying down. Attacks rear the
 	# chest up off the floor before the arms come down; staggers flop it flat.

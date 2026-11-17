@@ -14,6 +14,7 @@ const RAGDOLL_SIM_TIME := 5.0
 var stats := { "bursts": 0, "splats": 0, "gibs": 0, "ragdolls": 0, "chunks": 0 }
 
 var ground := Callable() ## map.ground_y: where stains lie (unset: y = 0)
+var last_impulse := Vector3.ZERO ## the push the last ragdoll got (tests)
 var _splats: MultiMesh
 var _splat_i := 0
 var _gibs: Array[RigidBody3D] = []
@@ -241,6 +242,7 @@ func ragdoll(segments: Array, base_velocity: Vector3, impulse: Vector3, hit_part
 	if segments.is_empty():
 		return
 	stats.ragdolls += 1
+	last_impulse = impulse
 	var root := Ragdoll.create(segments, base_velocity, impulse, hit_part)
 	add_child(root)
 	_active.append(root)

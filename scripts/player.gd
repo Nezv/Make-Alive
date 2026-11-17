@@ -39,6 +39,7 @@ var view: Viewmodel
 var down_pose := 0.0      # 0 standing .. 1 on the floor, downed (eases: see step_down_view)
 var arrive_left := 0.0    # > 0 while dropping off the truck bed after a respawn
 var typing := false       # the chat line is open: keys go to it, not to walking
+var throw_left := 0.0     # > 0 while a throw is being made (others see the arm go over)
 var seat: Node3D = null   # aboard the helicopter: the body rides here, nothing else moves it
 var wash_shake := 0.0     # metres the view trembles under the helicopter's downwash
 var aiming := false
@@ -181,6 +182,7 @@ func try_quick_throw() -> bool:
 	if item == &"":
 		return false
 	item_requested.emit(item)
+	throw_left = Config.THROW_ANIM_TIME
 	return true
 
 
@@ -347,6 +349,16 @@ func action_bits() -> int:
 		bits |= PlayerWire.ACTION_CROUCH
 	if move.is_vaulting() or move.air_time > 0.1:
 		bits |= PlayerWire.ACTION_AIR
+	if move.is_vaulting():
+		bits |= PlayerWire.ACTION_VAULT
+	if aiming:
+		bits |= PlayerWire.ACTION_AIM
+	if weapons.is_reloading():
+		bits |= PlayerWire.ACTION_RELOAD
+	if shove_left > 0.0:
+		bits |= PlayerWire.ACTION_SHOVE
+	if throw_left > 0.0:
+		bits |= PlayerWire.ACTION_THROW
 	return bits
 
 
@@ -470,6 +482,7 @@ func _process(delta: float) -> void:
 		origin = seat.global_position
 	weapons.step(delta)
 	shove_left = maxf(0.0, shove_left - delta)
+	throw_left = maxf(0.0, throw_left - delta)
 	fire_buffer -= delta
 	step_recoil(delta)
 	if status.dead:

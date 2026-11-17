@@ -256,7 +256,7 @@ func mult(key: String) -> float:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func client_state(pos: Vector3, yaw: float, action: int = 0, mag: int = 0) -> void:
+func client_state(pos: Vector3, yaw: float, action: int = 0, mag: int = 0, pitch: float = 0.0) -> void:
 	if not is_host:
 		return
 	var p = players.get(multiplayer.get_remote_sender_id())
@@ -266,6 +266,7 @@ func client_state(pos: Vector3, yaw: float, action: int = 0, mag: int = 0) -> vo
 	p.yaw = yaw
 	p.action = action & PlayerWire.ACTION_BODY # the host adds bleeding and healing itself
 	p.mag = clampi(mag, 0, 255) # only shown to whoever spectates them
+	p.pitch = clampf(pitch, -PlayerWire.PITCH_RANGE, PlayerWire.PITCH_RANGE)
 
 
 ## The sender swung a shove from `origin` along `dir`.
@@ -668,7 +669,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "mag": 0, "boarded": false, "last_shove": -100.0, "step_pos": map.player_spawn(),
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "mag": 0, "pitch": 0.0, "last_push": Vector3.ZERO, "boarded": false, "last_shove": -100.0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo(), "inventory": Inventory.new(), "status": PlayerStatus.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
@@ -1243,6 +1244,9 @@ func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) 
 	if status.invuln > 0.0 or status.dead:
 		return # just got up (nothing can hurt them yet), or there is nothing left to hurt
 	hooks.on_player_damaged(id, amount, by)
+	if by != null and is_instance_valid(by): # the way a blow pushes them (a death falls that way)
+		var away: Vector3 = players[id].pos - by.global_position
+		players[id].last_push = Vector3(away.x, 0, away.z).normalized()
 	_send_to(id, &"got_hit", [amount, by.global_position if by != null and is_instance_valid(by) else Vector3.INF]) # their view jolts
 	if status.downed: # on the floor: the hit costs time, and can finish them
 		if amount > 0:
@@ -1695,7 +1699,7 @@ func build_snapshot() -> Array:
 	var pd := []
 	for id: int in players:
 		var p: Dictionary = players[id]
-		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).total(), "kills": p.kills, "weapon": p.weapon, "action": _action_bits(p), "mag": p.mag })
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).total(), "kills": p.kills, "weapon": p.weapon, "action": _action_bits(p), "mag": p.mag, "pitch": p.pitch })
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
@@ -1724,6 +1728,7 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		(remotes[id] as RemotePlayer).set_action(e.get("action", 0))
 		(remotes[id] as RemotePlayer).hp = e.hp
 		(remotes[id] as RemotePlayer).mag = e.get("mag", 0)
+		(remotes[id] as RemotePlayer).look_pitch = e.get("pitch", 0.0)
 		(remotes[id] as RemotePlayer).visible = int(e.get("action", 0)) & PlayerWire.ACTION_DEAD == 0 # (no ghost left standing)
 	for id: int in remotes.keys():
 		if not seen.has(id):
@@ -1802,7 +1807,7 @@ func _process(delta: float) -> void:
 		_send_timer -= delta
 		if _send_timer <= 0.0:
 			_send_timer = 1.0 / 30.0
-			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits(), local_player.weapons.rounds())
+			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits(), local_player.weapons.rounds(), local_player.pitch)
 
 
 ## Every bleeding player, you and the others, leaves drops on the floor behind them (drawn by each peer).
@@ -1823,26 +1828,29 @@ func _record_own_player() -> void:
 	players[1].yaw = local_player.yaw
 	players[1].action = local_player.action_bits()
 	players[1].mag = local_player.weapons.rounds()
+	players[1].pitch = local_player.pitch
 
 
 ## Host: a player just died. Their body falls on every peer, and zombies near it go to feed.
 func _leave_body(id: int) -> void:
 	var at: Vector3 = players[id].pos
-	player_body.rpc(id, at, float(players[id].yaw))
+	player_body.rpc(id, at, float(players[id].yaw), players[id].last_push)
+	player_body(id, at, float(players[id].yaw), players[id].last_push)
 	for z: Zombie in zombies.values():
 		if z.global_position.distance_to(at) <= Config.FEED_RANGE:
 			z.feed_at(at)
 
 
 ## Every peer: a dead player's body (their own look) crumples where they fell.
-@rpc("authority", "call_local", "reliable")
-func player_body(id: int, at: Vector3, yaw: float) -> void:
+@rpc("authority", "call_remote", "reliable")
+func player_body(id: int, at: Vector3, yaw: float, push := Vector3.ZERO) -> void:
 	var rig := Characters.survivor(id)
 	add_child(rig)
 	rig.global_position = Vector3(at.x, map.ground_y(at), at.z)
 	rig.rotation.y = yaw
 	rig.update(0.0, 0.0)
-	gore.ragdoll(rig.take_all(), Vector3.ZERO, Vector3(0, 0.5, 0) - rig.global_transform.basis.z * 1.5, Humanoid.Part.TORSO)
+	var away := push if push.length() > 0.1 else -rig.global_transform.basis.z # (no blow: forward on their face)
+	gore.ragdoll(rig.take_all(), Vector3.ZERO, Vector3(0, 0.5, 0) + away * Config.DEATH_PUSH, Humanoid.Part.TORSO)
 	rig.queue_free()
 
 

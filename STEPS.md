@@ -456,17 +456,18 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Blood on the lens after a close kill: a few drops that run down and fade
   - `HitMarker`, `DamageArcs`, `LensBlood`, the `low_hp` shader on the HUD; `Game.hit_confirm(killed, headshot, severed, dist)` and `got_hit(amount, from)` (protocol 4); `Sfx.muffle` / `step_muffle` (a low-pass on Master); the `sever_wet` sound
 
-### [ ] S038 · Other players' animations
+### [x] S038 · Other players' animations
 > needs: S016, S019 | size: L | test: `tests/test_remote_anim.gd` | see: `tools\play2.ps1`
-- [ ] Player snapshot carries an action byte: aim, reload, shove, heal, throw, downed, vault, crouch
-- [ ] Rig states in `Humanoid.Anim`
-  - [ ] Aim: shouldered gun, head tracks the look pitch
-  - [ ] Reload: support hand to the pouch and back, gun tilted
-  - [ ] Sprint with the gun carried low
-  - [ ] Shove, throw (wind-up, release), heal
-  - [ ] Hit flinch, death fall forward or backward by hit direction
-- [ ] Upper and lower body blend: legs run while the arms reload
-- [ ] Gun recoil kick on the remote rig per shot
+- [x] Player snapshot carries an action byte: aim, reload, shove, heal, throw, downed, vault, crouch
+- [x] Rig states in `Humanoid.Anim`
+  - [x] Aim: shouldered gun, head tracks the look pitch
+  - [x] Reload: support hand to the pouch and back, gun tilted
+  - [x] Sprint with the gun carried low
+  - [x] Shove, throw (wind-up, release), heal
+  - [x] Hit flinch, death fall forward or backward by hit direction
+- [x] Upper and lower body blend: legs run while the arms reload
+- [x] Gun recoil kick on the remote rig per shot
+  - `PlayerWire` 26 bytes (u16 action: AIM, RELOAD, SHOVE, THROW, VAULT added; s8 look pitch), protocol 5; `Humanoid.Upper` layered by `_write_upper` over the legs, `look_pitch`, `kick`; `RemotePlayer.upper_for`, `_place_gun`; the death falls along `players[id].last_push`; `--survivor-rack`. Aiming arms and gun line up roughly, not exactly (the gun hangs from the spine, not the hands)
 
 ---
 
