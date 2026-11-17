@@ -51,6 +51,7 @@ var tracers: Tracers      ## every bullet's streak (cosmetic, local)
 var casings: Casings      ## spent cases on the floor (cosmetic, local)
 var whizzes := 0          ## near misses heard (tests)
 var _own_shots := 0
+var _seen_shots := 0
 var heli: Helicopter = null ## the extraction helicopter, while one is coming, down or leaving
 var heli_flight: HeliFlight = null
 var heli_t := 0.0        ## seconds into its flight (every peer counts it itself)
@@ -1412,7 +1413,20 @@ func shot_seen(shooter: int, weapon: int, origin: Vector3, end: Vector3) -> void
 	else:
 		muzzle_smoke(at, 1, false)
 	var d := Weapons.def(weapon)
-	Sfx.play("gunshot", at, 0.04, d.volume, d.pitch)
+	_seen_shots += 1
+	var vary := GunVoice.variation(_seen_shots)
+	var far := local_player != null and origin.distance_to(local_player.camera.global_position) > Config.SHOT_FAR_DIST
+	Sfx.play(GunVoice.sound(weapon) + ("_far" if far else ""), at, 0.0, d.volume + vary[1], vary[0])
+	Sfx.play(GunVoice.tail(place_at(at)), at, 0.0, d.volume - Config.TAIL_DB, vary[0])
+
+
+## What answers a shot fired at `pos`: a room, the street between buildings, the open hill.
+func place_at(pos: Vector3) -> int:
+	if not map.outdoor:
+		return GunVoice.Place.INDOOR
+	if map.ground_y(pos) > Config.HILL_OPEN_Y:
+		return GunVoice.Place.OPEN
+	return GunVoice.Place.STREET
 
 
 ## Someone else's bullet from `origin` to `end`: if it passed close by your head, you hear it go by
@@ -2076,7 +2090,9 @@ func _update_weapon() -> void:
 func _fire(d: Dictionary) -> void:
 	var lp := local_player
 	lp.view.fire()
-	Sfx.play_ui("gunshot", d.volume, d.pitch * rng.randf_range(0.96, 1.04))
+	var vary := GunVoice.variation(_own_shots)
+	Sfx.play_ui(GunVoice.sound(lp.weapons.current), d.volume + vary[1], vary[0])
+	Sfx.play_ui(GunVoice.tail(place_at(lp.global_position)), d.volume - Config.TAIL_DB, vary[0])
 	var cam := lp.camera
 	var origin := cam.global_position
 	var cone := 0.0 if bot else Weapons.spread(d, lp.aiming, lp.move_speed / Config.SPRINT_SPEED, lp.move.crouch)

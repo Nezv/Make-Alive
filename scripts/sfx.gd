@@ -17,6 +17,7 @@ const RATE := 22050
 const BUSES := ["Master", "Guns", "Zombies", "World", "UI", "Music"]
 
 static var stats := { "played": 0, "stolen": 0, "dropped": 0 }
+static var last: Array[String] = [] ## the names of the last sounds asked for (tests)
 static var _defs := {}    ## name -> { bus, build }
 static var _streams := {} ## name -> AudioStreamWAV
 static var _pool: Pool
@@ -63,6 +64,8 @@ static func _builtin() -> void:
 		register("whiz", "Guns", _whiz)
 	if not _defs.has("tink"):
 		register("tink", "World", _tink)
+	if not _defs.has(GunVoice.sound(0)):
+		GunVoice.register_all()
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -79,14 +82,22 @@ static func stream(sound: String) -> AudioStreamWAV:
 ## Play `sound` at `position` in the world. `pitch_jitter` 0.05 means each play is up to 5% higher or lower.
 ## Returns false if the sound is unknown or was dropped because the pool is full of nearer sounds.
 static func play(sound: String, position: Vector3, pitch_jitter := 0.0, volume_db := 0.0, pitch := 1.0) -> bool:
+	_note(sound)
 	var s := stream(sound)
 	return s != null and pool().play_3d(s, _defs[sound].bus, position, pitch_jitter, volume_db, pitch)
 
 
 ## Play `sound` with no position: interface sounds and the local player's own gun.
 static func play_ui(sound: String, volume_db := 0.0, pitch := 1.0) -> bool:
+	_note(sound)
 	var s := stream(sound)
 	return s != null and pool().play_2d(s, _defs[sound].bus, volume_db, pitch)
+
+
+static func _note(sound: String) -> void:
+	last.append(sound)
+	if last.size() > 16:
+		last.pop_front()
 
 
 ## The node that owns the voices. Made on first use, lives under the scene tree's root.

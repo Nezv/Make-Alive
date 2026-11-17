@@ -397,16 +397,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Penetration data per surface stored now, used by S101
   - `Surface` (`scripts/world/surface.gd`: `tag`, `of_hit`, `PENETRATION`), `Fx.Kind.IMPACT` with the surface as `arg` (`IMPACT_HOLE_ONLY`, `IMPACT_PUFF_ONLY` for a shotgun's pattern); the corridor, doors, crates and lootboxes are tagged, the city is still all concrete until its streets and blocks are built (S041, S043); `--fx-rack` has a row of impacts
 
-### [ ] S033 · Gun voices
+### [x] S033 · Gun voices
 > needs: S005 | size: L | test: `tests/test_gun_sounds.gd`
-- [ ] One synthesised shot per gun from layers: crack (noise burst), body (low thump by calibre), mechanical click, tail
-  - [ ] P19 short pop, P90 buzzy snap, Type 95 and AK47 heavy bark, AS Val soft thud
-  - [ ] USAS-12 and SPAS-12 boom with a long tail, T-5000 crack with a rolling echo, Dragunov sharp slap
-- [ ] Tail by place: short and boxy indoors, long slapback between buildings, open on the hill
-- [ ] Distance versions: far shots lose the crack and keep a dull thump
-- [ ] Suppressed variants
-- [ ] Dry fire click
-- [ ] Small pitch and level variation per shot, seeded per shot index
+- [x] One synthesised shot per gun from layers: crack (noise burst), body (low thump by calibre), mechanical click, tail
+  - [x] P19 short pop, P90 buzzy snap, Type 95 and AK47 heavy bark, AS Val soft thud
+  - [x] USAS-12 and SPAS-12 boom with a long tail, T-5000 crack with a rolling echo, Dragunov sharp slap
+- [x] Tail by place: short and boxy indoors, long slapback between buildings, open on the hill
+- [x] Distance versions: far shots lose the crack and keep a dull thump
+- [x] Suppressed variants
+- [x] Dry fire click
+- [x] Small pitch and level variation per shot, seeded per shot index
+  - `GunVoice` (`scripts/gun_voice.gd`: `RECIPES`, `sound(id)` + `_far` / `_sup`, `tail(place)`, `variation(i)`), `Game.place_at`; checked by measurement in the tests (length, loudness, brightness), not yet by ear
 
 ### [ ] S034 · Handling animation and sound
 > needs: S033 | size: L | test: `tests/test_viewmodel.gd` | see: `--weapon=1..9 --pose=reload`

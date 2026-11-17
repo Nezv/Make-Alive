@@ -130,6 +130,13 @@ const CASING_MAX := 160          # lying about at once (the oldest gives way)
 const CASING_REST := 20.0        # seconds one lies still before it sinks
 const CASING_SINK := 2.0         # seconds it takes to sink away
 
+# --- Gun voices (scripts/gun_voice.gd) ---
+const SHOT_FAR_DIST := 60.0      # metres beyond which you hear the far version (the crack gone)
+const SHOT_PITCH_VARY := 0.04    # each shot up to this much higher or lower
+const SHOT_DB_VARY := 1.5        # ...and this many dB louder or softer
+const TAIL_DB := 5.0             # the room's answer is this much quieter than the shot
+const HILL_OPEN_Y := 40.0        # metres up the hill where a shot rings out in the open
+
 # --- The helicopter (scripts/heli_flight.gd is its path; scripts/world/helicopter.gd its look) ---
 const HELI_MAX_MESHES := 12      # draws for the whole machine
 const HELI_BLUR_AT := 0.6        # rotor speed (0..1) above which the blades show as a disc
