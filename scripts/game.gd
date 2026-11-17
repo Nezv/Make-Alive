@@ -45,6 +45,7 @@ var rules: MissionRules  ## the objective list being played (host runs it; see `
 var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason": "", "id": "", "kind": "", "text": "",
 	"left": -1.0, "counting": false, "wave": 0, "has_marker": false, "marker": Vector3.ZERO }
 var remotes := {}        ## peer id -> RemotePlayer
+var _drips := BleedTrail.new() ## where bleeding players last dropped blood
 var names := {}          ## peer id -> player name, on every peer (sent when someone joins or leaves)
 var zombies := {}        ## zombie id -> Zombie
 var zombie_list: Array[Zombie] = [] ## same zombies as an array, refreshed each host tick
@@ -1603,6 +1604,7 @@ func _process(delta: float) -> void:
 	local_player.status.tick_view(delta)
 	hud.set_inventory(local_player.inventory)
 	hud.set_status(local_player.status)
+	update_drips(delta)
 	if local_player.status.dead:
 		_update_spectating(delta)
 	hud.set_spectate(spectate_text())
@@ -1624,6 +1626,18 @@ func _process(delta: float) -> void:
 		if _send_timer <= 0.0:
 			_send_timer = 1.0 / 30.0
 			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits())
+
+
+## Every bleeding player, you and the others, leaves drops on the floor behind them (drawn by each peer).
+func update_drips(delta: float) -> void:
+	var me := local_player.status
+	if _drips.step(my_id, local_player.global_position, me.bleed > 0 and not me.dead, delta):
+		gore.splat(local_player.global_position, Vector3.ZERO, Config.BLEED_DRIP_SIZE)
+	for id: int in remotes:
+		var r: RemotePlayer = remotes[id]
+		var bleeding := r.action & PlayerWire.ACTION_BLEED != 0 and r.action & PlayerWire.ACTION_DEAD == 0
+		if _drips.step(id, r.global_position, bleeding, delta):
+			gore.splat(r.global_position, Vector3.ZERO, Config.BLEED_DRIP_SIZE)
 
 
 ## Holding use beside a downed teammate gets them up: say so to the host once, and again when you let go.

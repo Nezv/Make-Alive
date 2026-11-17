@@ -17,6 +17,17 @@ const LOWERED_ROT := Vector3(-0.9, 0.0, 0.0)
 const STOW_TIME := 0.12                              ## seconds to drop the gun out of the way or bring it back
 const ELBOW_R := Vector3(0.36, -0.6, 0.15)           ## where the forearms come from (camera space)
 const ELBOW_L := Vector3(-0.22, -0.62, 0.1)
+## Putting on a bandage: [left hand, right hand] in camera space. The left forearm is held across the
+## body, the right hand goes round it: beside, over, behind, under, and round again.
+const HEAL_POSES := [
+	[Vector3(-0.05, -0.2, -0.4), Vector3(0.09, -0.18, -0.37)],
+	[Vector3(-0.04, -0.21, -0.4), Vector3(-0.01, -0.12, -0.41)],
+	[Vector3(-0.05, -0.2, -0.39), Vector3(-0.12, -0.17, -0.42)],
+	[Vector3(-0.04, -0.19, -0.4), Vector3(0.0, -0.26, -0.35)],
+]
+const HEAL_ELBOW_L := Vector3(-0.42, -0.36, -0.22)  ## the left forearm lies across the body
+const HEAL_ELBOW_R := Vector3(0.36, -0.42, -0.04)
+const BANDAGE := Color(0.92, 0.9, 0.84)
 const SLEEVE := Color(0.1, 0.12, 0.08)
 const GLOVE := Color(0.05, 0.05, 0.05)
 
@@ -33,6 +44,10 @@ var dry := 0.0             ## 1 right after a click on an empty gun, runs down t
 var shove_t := -1.0         ## seconds into a shove (-1 = none)
 var stow := 0.0            ## 0..1: the gun is down and out of the way (hands busy: vaulting)
 var stow_goal := 0.0       ## where `stow` is easing to; the player sets this, never the pose
+var heal := 0.0            ## 0..1: the gun is down and the hands are putting something on
+var heal_goal := 0.0       ## where `heal` is easing to (the player sets it from its status)
+var heal_t := 0.0          ## seconds into the heal: which pose the hands are at
+var bandage: MeshInstance3D ## the roll in the right hand while healing
 var bob := 0.0
 var flash: MeshInstance3D
 var light: OmniLight3D
@@ -51,6 +66,12 @@ func _init() -> void:
 	add_child(pivot)
 	arm_r = _make_arm()
 	arm_l = _make_arm()
+	var bb := MeshKit.Builder.new()
+	bb.box(Vector3(0.04, 0.04, 0.03), Vector3(0, 0.04, -0.02), BANDAGE)
+	bb.box(Vector3(0.022, 0.004, 0.05), Vector3(-0.012, 0.062, 0.01), BANDAGE) # the strip running off it
+	bandage = bb.instance(null, false)
+	bandage.visible = false
+	add_child(bandage)
 
 	flash = MeshInstance3D.new()
 	var sphere := SphereMesh.new()
@@ -142,6 +163,23 @@ static func _ease(x: float) -> float:
 	return x * x * (3.0 - 2.0 * x)
 
 
+## Where the hands are `t` seconds into a heal: [left, right], eased from pose to pose, each held
+## exactly on its beat (`Config.HEAL_POSE_TIME` apart).
+static func heal_hands(t: float) -> Array:
+	var ph := maxf(t, 0.0) / Config.HEAL_POSE_TIME
+	var k := floori(ph)
+	var f := ph - k
+	if absf(ph - roundf(ph)) < 1e-5:
+		k = roundi(ph)
+		f = 0.0
+	var a: Array = HEAL_POSES[k % HEAL_POSES.size()]
+	if f == 0.0:
+		return a.duplicate()
+	var b: Array = HEAL_POSES[(k + 1) % HEAL_POSES.size()]
+	var w := _ease(f)
+	return [(a[0] as Vector3).lerp(b[0], w), (a[1] as Vector3).lerp(b[1], w)]
+
+
 ## 0 → 1 → 0 as `x` goes from `from` to `to`.
 static func _pulse(x: float, from: float, to: float) -> float:
 	return sin(clampf((x - from) / (to - from), 0.0, 1.0) * PI)
@@ -183,6 +221,10 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	rot = rot.lerp(LOWERED_ROT, w)
 	stow = move_toward(stow, stow_goal, delta / STOW_TIME)
 	w = _ease(stow)
+	pos = pos.lerp(gun.hip + LOWERED_SHIFT, w)
+	rot = rot.lerp(LOWERED_ROT, w)
+	heal = move_toward(heal, heal_goal, delta / Config.HEAL_LOWER_TIME)
+	w = _ease(heal)
 	pos = pos.lerp(gun.hip + LOWERED_SHIFT, w)
 	rot = rot.lerp(LOWERED_ROT, w)
 
@@ -252,8 +294,22 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 		left = left.lerp(gun.mag_at + gun.mag_out * out, grab)
 	elif reloading:
 		left = (gun.port + Vector3(-0.05, -0.28, 0.1)).lerp(gun.port, _pulse(u, 0.0, 1.0))
-	_place_arm(arm_r, pivot.transform * right, ELBOW_R)
-	_place_arm(arm_l, pivot.transform * left, ELBOW_L)
+	var hand_r := pivot.transform * right
+	var hand_l := pivot.transform * left
+	var elbow_l := ELBOW_L
+	var elbow_r := ELBOW_R
+	if heal > 0.0: # the hands leave the gun for the wound
+		var hh := heal_hands(heal_t)
+		w = _ease(heal)
+		hand_l = hand_l.lerp(hh[0], w)
+		hand_r = hand_r.lerp(hh[1], w)
+		elbow_l = ELBOW_L.lerp(HEAL_ELBOW_L, w)
+		elbow_r = ELBOW_R.lerp(HEAL_ELBOW_R, w)
+	_place_arm(arm_r, hand_r, elbow_r)
+	_place_arm(arm_l, hand_l, elbow_l)
+	bandage.visible = heal > 0.5
+	if bandage.visible:
+		bandage.transform = arm_r.transform
 
 	_flash_t -= delta
 	flash.visible = _flash_t > 0.0

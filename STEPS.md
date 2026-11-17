@@ -189,17 +189,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Drop on death as a backpack other players can loot
 - Medkit and bandage heal at once for now; painkillers and throwables are consumed with no effect until S015 and S093 write theirs in `GameHooks.on_item_used`.
 
-### [ ] S015 · Bleeding and healing
+### [x] S015 · Bleeding and healing
 > needs: S014 | size: M | test: `tests/test_bleeding.gd`
 - [x] Bleed chance on a hit, stacks to three, ticks HP, pinned in tests
 - [x] Bandage stops bleeding, medkit restores HP over its use time, painkillers give decaying temporary HP
   - The medkit and bandage are spent and heal only when their use time (`Inventory.use_time`) is over; a hit or a sprint cancels them and the item stays in the pack
-- [ ] Use animation in first person: gun lowers, hands wrap a bandage (four eased poses), cancelled by sprint or damage
-  - The cancelling is done (`LocalPlayer.check_use_cancel`, `Game.cancel_use`); `local_player.status.using` / `use_left` / `use_total` say what to animate
-- [ ] Others see the heal pose on the remote player
-  - The host already sets `PlayerWire.ACTION_HEAL` and `ACTION_BLEED` in every snapshot; `RemotePlayer.set_action` has to draw them
-- [ ] Bleeding look: red drops from the lower screen edge, drip trail decals behind the player, heartbeat when low
-  - Only a red "BLEEDING x2" line (`Hud.set_status`) so far
+- [x] Use animation in first person: gun lowers, hands wrap a bandage (four eased poses), cancelled by sprint or damage
+  - `Viewmodel.heal` / `heal_goal` / `heal_t`, `HEAL_POSES`, `heal_hands(t)`; the player sets them from `status`; `--pose=heal` shows it
+- [x] Others see the heal pose on the remote player
+  - `Humanoid.Anim.HEAL`, picked by `RemotePlayer.anim_for` from `PlayerWire.ACTION_HEAL`
+- [x] Bleeding look: red drops from the lower screen edge, drip trail decals behind the player, heartbeat when low
+  - `BleedDrops` on the HUD, `BleedTrail` + `Game.update_drips` (every peer, from `ACTION_BLEED`), `Heartbeat` and the `heartbeat` sound
 - [x] `on_player_bleeding`, `on_player_healed` hooks (and `on_item_use_cancelled`)
 
 ### [ ] S016 · Downed and revive

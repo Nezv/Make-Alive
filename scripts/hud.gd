@@ -25,6 +25,8 @@ var status_label: Label    ## wounds and what is being put on, above it
 var director_label: Label  ## --director: the horde director's pace (host debug)
 var spectate_label: Label  ## while dead: who you are watching and when you come back
 var wheel_view: ItemWheelView ## the item wheel, while its key is held
+var bleed_drops: BleedDrops ## blood at the bottom of the screen while bleeding
+var heartbeat := Heartbeat.new() ## when to thump while HP is low
 var objective_label: Label  ## the current objective and its clock, top centre
 var countdown_label: Label  ## big numerals while the extraction clock runs
 var last_beep_pitch := 0.0  ## pitch of the last countdown beep (tests)
@@ -118,6 +120,8 @@ void fragment() {
 	status_label = _label(17, Control.PRESET_BOTTOM_LEFT, Vector2(28, -132))
 	inventory_label = _label(15, Control.PRESET_BOTTOM_LEFT, Vector2(28, -104))
 	inventory_label.modulate.a = 0.85
+	bleed_drops = BleedDrops.new()
+	add_child(bleed_drops)
 	wheel_view = ItemWheelView.new()
 	add_child(wheel_view)
 	weapon_label = _label(26, Control.PRESET_BOTTOM_RIGHT, Vector2(-420, -82))
@@ -410,6 +414,7 @@ func set_status(status: PlayerStatus) -> void:
 	elif status.is_using():
 		parts.append("%s  %.1f s" % [Inventory.item_name(status.using), status.use_left])
 	status_label.text = "   ·   ".join(parts)
+	bleed_drops.bleed = 0 if status.dead else status.bleed
 	status_label.modulate = Color("ff6a5a") if status.bleed > 0 or status.downed else Color.WHITE
 
 
@@ -486,6 +491,8 @@ func _process(delta: float) -> void:
 	var low := _last_hp > 0 and float(_last_hp) <= Config.PLAYER_HP * Config.LOW_HP_FRACTION
 	var pulse := 0.12 + 0.08 * sin(Time.get_ticks_msec() * 0.008) if low else 0.0 # heartbeat when hurt
 	damage.color.a = maxf(clampf(_dmg_t, 0.0, 0.3), pulse)
+	if heartbeat.step(delta, _last_hp if not _ended else 0):
+		Sfx.play_ui("heartbeat")
 	pause_panel.visible = Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not _ended
 	perf_label.visible = Settings.get_value("show_draws")
 	perf_label.text = "%d fps · %d draws · ping %d ms" % [

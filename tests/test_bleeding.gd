@@ -294,6 +294,158 @@ func test_others_see_who_is_bleeding_or_healing() -> void:
 	assert_true(wire[0].action & PlayerWire.ACTION_BLEED != 0)
 
 
+# --- How it looks ---------------------------------------------------------------------
+
+func _viewmodel() -> Array:
+	var vm := Viewmodel.new()
+	add_child(vm)
+	var w := WeaponState.new()
+	w.switch_to(Weapons.AK47)
+	w.step(1.0)
+	vm.show_weapon(Weapons.AK47)
+	return [vm, w]
+
+
+func _run_vm(vm: Viewmodel, w: WeaponState, secs: float) -> void:
+	var dt := 1.0 / 60.0
+	for i in int(secs / dt):
+		w.step(dt)
+		vm.update(dt, 0.0, false, false, w)
+
+
+func test_putting_on_a_bandage_lowers_the_gun_and_the_hands_wrap_through_four_poses() -> void:
+	var a := _viewmodel()
+	var vm: Viewmodel = a[0]
+	_run_vm(vm, a[1], 0.5)
+	var rest_y := vm.pivot.position.y
+	assert_false(vm.bandage.visible, "no bandage in hand at rest")
+	vm.heal_goal = 1.0
+	_run_vm(vm, a[1], Config.HEAL_LOWER_TIME * 0.4)
+	assert_true(vm.heal > 0.0 and vm.heal < 1.0, "eases down, no snap")
+	_run_vm(vm, a[1], Config.HEAL_LOWER_TIME * 2.0)
+	assert_near(vm.heal, 1.0, 0.01)
+	assert_lt(vm.pivot.position.y, rest_y - 0.15, "the gun is down out of the way")
+	assert_true(vm.bandage.visible)
+	assert_eq(Viewmodel.HEAL_POSES.size(), 4)
+	var seen := []
+	for k in 4:
+		var hands: Array = Viewmodel.heal_hands(k * Config.HEAL_POSE_TIME)
+		assert_eq(hands, Viewmodel.HEAL_POSES[k], "pose %d is held exactly on its beat" % k)
+		assert_false(hands in seen, "every pose is its own")
+		seen.append(hands)
+	assert_eq(Viewmodel.heal_hands(4 * Config.HEAL_POSE_TIME), Viewmodel.HEAL_POSES[0], "and round again")
+	var mid: Array = Viewmodel.heal_hands(0.5 * Config.HEAL_POSE_TIME)
+	var pose0: Array = Viewmodel.HEAL_POSES[0]
+	var pose1: Array = Viewmodel.HEAL_POSES[1]
+	assert_true((mid[0] as Vector3).distance_to(pose0[0]) > 0.001 and (mid[0] as Vector3).distance_to(pose1[0]) > 0.001, "eased between beats")
+	vm.heal_goal = 0.0
+	_run_vm(vm, a[1], Config.HEAL_LOWER_TIME * 2.0)
+	assert_eq(vm.heal, 0.0, "cancelled: the gun comes back up")
+	assert_false(vm.bandage.visible)
+	vm.free()
+
+
+func test_the_player_animates_what_is_being_put_on_and_stops_when_it_is_cancelled() -> void:
+	var g := await _game()
+	var lp := g.local_player
+	g.give_item(1, I.BANDAGE)
+	g.damage_player(1, 20)
+	g.use_item(1, I.BANDAGE)
+	await frames(3)
+	assert_eq(lp.view.heal_goal, 1.0, "a bandage going on")
+	g.damage_player(1, 1)
+	await frames(3)
+	assert_eq(lp.view.heal_goal, 0.0, "a hit knocks it off")
+	g.give_item(1, I.PAINKILLERS)
+	g.use_item(1, I.PAINKILLERS)
+	await frames(3)
+	assert_eq(lp.view.heal_goal, 1.0, "pills too")
+	_status(g).begin_use(&"revive", 3.0)
+	lp.status.apply_state(_status(g).get_state())
+	await frames(3)
+	assert_eq(lp.view.heal_goal, 0.0, "getting someone up is not a heal")
+
+
+func test_others_see_the_heal_pose_on_the_remote_player() -> void:
+	assert_eq(RemotePlayer.anim_for(PlayerWire.ACTION_HEAL, 0.0), Humanoid.Anim.HEAL)
+	assert_eq(RemotePlayer.anim_for(PlayerWire.ACTION_HEAL | PlayerWire.ACTION_CROUCH, 0.0), Humanoid.Anim.HEAL)
+	assert_eq(RemotePlayer.anim_for(PlayerWire.ACTION_HEAL | PlayerWire.ACTION_AIR, 0.0), Humanoid.Anim.JUMP, "off the ground wins")
+	assert_eq(RemotePlayer.anim_for(0, 0.0), Humanoid.Anim.IDLE)
+	assert_eq(RemotePlayer.anim_for(0, 3.0), Humanoid.Anim.WALK)
+	var rig := Characters.survivor(2)
+	add_child(rig)
+	rig.set_anim(Humanoid.Anim.HEAL)
+	for i in 60:
+		rig.update(1.0 / 60.0, 0.0)
+	assert_gt(rig._cur[Humanoid.J.NECK_PITCH], 0.2, "looking down at the wound")
+	assert_gt(rig._cur[Humanoid.J.EL_L], 0.8, "the arm held across the body")
+	assert_gt(rig._cur[Humanoid.J.EL_R], 0.8)
+	var before := rig._cur[Humanoid.J.SH_R_X]
+	for i in 20:
+		rig.update(1.0 / 60.0, 0.0)
+	assert_true(absf(rig._cur[Humanoid.J.SH_R_X] - before) > 0.01, "the right hand keeps wrapping")
+	rig.free()
+
+
+func test_a_bleeding_player_leaves_drops_behind_them() -> void:
+	var t := BleedTrail.new()
+	assert_false(t.step(1, Vector3.ZERO, false, 0.1), "not bleeding")
+	assert_true(t.step(1, Vector3.ZERO, true, 0.1), "the first drop falls at once")
+	assert_false(t.step(1, Vector3(0.2, 0, 0), true, 0.1))
+	assert_true(t.step(1, Vector3(Config.BLEED_DRIP_STEP + 0.01, 0, 0), true, 0.1), "a drop every few steps")
+	assert_false(t.step(1, Vector3(Config.BLEED_DRIP_STEP + 0.01, 0, 0), true, Config.BLEED_DRIP_IDLE * 0.5))
+	assert_true(t.step(1, Vector3(Config.BLEED_DRIP_STEP + 0.01, 0, 0), true, Config.BLEED_DRIP_IDLE * 0.6), "standing still it drips in place")
+	assert_true(t.step(2, Vector3(5, 0, 5), true, 0.1), "everyone has their own trail")
+	var g := await _game()
+	var before: int = g.gore.stats.splats
+	g.damage_player(1, 5, _zombie(g), 0.0)
+	g.update_drips(0.1)
+	g.local_player.global_position += Vector3(Config.BLEED_DRIP_STEP * 1.5, 0, 0)
+	g.update_drips(0.1)
+	assert_eq(g.gore.stats.splats, before + 2, "two drops on the floor")
+
+
+func test_blood_runs_up_from_the_bottom_of_the_screen_while_bleeding() -> void:
+	var drops := BleedDrops.new()
+	drops.size = Vector2(1600, 900)
+	drops.bleed = 0
+	drops.step(1.0)
+	assert_eq(drops.drops.size(), 0)
+	drops.bleed = 2
+	for i in 60:
+		drops.step(1.0 / 30.0)
+	assert_gt(drops.drops.size(), 0, "drops on the screen")
+	assert_true(drops.drops.size() <= 2 * Config.BLEED_SCREEN_DROPS, "a few per wound")
+	for d: Dictionary in drops.drops:
+		assert_gt((d.pos as Vector2).y, drops.size.y * 0.55, "only the lower edge")
+	drops.bleed = 0
+	for i in 120:
+		drops.step(1.0 / 30.0)
+	assert_eq(drops.drops.size(), 0, "they fade once the bleeding stops")
+	drops.free()
+
+
+func test_a_heartbeat_when_hp_is_low_and_faster_the_lower_it_is() -> void:
+	assert_true(Sfx.stream("heartbeat") != null, "a heartbeat sound")
+	var h := Heartbeat.new()
+	var beats := 0
+	for i in 300:
+		if h.step(0.02, Config.PLAYER_HP):
+			beats += 1
+	assert_eq(beats, 0, "healthy: no heartbeat")
+	var low := int(Config.PLAYER_HP * Config.LOW_HP_FRACTION)
+	for i in 300:
+		if h.step(0.02, low):
+			beats += 1
+	var near_death := 0
+	for i in 300:
+		if h.step(0.02, 3):
+			near_death += 1
+	assert_gt(beats, 2, "hurt: it beats")
+	assert_gt(near_death, beats, "faster near death")
+	assert_false(h.step(10.0, 0), "the dead have none")
+
+
 func test_the_dead_do_not_bleed_or_heal() -> void:
 	var g := await _game()
 	g.give_item(1, I.BANDAGE)

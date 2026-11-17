@@ -57,6 +57,8 @@ static func _builtin() -> void:
 		register("beep", "UI", _beep)
 	if not _defs.has("breath"):
 		register("breath", "World", _breath)
+	if not _defs.has("heartbeat"):
+		register("heartbeat", "UI", _heartbeat)
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -159,6 +161,20 @@ static func _breath() -> PackedFloat32Array:
 		if at + i < buf.size():
 			buf[at + i] += breath_out[i] * 2.6
 	return soft_clip(buf)
+
+
+## A heartbeat heard from inside: lub-dub, two low thumps, the second softer.
+static func _heartbeat() -> PackedFloat32Array:
+	var lub := low_pass(exp_tail(sweep(0.16, 75.0, 42.0), 22.0), 220.0)
+	var dub := low_pass(exp_tail(sweep(0.14, 68.0, 40.0), 26.0), 200.0)
+	var buf := _blank(0.42)
+	for i in lub.size():
+		buf[i] = lub[i] * 1.6
+	var at := int(0.2 * RATE)
+	for i in dub.size():
+		if at + i < buf.size():
+			buf[at + i] += dub[i] * 1.1
+	return soft_clip(buf, 1.4)
 
 
 # --- Sources ----------------------------------------------------------------------

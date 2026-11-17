@@ -58,14 +58,20 @@ func _process(delta: float) -> void:
 	var moved := Vector2(position.x - _last_pos.x, position.z - _last_pos.z).length()
 	_last_pos = position
 	var ground_speed := moved / delta if delta > 0.0 else 0.0
-	var a := Humanoid.Anim.IDLE
-	if ground_speed > 6.0:
-		a = Humanoid.Anim.RUN
-	elif ground_speed > 0.3:
-		a = Humanoid.Anim.WALK
-	if action & PlayerWire.ACTION_AIR:
-		a = Humanoid.Anim.JUMP
-	elif action & PlayerWire.ACTION_CROUCH:
-		a = Humanoid.Anim.CROUCH
-	rig.set_anim(a)
+	rig.set_anim(anim_for(action, ground_speed))
 	rig.update(delta, ground_speed)
+
+
+## The rig's state for a player's action bits and how fast they move over the ground.
+static func anim_for(bits: int, ground_speed: float) -> int:
+	if bits & PlayerWire.ACTION_AIR:
+		return Humanoid.Anim.JUMP
+	if bits & PlayerWire.ACTION_HEAL:
+		return Humanoid.Anim.HEAL
+	if bits & PlayerWire.ACTION_CROUCH:
+		return Humanoid.Anim.CROUCH
+	if ground_speed > 6.0:
+		return Humanoid.Anim.RUN
+	if ground_speed > 0.3:
+		return Humanoid.Anim.WALK
+	return Humanoid.Anim.IDLE

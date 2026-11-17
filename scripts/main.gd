@@ -23,7 +23,7 @@ extends Node
 ##   --weapon=4             start holding gun 1-9 (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov)
 ##   --difficulty=hard      host: easy, normal (default), hard or nightmare (see scripts/difficulty.gd)
 ##   --limited-ammo         host: reloads take from a reserve (the map's starting_ammo) even on a test map
-##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload or shove
+##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload, shove or heal (hurt, bleeding, a medkit going on)
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
 ##   --wheel                host: carry a little of everything and hold the item wheel up (pointer on the bandage)
@@ -249,6 +249,14 @@ func _pose(pose: String) -> void:
 		get_tree().create_timer(maxf(0.5, at_s - 0.17)).timeout.connect(func():
 			if game:
 				game.local_player.view.shove())
+	if pose == "heal": # badly hurt, two wounds open, a second into a medkit when the first screenshot is taken
+		var at_h := float(str(_args.get("shot-at", "5")).split(",")[0])
+		get_tree().create_timer(maxf(0.5, at_h - 1.0)).timeout.connect(func():
+			if game:
+				game.give_item(1, Inventory.MEDKIT)
+				game.damage_player(1, 75)
+				(game.players[1].status as PlayerStatus).bleed = 2
+				game.use_item(1, Inventory.MEDKIT))
 	if pose == "reload": # be 40% through a reload when the first screenshot is taken
 		var at := float(str(_args.get("shot-at", "5")).split(",")[0])
 		var t: float = p.weapons.def().reload

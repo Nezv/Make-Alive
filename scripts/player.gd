@@ -391,6 +391,9 @@ func _process(delta: float) -> void:
 	_spectate_cam = Vector3.INF
 	_dead_t = 0.0
 	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, 0)), origin)
+	var healing := status.is_using() and Inventory.valid(status.using) # (a revive is hands on someone else)
+	view.heal_goal = 1.0 if healing else 0.0
+	view.heal_t = status.use_total - status.use_left if healing else 0.0
 	view.update(delta, move_speed, aiming, sprinting, weapons)
 	var zoom: float = weapons.def().ads_fov
 	camera.fov = lerpf(base_fov(), minf(zoom, base_fov()), Viewmodel._ease(view.aim))

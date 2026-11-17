@@ -30,7 +30,7 @@ extends Node3D
 ## Placing things on the round body: `chest(x, y)`, `back(x, y)`, `face(x, y)`.
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
-enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP }
+enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL }
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
@@ -778,6 +778,20 @@ func _write_goal(speed: float) -> void:
 			_goal[J.SH_R_X] = 1.0
 			_goal[J.EL_L] = 0.7
 			_goal[J.EL_R] = 0.5
+
+		Anim.HEAL: # a survivor wrapping a wound: head down, left forearm across the body, the right hand going round it
+			var wrap := anim_t * TAU / (4.0 * Config.HEAL_POSE_TIME)
+			_goal[J.SPINE_PITCH] = 0.25
+			_goal[J.NECK_PITCH] = 0.7
+			_goal[J.NECK_YAW] = 0.2
+			_goal[J.SH_L_X] = 0.3
+			_goal[J.SH_L_OUT] = -0.3
+			_goal[J.EL_L] = 1.25
+			_goal[J.SH_R_X] = 0.45 + sin(wrap) * 0.2
+			_goal[J.SH_R_OUT] = -0.3 + cos(wrap) * 0.12
+			_goal[J.EL_R] = 1.1 + cos(wrap) * 0.25
+			_goal[J.KNEE_L] = -0.1
+			_goal[J.HIP_L] = 0.05
 
 		Anim.CRAWL: # face down, dragging itself forward one arm at a time
 			_goal[J.HIPS_Y] = 0.22
