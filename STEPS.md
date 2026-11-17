@@ -457,7 +457,6 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
   - [ ] Hit flinch, death fall forward or backward by hit direction
 - [ ] Upper and lower body blend: legs run while the arms reload
 - [ ] Gun recoil kick on the remote rig per shot
-- [ ] Survivor outfits by player slot: four distinct looks, deterministic
 
 ---
 
@@ -817,6 +816,59 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Interest management: when the count exceeds one packet, each client gets the nearest zombies every tick and the far ones every few ticks
   - `Interest.pick`; today's cap of 60 fits in one packet with eight players, so it only starts to matter above `Interest.budget`. Clients keep a zombie that missed a packet for `Config.ZOMBIE_STALE` seconds
 
+### [x] S136 · Low-poly bodies and skeleton ✅
+> needs: none | size: L | test: `tests/test_body_model.gd` | see: `--host --body-rack`
+- [x] `tools/models/poly.py`: low-poly kit, rings lofted into flat-shaded prisms, a tag per face ✅
+- [x] `tools/models/measure.py`: proportions, face layout and colours read off `references/zombies.png` ✅
+- [x] Generic male and female bodies (`body.py`): one closed piece per joint, shoulder ledge, torso break that bends closed ✅
+  - [x] Faceted head: sunk sockets, V brow, glowing slit eyes, downturned mouth with teeth ✅
+  - [x] Bone stubs in the wounds a severed part shows ✅
+- [x] Skeleton model on the same joints, fitted inside the male body (`skeleton.py`) ✅
+- [x] `CharacterModel` loads a .glb, binds it to the game's joints, cuts a rigid copy per segment for gibs and ragdolls ✅
+- [x] The old SDF cop model removed ✅
+
+### [x] S137 · Outfit models ✅
+> needs: S136 | size: L | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=1`
+- [x] Garment kit `tools/models/clothes.py`, fitted by slicing the body ✅
+  - [x] Shirts and jackets: long, short or no sleeves; crew, collar or high neck; tucked or over the trousers; open front ✅
+  - [x] Trousers and shorts with an optional belt ✅
+  - [x] Shoes, sneakers, boots ✅
+  - [x] Headgear: police cap, hard hat, helmet, fire helmet, nurse's cap ✅
+- [x] One continuous surface per garment: sleeves out of the armhole, legs out of the seat, no break at any joint ✅
+- [x] Helper bones turning half as far as each limb joint, so cloth bends without pinching ✅
+- [x] Pieces cut below each joint, closed by wounds; piece ids in the .glb's second UV channel ✅
+- [x] Nine outfits on the male and the female body (18 models), plain colours, worn by every walking zombie ✅
+- [x] Sex picked from the id per outfit (`Characters.FEMALE_SHARE`) ✅
+- [x] Tools: `outfits.py --sketch` (posed previews without Blender), `--folds`, `--outfit-rack`, `--rack-sever` ✅
+
+### [ ] S138 · Bite variants
+> needs: S137 | size: L | test: `tests/test_bite_variants.gd` | see: `python tools/models/outfits.py --bites nurse --f`
+- Agent: Opus 5.5 at effort max. Geometry-heavy work with many look-and-fix rounds; it needs the whole pipeline (body, skeleton, clothes, rig, piece cuts) in its head at once. Plan first, then build one bite end to end before the other nine.
+- [ ] Optimized variant producer in `tools/models/`: from one outfit and body, many variants that share what they can
+  - [ ] Clothes swaps per variant (sleeve length, open or closed, hat or none, colour sets)
+  - [ ] Variants picked from the zombie id, the same on every peer; the wire unchanged
+  - [ ] Budget: triangles and texture memory per variant kept close to the plain model, loading stays before the first spawn
+- [ ] Ten bites, each a named region torn out of flesh and clothes together, e.g.
+  - [ ] Left or right side of the abdomen, left or right lower ribs, upper chest, shoulder, upper arm, forearm, thigh, calf, neck and jaw
+  - [ ] The hole cuts the body and every garment over it, with a torn ragged edge (not a clean cut) and blood-dark rims
+  - [ ] Only that region's bones show under it (a few ribs, the radius and ulna, a length of femur, a piece of spine), never the whole skeleton model
+  - [ ] Inside the hole: wound flesh, the bone section, depth, so no see-through; the piece it belongs to stays closed for gibs
+- [ ] Bites survive the existing rules: helpers bend them, they come off with their piece, stumps still close
+- [ ] Contact sheet of every bone, clothes and body variant of the female nurse in one isometric picture, shown in chat when done
+
+### [ ] S139 · Outfit details and special bodies
+> needs: S137 | size: L | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=2`
+- [ ] Details painted or modelled on the outfits: prints, badges, pockets, hi-vis stripes, ties
+- [ ] Skirts and dresses
+- [ ] Blood that varies per zombie on a model
+- [ ] Special zombies built on the same pipeline, not on the round body
+  - [ ] Bloater: swollen torso and neck, split shirt, pale green skin, pulsing belly
+  - [ ] Spitter: long neck, distended jaw, burnt chest, thin limbs
+  - [ ] Brute: a head taller, huge arms, small head, firefighter or riot gear fused on
+  - [ ] Screamer: gaunt, torn hospital gown, jaw unhinged, hands clawing its own head
+  - [ ] Crawler: torn trousers, entrails dragging
+- [ ] Survivor models by player slot: four distinct looks with living faces, deterministic
+
 ### [ ] S071 · Zombie animation pass
 > needs: S070 | size: L | test: `tests/test_rig.gd` | see: `--host --demo --shot-at=1,2,3`
 - [ ] Idle variety per zombie id: sway, head twitch, jaw working, one arm hanging dead, sniffing the air
@@ -867,12 +919,10 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 > needs: S071 | size: S | test: `tests/test_zombie_crawler.gd`
 - [ ] Spawns legless: under cars, in stairwells, under beds
 - [ ] Silent until close, grabs an ankle: the player is slowed until it is shoved or shot
-- [ ] Look: torn trousers, entrail drag trail decal behind it
 - [ ] Hard to see: low, in the dark, flashlights help
 
 ### [ ] S076 · Bloater
 > needs: S070, S004 | size: M | test: `tests/test_zombie_bloater.gd` | see: `--zombie-rack=1`
-- [ ] Model: swollen torso and neck, split shirt, pale green skin, pulsing belly (scale wobble on the torso mesh)
 - [ ] Slow waddle, gurgling
 - [ ] Death or close contact: bursts
   - [ ] Belly swells for 0.4 s first as a warning
@@ -883,7 +933,6 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S077 · Spitter
 > needs: S070, S004 | size: M | test: `tests/test_zombie_spitter.gd`
-- [ ] Model: long neck, distended jaw, burnt chest, thin limbs
 - [ ] Keeps distance, climbs to high ground, strafes between spits
 - [ ] Spit: rears the head back with a throat bulge, then a glowing green arc with a drip trail
 - [ ] Lands as an acid pool: bubbles, steam wisps, eats HP while stood in, fades in seconds
@@ -892,7 +941,6 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S078 · Brute
 > needs: S070, S071 | size: L | test: `tests/test_zombie_brute.gd`
-- [ ] Model: a head taller, huge arms, small head, firefighter or riot gear fused on
 - [ ] Armour plates on torso and arms as separate parts with their own HP; plates crack, then fly off, showing flesh
 - [ ] Charge: lowers the shoulder, paws the ground, a straight run that throws players and zombies aside and ends in a stumble if it misses
 - [ ] Smashes doors and barricades in one hit, flips small wrecks aside
@@ -902,7 +950,6 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S079 · Screamer
 > needs: S070, S028 | size: M | test: `tests/test_zombie_screamer.gd`
-- [ ] Model: gaunt, torn hospital gown, jaw unhinged, hands clawing its own head
 - [ ] On sight of a player it stands still, arches back and screams for three seconds
 - [ ] The scream is visible: ripple rings of distorted air, nearby glass rattles, the player's view trembles
 - [ ] Finished scream calls a horde through the director; killing it mid-scream stops it
@@ -1224,10 +1271,8 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S112 · Gore 2
 > needs: S032, S081 | size: L | test: `tests/test_gore.gd` | see: `--host --demo --bot --bot-aim=head --shot-at=2,3,4`
-- [ ] Wounds on the body: a dark red hole where each bullet hit, drawn into the part's vertex colours, clothes darken and soak around it
 - [ ] Exit wounds: a bigger burst and a spray on the wall behind in the bullet's direction
 - [ ] Head: jaw, top or half can go separately; a headshot leaves a stump with a spurting pulse that weakens
-- [ ] Stumps: bone end and torn flesh geometry, dripping
 - [ ] Blood in the world
   - [ ] Wall splatter with drips that run down over seconds
   - [ ] Pools that grow under corpses and follow the floor's slope
@@ -1235,7 +1280,6 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
   - [ ] Drag smears behind crawlers
   - [ ] Mist that hangs for a moment after a shotgun hit
 - [ ] Viewmodel: blood spatters on the gun and hands at close range, wiped during the inspect animation
-- [ ] Gibs: recognisable pieces (hand, foot, ribs, jaw) besides chunks
 - [ ] Everything capped and pooled as now, tiered
 
 ### [ ] S113 · Glass and breakables

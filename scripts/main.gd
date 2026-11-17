@@ -33,6 +33,10 @@ extends Node
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
 ##   --zombie-rack=1        stand one zombie of every outfit in front of you: =1 first half, =2 second half (add --back for their backs)
+##   --body-rack            the generic model bodies (male, female) and their skeleton, still (also --back, --rack-anim)
+##   --outfit-rack=1        the outfit models, each as a man and a woman: =1 civilian, worker, nurse; =2 doctor, cop, soldier; =3 the rest (also --back, --rack-anim)
+##   --rack-anim=walk       the rack zombies hold that animation's pose (idle, walk, run, attack, windup, leap, stagger, crawl)
+##   --rack-sever=arm       the rack zombies have lost that part (arm: the right one, leg: the left one, head), to look at stumps
 
 var menu: Menu
 var game: Game
@@ -88,7 +92,8 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.bot = _args.has("bot")
 	game.map_name = map_name
 	game.mission = mission
-	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
+	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") \
+			or _args.has("body-rack") or _args.has("outfit-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
 	game.difficulty = _args.get("difficulty", "normal")
@@ -146,6 +151,10 @@ func _host(map_name := "city", mission := "") -> void:
 		_perf_warmup = 2.0
 	if _args.has("zombie-rack"):
 		_zombie_rack()
+	if _args.has("body-rack"):
+		_body_rack()
+	if _args.has("outfit-rack"):
+		_outfit_rack(int(_args["outfit-rack"]))
 	var ips := ", ".join(Net.local_ips())
 	print("[host] hosting on port %d. Friends join: %s" % [Config.PORT, ips])
 	game.hud.push_feed("Hosting. Friends join with IP: %s" % ips)
@@ -306,22 +315,57 @@ func _fx_rack_play() -> void:
 
 ## Still zombies, one per outfit, half of them at a time so none hides another. Models only: no AI.
 func _zombie_rack() -> void:
+	var n := Characters.Outfit.size()
+	var per_row := (n + 1) / 2
+	var row := []
+	for o in n:
+		if o / per_row == int(_args["zombie-rack"]) - 1:
+			row.append([Characters.zombie(100 + o * 7, Zombie.Type.WALKER, o), Characters.OUTFIT_NAMES[o]])
+	_rack(row, per_row)
+
+
+## The generic bodies of tools/models/body.py and their skeleton, still.
+func _body_rack() -> void:
+	var row := []
+	for m: Array in [["male body", CharacterModel.BODY_M], ["female body", CharacterModel.BODY_F],
+			["skeleton", CharacterModel.SKELETON]]:
+		row.append([Humanoid.create_model(CharacterModel.load_model(m[1]), {"zombie": true}), m[0]])
+	_rack(row, row.size())
+
+
+## Three outfits of tools/models/outfits.py (group 1, 2 or 3), each worn by the male and the
+## female body, side by side.
+func _outfit_rack(group: int) -> void:
+	var row := []
+	for o in range((group - 1) * 3, mini(group * 3, Characters.FEMALE_SHARE.size())):
+		for female: bool in [false, true]:
+			var model := CharacterModel.outfit(Characters.OUTFIT_NAMES[o], female)
+			var label := "%s %s" % [Characters.OUTFIT_NAMES[o], "f" if female else "m"]
+			row.append([Humanoid.create_model(model, {"zombie": true}), label])
+	_rack(row, row.size(), 0.8)
+
+
+## Rigs ([rig, label] each) in a row in front of you, facing you (--back: away), holding the
+## pose of --rack-anim, labelled, under a lamp.
+func _rack(row: Array, per_row: int, spacing := 0.95) -> void:
 	game.director.enabled = false
 	game.local_player.hide_view = true
 	var at := game.local_player.global_position
-	var n := Characters.Outfit.size()
-	var per_row := (n + 1) / 2
-	for o in n:
-		if o / per_row != int(_args["zombie-rack"]) - 1:
-			continue
-		var rig := Characters.zombie(100 + o * 7, Zombie.Type.WALKER, o)
+	for i in row.size():
+		var rig: Humanoid = row[i][0]
 		game.add_child(rig)
-		rig.position = at + Vector3((o % per_row - (per_row - 1) / 2.0) * 0.95, 0.1, -3.2)
+		rig.position = at + Vector3((i - (per_row - 1) / 2.0) * spacing, 0.1, -3.2)
 		rig.rotation.y = 0.0 if _args.has("back") else PI
-		rig.set_anim(Humanoid.Anim.IDLE)
-		rig.update(0.5, 0.0)
+		var lost: int = {"arm": Humanoid.Part.ARM_R, "leg": Humanoid.Part.LEG_L, "head": Humanoid.Part.HEAD}.get(
+			String(_args.get("rack-sever", "")), -1)
+		if lost >= 0:
+			Humanoid.discard(rig.sever(lost))
+		var anim_name := String(_args.get("rack-anim", "idle")).to_upper()
+		rig.set_anim(Humanoid.Anim.get(anim_name, Humanoid.Anim.IDLE))
+		for k in 30: # long enough for the pose to settle (0.5 s)
+			rig.update(1.0 / 60.0, 1.2 if anim_name in ["WALK", "RUN", "CRAWL"] else 0.0)
 		var tag := Label3D.new()
-		tag.text = Characters.OUTFIT_NAMES[o]
+		tag.text = row[i][1]
 		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		tag.no_depth_test = true
 		tag.font_size = 40

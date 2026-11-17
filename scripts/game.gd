@@ -71,6 +71,8 @@ var _send_timer := 0.0
 func _ready() -> void:
 	name = "Game"
 	Controls.setup()
+	for path in Characters.model_paths():
+		CharacterModel.load_model(path) # now, not as a hitch when the first one spawns
 	hooks = GameHooks.new()
 	hooks.name = "Hooks"
 	hooks.game = self
