@@ -329,6 +329,16 @@ func _fx_rack() -> void:
 		tag.outline_size = 10
 		tag.position = _fx_rack_spot(at, kind, n) + Vector3(0, 1.6, 0)
 		game.add_child(tag)
+	for surface in Surface.Kind.size(): # a second row: a bullet into every surface
+		var tag := Label3D.new()
+		tag.text = Surface.NAMES[surface]
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.no_depth_test = true
+		tag.font_size = 32
+		tag.pixel_size = 0.004
+		tag.outline_size = 10
+		tag.position = _impact_rack_spot(at, surface) + Vector3(0, 0.55, 0)
+		game.add_child(tag)
 	var timer := Timer.new()
 	timer.wait_time = 2.0
 	timer.autostart = true
@@ -341,10 +351,18 @@ func _fx_rack_spot(at: Vector3, kind: int, n: int) -> Vector3:
 	return at + Vector3((kind - (n - 1) / 2.0) * 0.7, 0.0, -5.0)
 
 
+func _impact_rack_spot(at: Vector3, surface: int) -> Vector3:
+	return at + Vector3((surface - (Surface.Kind.size() - 1) / 2.0) * 0.6, 0.6, -3.2)
+
+
 func _fx_rack_play() -> void:
 	var at := game.local_player.global_position
+	for surface in Surface.Kind.size():
+		game.play_fx(Fx.Kind.IMPACT, _impact_rack_spot(at, surface), Vector3(0, 0.3, 1).normalized(), surface)
 	var n := Fx.Kind.size()
 	for kind in n:
+		if kind == Fx.Kind.IMPACT:
+			continue
 		var on_floor: bool = kind in [Fx.Kind.BLAST, Fx.Kind.SPLASH]
 		var spot := _fx_rack_spot(at, kind, n)
 		var decal: bool = kind in [Fx.Kind.HOLE, Fx.Kind.CRACK]

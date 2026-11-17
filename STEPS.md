@@ -380,21 +380,22 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] A wisp of smoke from the ejection port
   - `Casings` (`game.casings`), `Weapons.GUN_EJECT` / `casing_kind`, `Viewmodel.eject`; the tink's pitch is by kind of case until S032 gives floors their surface
 
-### [ ] S032 · Surfaces and impacts
+### [x] S032 · Surfaces and impacts
 > needs: S004 | size: L | test: `tests/test_impacts.gd` | see: `--host --fx-rack`
-- [ ] Surface kinds on collision bodies via metadata: concrete, asphalt, brick, metal, wood, glass, dirt, grass, water, flesh, tile
-- [ ] Impact per surface
-  - [ ] Concrete: grey dust cone, chips flying, round pocked hole
-  - [ ] Brick: red dust, larger chips
-  - [ ] Metal: sparks with gravity that bounce once, bright flash, dented hole with a shine ring, ricochet chance with a tracer
-  - [ ] Wood: splinters, pale torn hole
-  - [ ] Glass: star crack decal, a spray of shards
-  - [ ] Dirt and grass: clod spray, dark puff, blades of grass
-  - [ ] Water: vertical splash column, ring ripples
-  - [ ] Tile: white shards, cracked decal
-- [ ] Hole decals in the MultiMesh pool, aligned to the normal
-- [ ] Shotgun: one combined puff for the pattern plus individual holes
-- [ ] Penetration data per surface stored now, used by S101
+- [x] Surface kinds on collision bodies via metadata: concrete, asphalt, brick, metal, wood, glass, dirt, grass, water, flesh, tile
+- [x] Impact per surface
+  - [x] Concrete: grey dust cone, chips flying, round pocked hole
+  - [x] Brick: red dust, larger chips
+  - [x] Metal: sparks with gravity that bounce once, bright flash, dented hole with a shine ring, ricochet chance with a tracer
+  - [x] Wood: splinters, pale torn hole
+  - [x] Glass: star crack decal, a spray of shards
+  - [x] Dirt and grass: clod spray, dark puff, blades of grass
+  - [x] Water: vertical splash column, ring ripples
+  - [x] Tile: white shards, cracked decal
+- [x] Hole decals in the MultiMesh pool, aligned to the normal
+- [x] Shotgun: one combined puff for the pattern plus individual holes
+- [x] Penetration data per surface stored now, used by S101
+  - `Surface` (`scripts/world/surface.gd`: `tag`, `of_hit`, `PENETRATION`), `Fx.Kind.IMPACT` with the surface as `arg` (`IMPACT_HOLE_ONLY`, `IMPACT_PUFF_ONLY` for a shotgun's pattern); the corridor, doors, crates and lootboxes are tagged, the city is still all concrete until its streets and blocks are built (S041, S043); `--fx-rack` has a row of impacts
 
 ### [ ] S033 · Gun voices
 > needs: S005 | size: L | test: `tests/test_gun_sounds.gd`

@@ -32,6 +32,7 @@ func _init() -> void:
 	panel = b.instance()
 	hinge.add_child(panel)
 	body = _click_body(Vector3(THICK + 0.08, HEIGHT, WIDTH), c)
+	Surface.tag(body, Surface.Kind.WOOD)
 	hinge.add_child(body)
 
 

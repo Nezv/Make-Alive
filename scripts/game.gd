@@ -1360,8 +1360,17 @@ func resolve_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Wea
 	var pellets: int = d.pellets
 	var cone: float = d.pellet_spread
 	var landed := false
+	var impacts := []
 	for i in pellets:
-		landed = _trace_bullet(shooter, origin, Weapons.scatter(dir, cone, rng), d) or landed
+		landed = _trace_bullet(shooter, origin, Weapons.scatter(dir, cone, rng), d, impacts) or landed
+	if pellets > 1 and not impacts.is_empty(): # a pattern: a hole per pellet, one puff for the lot
+		var mid := Vector3.ZERO
+		for im: Array in impacts:
+			play_fx(Fx.Kind.IMPACT, im[0], im[1], im[2] + Fx.IMPACT_HOLE_ONLY)
+			mid += im[0]
+		play_fx(Fx.Kind.IMPACT, mid / impacts.size(), impacts[0][1], impacts[0][2] + Fx.IMPACT_PUFF_ONLY)
+	elif not impacts.is_empty():
+		play_fx(Fx.Kind.IMPACT, impacts[0][0], impacts[0][1], impacts[0][2])
 	score.add(shooter, "shots")
 	if landed:
 		score.add(shooter, "hits")
@@ -1438,7 +1447,7 @@ func muzzle_smoke(at: Vector3, count: int, thin: bool) -> void:
 
 ## Trace a bullet and apply it. Body-part hitboxes are Area3Ds; walls and closed doors block.
 ## True if it hit a zombie.
-func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -> bool:
+func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary, impacts: Array = []) -> bool:
 	var space := get_viewport().get_world_3d().direct_space_state
 	var reach: float = d.range
 	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * reach,
@@ -1455,6 +1464,7 @@ func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -
 		if is_instance_valid(z) and zombies.has(z.zid):
 			hit_zombie(shooter, z, collider.get_meta("part"), hit.position, dir, d.damage)
 			return true
+	impacts.append([hit.position, hit.normal, Surface.of_hit(hit)]) # a wall, a floor, a door: what it is made of
 	return false
 
 

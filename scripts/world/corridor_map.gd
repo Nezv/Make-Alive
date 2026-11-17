@@ -75,13 +75,14 @@ static func build() -> Dictionary:
 	body.collision_mask = 0
 	root.add_child(body)
 
-	var solid := func(center: Vector3, size: Vector3, color: Color) -> void:
+	var solid := func(center: Vector3, size: Vector3, color: Color, surface := Surface.Kind.CONCRETE) -> void:
 		b.box(size, center, color)
 		var cs := CollisionShape3D.new()
 		var shape := BoxShape3D.new()
 		shape.size = size
 		cs.shape = shape
 		cs.position = center
+		Surface.tag(cs, surface)
 		body.add_child(cs)
 	var wall_x := func(x: float, z0: float, z1: float, color: Color) -> void:
 		solid.call(Vector3(x, WALL_H / 2.0, (z0 + z1) / 2.0), Vector3(WALL_T, WALL_H, absf(z1 - z0)), color)
@@ -92,8 +93,8 @@ static func build() -> Dictionary:
 	var wall_c := Color("5c6168")
 	var edge := HALF_W + WALL_T / 2.0
 	# Floors
-	solid.call(Vector3(0, -0.25, (LEG_A_END - HALF_W) / 2.0), Vector3(HALF_W * 2 + 1, 0.5, LEG_A_END + HALF_W + 1), floor_c)
-	solid.call(Vector3((LEG_B_END + HALF_W) / 2.0, -0.25, 0), Vector3(LEG_B_END - HALF_W, 0.5, HALF_W * 2 + 1), floor_c)
+	solid.call(Vector3(0, -0.25, (LEG_A_END - HALF_W) / 2.0), Vector3(HALF_W * 2 + 1, 0.5, LEG_A_END + HALF_W + 1), floor_c, Surface.Kind.TILE)
+	solid.call(Vector3((LEG_B_END + HALF_W) / 2.0, -0.25, 0), Vector3(LEG_B_END - HALF_W, 0.5, HALF_W * 2 + 1), floor_c, Surface.Kind.TILE)
 	# Floor stripes, so movement reads clearly
 	var z := 6.0
 	while z < LEG_A_END:
@@ -111,9 +112,9 @@ static func build() -> Dictionary:
 	wall_z.call(edge, HALF_W, LEG_B_END, wall_c)                   # B south
 	# Door wall with an opening
 	var frame_c := Color("4a4e55")
-	solid.call(Vector3(DOOR_X, WALL_H / 2.0, -(HALF_W + DOOR_HALF) / 2.0), Vector3(0.3, WALL_H, HALF_W - DOOR_HALF), frame_c)
-	solid.call(Vector3(DOOR_X, WALL_H / 2.0, (HALF_W + DOOR_HALF) / 2.0), Vector3(0.3, WALL_H, HALF_W - DOOR_HALF), frame_c)
-	solid.call(Vector3(DOOR_X, (WALL_H + Door.HEIGHT) / 2.0, 0), Vector3(0.3, WALL_H - Door.HEIGHT, DOOR_HALF * 2), frame_c)
+	solid.call(Vector3(DOOR_X, WALL_H / 2.0, -(HALF_W + DOOR_HALF) / 2.0), Vector3(0.3, WALL_H, HALF_W - DOOR_HALF), frame_c, Surface.Kind.METAL)
+	solid.call(Vector3(DOOR_X, WALL_H / 2.0, (HALF_W + DOOR_HALF) / 2.0), Vector3(0.3, WALL_H, HALF_W - DOOR_HALF), frame_c, Surface.Kind.METAL)
+	solid.call(Vector3(DOOR_X, (WALL_H + Door.HEIGHT) / 2.0, 0), Vector3(0.3, WALL_H - Door.HEIGHT, DOOR_HALF * 2), frame_c, Surface.Kind.METAL)
 	root.add_child(b.instance())
 
 	# Lamps
