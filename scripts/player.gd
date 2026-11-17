@@ -5,6 +5,8 @@ signal shoved(origin: Vector3, dir: Vector3) ## a shove went out: the game tells
 signal landed(height: float) ## the feet came down after falling this far (the host decides if it hurt)
 signal item_requested(item: StringName) ## an item of the inventory is to be used (the host decides if it can be)
 signal use_cancelled ## a sprint began while an item was being put on
+signal chat_requested ## the chat key: open the line to type in
+signal ping_requested(spot: Vector3) ## the ping key: mark where the view points
 ## The player you control: physics movement, mouse look, first-person camera and guns.
 ## Movement runs at the physics rate; the camera is placed every rendered frame from the
 ## interpolated body transform, so it's smooth at 144 Hz.
@@ -35,6 +37,8 @@ var _spectate_cam := Vector3.INF   # where the camera is
 var _dead_t := 0.0
 var view: Viewmodel
 var down_pose := 0.0      # 0 standing .. 1 on the floor, downed (eases: see step_down_view)
+var arrive_left := 0.0    # > 0 while dropping off the truck bed after a respawn
+var typing := false       # the chat line is open: keys go to it, not to walking
 var aiming := false
 var sprinting := false
 var aim_blocked := false  # this right-click was spent on a door or lootbox
@@ -175,6 +179,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## What a key press or mouse move does (only while the mouse is captured; tests call this directly).
 func handle_event(event: InputEvent) -> void:
+	if not bot and event.is_action_pressed("chat"): # (the dead too)
+		chat_requested.emit()
+		return
+	if not bot and event.is_action_pressed("ping"):
+		ping_requested.emit(look_point())
+		return
 	if status.dead: # watching: fire goes to the next one, aim to the one before
 		if event.is_action_pressed("fire"):
 			spectator.cycle(spectate_candidates, 1)
@@ -227,9 +237,11 @@ func _physics_process(delta: float) -> void:
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if wheel.open and not captured:
 		wheel.finish() # the window lost the mouse (pause menu) with the wheel up: nothing is picked
-	if captured and not bot:
+	if captured and not bot and not typing:
 		input = Input.get_vector("move_left", "move_right", "move_back", "move_forward")
 		firing = Input.is_action_pressed("fire") and not wheel.open
+	elif typing:
+		firing = false
 	elif not bot:
 		firing = false
 
@@ -380,6 +392,28 @@ func _vault_step(delta: float) -> void:
 	sprinting = false
 
 
+## Where the view points: the first wall or floor along it, or a spot well ahead in the open.
+func look_point() -> Vector3:
+	var from := camera.global_position
+	var dir := -camera.global_transform.basis.z
+	var to := from + dir * Config.PING_REACH
+	if is_inside_tree():
+		var q := PhysicsRayQueryParameters3D.create(from, to, Config.LAYER_WORLD)
+		var hit := get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			return hit.position
+	return to
+
+
+## Coming back: the view starts up on a truck bed and drops to the ground over `Config.ARRIVE_TIME`.
+func arrive() -> void:
+	arrive_left = Config.ARRIVE_TIME
+
+
+func step_arrival(delta: float) -> void:
+	arrive_left = maxf(0.0, arrive_left - delta)
+
+
 ## Going down drops the eyes to the floor and tilts the view (`Config.DOWNED_FALL_TIME`); getting up
 ## brings them back (`GETUP_TIME`). 0 = standing, 1 = on the floor.
 func step_down_view(delta: float) -> void:
@@ -390,7 +424,8 @@ func step_down_view(delta: float) -> void:
 
 ## How high the eyes are above the feet now.
 func view_height() -> float:
-	return lerpf(move.eye_height(), Config.DOWNED_EYE, Viewmodel._ease(down_pose))
+	var u := arrive_left / Config.ARRIVE_TIME # a fall: slow off the edge, fast at the bottom
+	return lerpf(move.eye_height(), Config.DOWNED_EYE, Viewmodel._ease(down_pose)) + Config.ARRIVE_DROP * (1.0 - (1.0 - u) * (1.0 - u))
 
 
 ## How far the view is tilted sideways now.
@@ -400,6 +435,7 @@ func view_roll() -> float:
 
 func _process(delta: float) -> void:
 	step_down_view(delta)
+	step_arrival(delta)
 	var origin := get_global_transform_interpolated().origin + Vector3(0, view_height(), 0)
 	weapons.step(delta)
 	shove_left = maxf(0.0, shove_left - delta)

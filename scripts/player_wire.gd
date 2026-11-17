@@ -1,12 +1,12 @@
 class_name PlayerWire
-## Compact binary encoding of player snapshots, the partner of ZombieWire: 23 bytes per player.
+## Compact binary encoding of player snapshots, the partner of ZombieWire: 24 bytes per player.
 ## Names are not here: they change when someone joins or leaves, not 20 times a second, so they
 ## travel once through Game.player_names.
 ##
-## Layout per player: u32 id | f32 x,y,z | u16 yaw | u8 hp | u16 kills | u8 weapon | u8 action
+## Layout per player: u32 id | f32 x,y,z | u16 yaw | u8 hp | u16 kills | u8 weapon | u8 action | u8 mag
 ## `action` is bits (ACTION_*): what the body is doing, so others can draw it.
 
-const BYTES_EACH := 23
+const BYTES_EACH := 24
 const ACTION_CROUCH := 1
 const ACTION_AIR := 2 ## off the ground: jumping, falling, vaulting
 const ACTION_HEAL := 4  ## using a medical item (set by the host, never trusted from a client)
@@ -16,7 +16,8 @@ const ACTION_DEAD := 32 ## dead and out of the fight, watching (host only too)
 const ACTION_BODY := ACTION_CROUCH | ACTION_AIR ## what a client may say about itself
 
 
-## `list`: Array of { id, pos: Vector3, yaw, hp, kills, weapon, action } (`action` may be left out).
+## `list`: Array of { id, pos: Vector3, yaw, hp, kills, weapon, action, mag } (`action` and `mag`, the rounds
+## in their magazine for whoever spectates them, may be left out).
 static func pack(list: Array) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(list.size() * BYTES_EACH)
@@ -32,6 +33,7 @@ static func pack(list: Array) -> PackedByteArray:
 		out.encode_u16(o + 19, clampi(p.kills, 0, 65535))
 		out.encode_u8(o + 21, clampi(p.weapon, 0, 255))
 		out.encode_u8(o + 22, int(p.get("action", 0)) & 0xFF)
+		out.encode_u8(o + 23, clampi(int(p.get("mag", 0)), 0, 255))
 		o += BYTES_EACH
 	return out
 
@@ -48,6 +50,7 @@ static func unpack(bytes: PackedByteArray) -> Array:
 			"kills": bytes.decode_u16(o + 19),
 			"weapon": bytes.decode_u8(o + 21),
 			"action": bytes.decode_u8(o + 22),
+			"mag": bytes.decode_u8(o + 23),
 		})
 		o += BYTES_EACH
 	return out

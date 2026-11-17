@@ -256,3 +256,97 @@ func test_the_screen_says_when_you_are_coming_back() -> void:
 	assert_true(never.spectate_text().contains("out"), never.spectate_text())
 	var alive := await _game()
 	assert_eq(alive.spectate_text(), "", "nothing while you are playing")
+
+
+# --- The body, the arrival, and what the dead can still do ----------------------------
+
+func test_a_dead_player_leaves_a_body_and_zombies_near_it_go_and_feed() -> void:
+	var g := await _game()
+	g.players[7].pos = HERE + Vector3(60, 0, 0) # the other one far off
+	var near := g.spawn_zombie(Zombie.Type.WALKER, HERE + Vector3(0, 0, 5))
+	var far := g.spawn_zombie(Zombie.Type.WALKER, HERE + Vector3(0, 0, Config.FEED_RANGE + 8))
+	var before: int = g.gore.stats.ragdolls
+	g.kill_player(1)
+	assert_eq(g.gore.stats.ragdolls, before + 1, "a body on the floor")
+	assert_true(near.investigating(), "the near one smells it")
+	assert_false(far.investigating(), "too far to care")
+	for i in 900:
+		near.host_step(1.0 / 60.0, g)
+		if near.state == Zombie.State.FEED:
+			break
+	assert_eq(near.state, Zombie.State.FEED, "down on the body")
+	assert_eq(near._anim_for_state(), Humanoid.Anim.FEED)
+	var wire := ZombieWire.unpack(ZombieWire.pack([{ "zid": 3, "pos": HERE, "yaw": 0.0, "state": Zombie.State.FEED, "type": 0, "mask": 0 }]))
+	assert_eq(wire[0].state, Zombie.State.FEED, "and every peer sees it")
+	g.players[7].pos = near.global_position + Vector3(2, 0, 0)
+	near.host_step(1.0 / 60.0, g)
+	assert_eq(near.state, Zombie.State.CHASE, "someone alive comes close: the meal can wait")
+
+
+func test_the_dead_see_the_magazine_of_whoever_they_watch() -> void:
+	assert_eq(PlayerWire.BYTES_EACH, 24)
+	var out := PlayerWire.unpack(PlayerWire.pack([{ "id": 7, "pos": HERE, "yaw": 0.0, "hp": 80, "kills": 0, "weapon": Weapons.AK47, "action": 0, "mag": 17 }]))
+	assert_eq(out[0].mag, 17)
+	var g := await _game()
+	var lp := g.local_player
+	lp.weapons.ammo[lp.weapons.current] = 9
+	g._record_own_player()
+	assert_eq(g.build_snapshot()[0][0].mag, 9, "the host's own magazine")
+	g.kill_player(1)
+	var standing := { "id": 7, "pos": HERE, "yaw": 0.0, "hp": 80, "kills": 0, "weapon": Weapons.AK47, "action": 0, "mag": 17 }
+	g._apply_snapshot([standing], [])
+	g._update_spectating(0.016)
+	var text := g.spectate_text()
+	assert_true(text.contains("17"), text)
+
+
+func test_coming_back_is_a_drop_from_a_truck_bed_not_a_pop() -> void:
+	var g := await _game(false, 5.0)
+	var lp := g.local_player
+	var standing := lp.view_height()
+	g.kill_player(1)
+	var played: int = g.fx.stats.played
+	g.tick_status(5.1)
+	assert_false(lp.status.dead, "back")
+	assert_eq(g.fx.last_kind, Fx.Kind.ARRIVAL, "dust where they land, on every peer")
+	assert_gt(g.fx.stats.played, played)
+	assert_gt(lp.view_height(), standing + Config.ARRIVE_DROP * 0.9, "the view starts up on the truck bed")
+	lp.step_arrival(Config.ARRIVE_TIME * 0.5)
+	assert_true(lp.view_height() > standing and lp.view_height() < standing + Config.ARRIVE_DROP, "dropping")
+	lp.step_arrival(Config.ARRIVE_TIME)
+	assert_near(lp.view_height(), standing, 0.01, "on the ground")
+
+
+func test_anyone_dead_or_alive_can_chat_and_everyone_reads_it() -> void:
+	var g := await _game()
+	var calls := spy(g)
+	g.kill_player(1)
+	assert_true(g.host_chat(1, "  behind you!  "), "the dead can talk")
+	assert_true(g.hud.chat_lines()[-1].ends_with(": behind you!"), str(g.hud.chat_lines()))
+	assert_true(g.hud.chat_lines()[-1].begins_with(g.player_name(1)))
+	assert_false(g.host_chat(7, "   "), "nothing to say")
+	assert_true(g.host_chat(7, "x".repeat(500)))
+	assert_true(g.hud.chat_lines()[-1].length() <= g.player_name(7).length() + 2 + Config.CHAT_MAX_CHARS, "cut short")
+	assert_eq(count(calls, &"on_chat"), 2)
+	g.say("on my way")
+	assert_true(g.hud.chat_lines()[-1].ends_with("on my way"), "your own line goes through the host too")
+
+
+func test_a_ping_marks_a_spot_for_everyone_for_a_while_and_the_dead_can_ping() -> void:
+	var g := await _game()
+	var calls := spy(g)
+	g.kill_player(1)
+	var spot := HERE + Vector3(3, 0, 3)
+	assert_true(g.host_ping(1, spot))
+	assert_eq(g.pings.size(), 1)
+	assert_lt((g.pings[1].node as Node3D).global_position.distance_to(spot), 0.01)
+	g.host_ping(1, HERE + Vector3(-3, 0, 0))
+	assert_eq(g.pings.size(), 1, "one each: a new one replaces the old")
+	g.host_ping(7, HERE)
+	assert_eq(g.pings.size(), 2)
+	g.step_pings(Config.PING_TIME * 0.5)
+	assert_eq(g.pings.size(), 2)
+	g.step_pings(Config.PING_TIME)
+	assert_eq(g.pings.size(), 0, "gone after a while")
+	assert_eq(count(calls, &"on_ping"), 3)
+	assert_true(InputMap.has_action("chat") and InputMap.has_action("ping"))

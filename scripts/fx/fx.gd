@@ -18,11 +18,12 @@ extends Node3D
 enum Layer { CHIP, GLOW, SMOKE }
 enum Mark { HOLE, SCORCH, CRACK, PUDDLE }
 ## What travels on the wire. Append only: the numbers are the protocol.
-enum Kind { DUST, SPARKS, FLASH, SMOKE, BLAST, HOLE, CRACK, SPLASH }
-const NAMES := ["dust", "sparks", "flash", "smoke", "blast", "hole", "crack", "splash"]
+enum Kind { DUST, SPARKS, FLASH, SMOKE, BLAST, HOLE, CRACK, SPLASH, ARRIVAL }
+const NAMES := ["dust", "sparks", "flash", "smoke", "blast", "hole", "crack", "splash", "arrival"]
 
 ## Counters (tests read these; handy for debugging too).
 var stats := { "played": 0, "bursts": 0, "lights": 0, "decals": 0, "trails": 0 }
+var last_kind := -1 ## the last effect played (tests)
 var ground := Callable() ## map.ground_y: where chips come to rest (unset: y = 0)
 
 var _count_mult := 1.0
@@ -244,6 +245,7 @@ func play(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 	if kind < 0 or kind >= Kind.size():
 		return
 	stats.played += 1
+	last_kind = kind
 	var s := maxf(arg, 0.1)
 	match kind:
 		Kind.DUST: # a bullet in concrete: a grey cone, a few chips
@@ -281,6 +283,13 @@ func play(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 			burst(Layer.SMOKE, pos, Vector3.UP, 7, { "speed": 3.0 * s, "spread": 0.2, "life": 0.5, "size": 0.1 * s,
 				"size_end": 0.35 * s, "color": Color(0.75, 0.82, 0.88, 0.55), "gravity": 9.0 })
 			decal(Mark.PUDDLE, pos, Vector3.UP, 0.7 * s)
+		Kind.ARRIVAL: # a survivor jumps down off a truck bed: a ring of dust kicked out round the feet
+			var feet := Vector3(pos.x, _floor(pos) + 0.05, pos.z)
+			for k in 8:
+				var out := Vector3(cos(k * TAU / 8.0), 0.15, sin(k * TAU / 8.0))
+				burst(Layer.SMOKE, feet, out, 1, { "speed": 1.8 * s, "spread": 0.25, "life": 0.9, "size": 0.15 * s,
+					"size_end": 0.6 * s, "color": Color(0.5, 0.48, 0.44, 0.45), "gravity": -0.2 })
+			burst(Layer.CHIP, feet, Vector3.UP, 6, { "speed": 2.0, "spread": 0.9, "size": 0.03, "color": Color("6f6a62") })
 
 
 # --- Every frame ------------------------------------------------------------------

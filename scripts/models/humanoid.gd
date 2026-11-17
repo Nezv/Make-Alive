@@ -30,7 +30,7 @@ extends Node3D
 ## Placing things on the round body: `chest(x, y)`, `back(x, y)`, `face(x, y)`.
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
-enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL, DOWNED, GETUP }
+enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL, DOWNED, GETUP, FEED }
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
@@ -813,6 +813,23 @@ func _write_goal(speed: float) -> void:
 			_goal[J.KNEE_L] = -0.15
 			_goal[J.HIP_R] = 0.6
 			_goal[J.KNEE_R] = -0.9
+
+		Anim.FEED: # a zombie on its knees over a body, hunched, tearing at it with one hand then the other
+			var tear := sin(anim_t * 5.0 + _seed)
+			_goal[J.HIPS_Y] = 0.42
+			_goal[J.HIP_L] = 1.5
+			_goal[J.KNEE_L] = -2.3
+			_goal[J.HIP_R] = 0.2
+			_goal[J.KNEE_R] = -2.2
+			_goal[J.SPINE_PITCH] = 0.9 + sin(anim_t * 2.5) * 0.08
+			_goal[J.NECK_PITCH] = 0.35 + maxf(0.0, -tear) * 0.3 # the head dips in to bite
+			_goal[J.NECK_ROLL] = _tilt
+			_goal[J.SH_L_X] = 1.0 + tear * 0.45
+			_goal[J.SH_R_X] = 1.0 - tear * 0.45
+			_goal[J.SH_L_OUT] = 0.2
+			_goal[J.SH_R_OUT] = 0.2
+			_goal[J.EL_L] = 0.7 - tear * 0.4
+			_goal[J.EL_R] = 0.7 + tear * 0.4
 
 		Anim.GETUP: # back on the feet: a knee and a hand on it first, then standing
 			var u := clampf(anim_t / Config.GETUP_TIME, 0.0, 1.0)

@@ -219,19 +219,19 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Zombies prefer standing players, finish downed ones when nobody else is near
 - [x] All downed at once fails the mission
 
-### [ ] S017 · Death and spectating
+### [x] S017 · Death and spectating
 > needs: S016 | size: M | test: `tests/test_spectate.gd`
-- [ ] Death camera: pulls back and up from the body, slow orbit, zombies feed on the corpse
-  - The camera part is done (`Spectator.orbit_goal`, used when nobody is left to watch); the corpse and the feeding are not
-- [ ] Spectate living teammates: next / previous, smoothed third-person follow, their HP and ammo shown
+- [x] Death camera: pulls back and up from the body, slow orbit, zombies feed on the corpse
+  - `Spectator.orbit_goal`; the body is `Game.player_body` (a ragdoll of their own look on every peer), zombies within `Config.FEED_RANGE` go to it (`Zombie.feed_at`, `State.FEED`, `Anim.FEED`) until someone alive comes close; `--feed` shows it
+- [x] Spectate living teammates: next / previous, smoothed third-person follow, their HP and ammo shown
   - [x] Fire and aim cycle through the standing, `Spectator`, a camera that eases behind and above them, their name, HP and gun on screen (`Game.spectate_text`)
-  - [ ] Their ammo: only its owner knows it (magazines are client-side), so the host would have to be told
+  - [x] Their ammo: the magazine travels in `client_state` and in the player snapshot (`PlayerWire` 24 bytes, `mag`)
 - [x] Respawn rules per mission from map data: at the next checkpoint, after a timer, or never
   - `respawn` in the data: `true` at once, seconds, `"checkpoint"`, `false` never; the dead are `PlayerStatus.dead` (out, frozen, hidden from the others by `ACTION_DEAD`, no shooting or using) until then
-- [ ] Respawn arrival: door kicked open or drop from a truck bed, not a pop
-  - `GameHooks.on_player_respawned(id, reason)` fires when they are back
-- [ ] Dead players keep text chat and pings
-  - There is no chat or ping system yet
+- [x] Respawn arrival: door kicked open or drop from a truck bed, not a pop
+  - A drop off a truck bed: the view falls `Config.ARRIVE_DROP` (`LocalPlayer.arrive`), others see dust kicked up (`Fx.Kind.ARRIVAL`)
+- [x] Dead players keep text chat and pings
+  - T opens the chat line (`Hud.open_chat`, `Game.say` → `host_chat` → `chat_line`), Z pings where you look (`Game.ping` → `host_ping` → `ping_at`, `Config.PING_TIME`); hooks `on_chat`, `on_ping`
 
 ### [x] S018 · Stamina and movement
 > needs: none | size: M | test: `tests/test_movement.gd`

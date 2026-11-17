@@ -26,6 +26,7 @@ extends Node
 ##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload, shove, heal (hurt, bleeding, a medkit going on) or downed
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --feed                 host: you die in front of three zombies (the body, the zombies feeding, the death camera)
 ##   --wheel                host: carry a little of everything and hold the item wheel up (pointer on the bandage)
 ##   --director             host: show the horde director's pace (state, stress, heat) on the HUD
 ##   --noise                host: draw an expanding ring wherever something made noise, out to where it is heard
@@ -135,6 +136,8 @@ func _host(map_name := "city", mission := "") -> void:
 		game.show_noise()
 	if _args.has("wheel"):
 		_wheel()
+	if _args.has("feed"):
+		_feed()
 	if _args.has("director"):
 		game.director_overlay = true
 	if _args.has("zones"):
@@ -225,6 +228,21 @@ func _demo() -> void:
 		Zombie.Type.WALKER, Zombie.Type.RUNNER, Zombie.Type.LEAPER, Zombie.Type.WALKER]
 	for i in types.size():
 		game.spawn_zombie(types[i], Vector3(-2.2 + (i % 4) * 1.4, 0.1, 8.0 + (i / 4) * 5.0 + (i % 2) * 1.5))
+
+
+## You die in front of three zombies with nobody to come back for you: the body, the zombies feeding.
+func _feed() -> void:
+	game.director.enabled = false
+	game.rules.respawn = false
+	game._add_player(7, "Stand-in") # alive far off, so the mission is not over
+	game.players[7].pos = game.local_player.global_position + Vector3(0, 0, -80)
+	var at := game.local_player.global_position
+	print("[feed] body at ", at)
+	for i in 3:
+		game.spawn_zombie(Zombie.Type.WALKER, at + Vector3(-1.5 + i * 1.5, 0.1, -6.0 - i))
+	get_tree().create_timer(0.3).timeout.connect(func():
+		if game:
+			game.kill_player(1))
 
 
 ## A little of everything in the pack and the item wheel up, for looking at it.

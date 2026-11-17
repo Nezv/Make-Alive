@@ -46,6 +46,7 @@ var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason":
 	"left": -1.0, "counting": false, "wave": 0, "has_marker": false, "marker": Vector3.ZERO }
 var remotes := {}        ## peer id -> RemotePlayer
 var _drips := BleedTrail.new() ## where bleeding players last dropped blood
+var pings := {}          ## player id -> { node: the marker, left: seconds }
 var names := {}          ## peer id -> player name, on every peer (sent when someone joins or leaves)
 var zombies := {}        ## zombie id -> Zombie
 var zombie_list: Array[Zombie] = [] ## same zombies as an array, refreshed each host tick
@@ -176,6 +177,12 @@ func _build_world() -> void:
 	local_player.landed.connect(_on_local_landed)
 	local_player.shoved.connect(_on_local_shove)
 	local_player.item_requested.connect(_on_local_item)
+	local_player.chat_requested.connect(func():
+		local_player.typing = true
+		hud.open_chat())
+	local_player.ping_requested.connect(ping)
+	hud.chat_submitted.connect(say)
+	hud.chat_closed.connect(func(): if local_player: local_player.typing = false)
 	local_player.use_cancelled.connect(_on_local_use_cancelled)
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
@@ -227,7 +234,7 @@ func mult(key: String) -> float:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
+func client_state(pos: Vector3, yaw: float, action: int = 0, mag: int = 0) -> void:
 	if not is_host:
 		return
 	var p = players.get(multiplayer.get_remote_sender_id())
@@ -236,6 +243,7 @@ func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
 	p.pos = pos
 	p.yaw = yaw
 	p.action = action & PlayerWire.ACTION_BODY # the host adds bleeding and healing itself
+	p.mag = clampi(mag, 0, 255) # only shown to whoever spectates them
 
 
 ## The sender swung a shove from `origin` along `dir`.
@@ -412,6 +420,8 @@ func _tick_mission_view(delta: float) -> void:
 func respawn_at(pos: Vector3, reason: String) -> void:
 	if local_player:
 		local_player.teleport(pos)
+		if reason != "spawn":
+			local_player.arrive()
 	if reason == "died":
 		hud.toast("YOU DIED", Color("ff4444"))
 
@@ -597,7 +607,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "mag": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo(), "inventory": Inventory.new(), "status": PlayerStatus.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
@@ -638,6 +648,8 @@ func respawn_player(id: int, reason: String) -> void:
 	rules.set_out(id, false) # (a downed player who bled out is back in the fight)
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
+	if reason != "spawn":
+		play_fx(Fx.Kind.ARRIVAL, p.pos, Vector3.UP) # dust where they jump down
 	hooks.on_player_respawned(id, reason)
 
 
@@ -893,6 +905,7 @@ func down_player(id: int) -> void:
 ## to help, or a downed player bled out or was finished.
 func kill_player(id: int) -> void:
 	(players[id].health as Health).hp = 0
+	_leave_body(id)
 	for other: int in players: # whoever was getting them up stops
 		if other != id and (players[other].status as PlayerStatus).revive_target == id:
 			cancel_use(other)
@@ -990,8 +1003,8 @@ func spectate_text() -> String:
 	var target := local_player.spectator.target
 	if target != 0 and remotes.has(target):
 		var r := remotes[target] as RemotePlayer
-		lines.append("SPECTATING  %s   ♥ %d   %s" % [names.get(target, "Survivor"), r.hp,
-			Weapons.def(r.weapon_id).name if Weapons.valid(r.weapon_id) else ""])
+		lines.append("SPECTATING  %s   ♥ %d   %s  %d" % [names.get(target, "Survivor"), r.hp,
+			Weapons.def(r.weapon_id).name if Weapons.valid(r.weapon_id) else "", r.mag])
 	var status := local_player.status
 	if status.respawn_left >= 0.0:
 		lines.append("Respawn in %d s" % ceili(status.respawn_left))
@@ -1465,9 +1478,7 @@ func _physics_process(delta: float) -> void:
 	if not is_host or local_player == null:
 		return
 	_now += delta
-	players[1].pos = local_player.global_position
-	players[1].yaw = local_player.yaw
-	players[1].action = local_player.action_bits()
+	_record_own_player()
 	_footsteps(delta)
 	tick_status(delta)
 
@@ -1525,7 +1536,7 @@ func build_snapshot() -> Array:
 	var pd := []
 	for id: int in players:
 		var p: Dictionary = players[id]
-		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).total(), "kills": p.kills, "weapon": p.weapon, "action": _action_bits(p) })
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).total(), "kills": p.kills, "weapon": p.weapon, "action": _action_bits(p), "mag": p.mag })
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
@@ -1552,6 +1563,7 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		(remotes[id] as RemotePlayer).set_weapon(e.weapon)
 		(remotes[id] as RemotePlayer).set_action(e.get("action", 0))
 		(remotes[id] as RemotePlayer).hp = e.hp
+		(remotes[id] as RemotePlayer).mag = e.get("mag", 0)
 		(remotes[id] as RemotePlayer).visible = int(e.get("action", 0)) & PlayerWire.ACTION_DEAD == 0 # (no ghost left standing)
 	for id: int in remotes.keys():
 		if not seen.has(id):
@@ -1606,6 +1618,7 @@ func _process(delta: float) -> void:
 	hud.set_status(local_player.status)
 	update_drips(delta)
 	update_reach()
+	step_pings(delta)
 	if local_player.status.dead:
 		_update_spectating(delta)
 	hud.set_spectate(spectate_text())
@@ -1626,7 +1639,7 @@ func _process(delta: float) -> void:
 		_send_timer -= delta
 		if _send_timer <= 0.0:
 			_send_timer = 1.0 / 30.0
-			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits())
+			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits(), local_player.weapons.rounds())
 
 
 ## Every bleeding player, you and the others, leaves drops on the floor behind them (drawn by each peer).
@@ -1639,6 +1652,123 @@ func update_drips(delta: float) -> void:
 		var bleeding := r.action & PlayerWire.ACTION_BLEED != 0 and r.action & PlayerWire.ACTION_DEAD == 0
 		if _drips.step(id, r.global_position, bleeding, delta):
 			gore.splat(r.global_position, Vector3.ZERO, Config.BLEED_DRIP_SIZE)
+
+
+## The host's own player, as its local game sees it.
+func _record_own_player() -> void:
+	players[1].pos = local_player.global_position
+	players[1].yaw = local_player.yaw
+	players[1].action = local_player.action_bits()
+	players[1].mag = local_player.weapons.rounds()
+
+
+## Host: a player just died. Their body falls on every peer, and zombies near it go to feed.
+func _leave_body(id: int) -> void:
+	var at: Vector3 = players[id].pos
+	player_body.rpc(id, at, float(players[id].yaw))
+	for z: Zombie in zombies.values():
+		if z.global_position.distance_to(at) <= Config.FEED_RANGE:
+			z.feed_at(at)
+
+
+## Every peer: a dead player's body (their own look) crumples where they fell.
+@rpc("authority", "call_local", "reliable")
+func player_body(id: int, at: Vector3, yaw: float) -> void:
+	var rig := Characters.survivor(id)
+	add_child(rig)
+	rig.global_position = Vector3(at.x, map.ground_y(at), at.z)
+	rig.rotation.y = yaw
+	rig.update(0.0, 0.0)
+	gore.ragdoll(rig.take_all(), Vector3.ZERO, Vector3(0, 0.5, 0) - rig.global_transform.basis.z * 1.5, Humanoid.Part.TORSO)
+	rig.queue_free()
+
+
+# --- Chat and pings (the dead keep both) ------------------------------------------------
+
+## What the local player typed: through the host, which sends it to everyone.
+func say(text: String) -> void:
+	if is_host:
+		host_chat(my_id, text)
+	else:
+		client_chat.rpc_id(1, text)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func client_chat(text: String) -> void:
+	if is_host:
+		host_chat(multiplayer.get_remote_sender_id(), text)
+
+
+## Host: `id` says `text` (trimmed, cut to `Config.CHAT_MAX_CHARS`); false if there was nothing to say.
+func host_chat(id: int, text: String) -> bool:
+	var line := text.strip_edges().left(Config.CHAT_MAX_CHARS)
+	if line == "" or not players.has(id):
+		return false
+	chat_line.rpc(id, line)
+	hooks.on_chat(id, line)
+	return true
+
+
+@rpc("authority", "call_local", "reliable")
+func chat_line(id: int, text: String) -> void:
+	hud.push_chat("%s: %s" % [player_name(id), text])
+
+
+## The local player marks where they look.
+func ping(spot: Vector3) -> void:
+	if is_host:
+		host_ping(my_id, spot)
+	else:
+		client_ping.rpc_id(1, spot)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func client_ping(spot: Vector3) -> void:
+	if is_host:
+		host_ping(multiplayer.get_remote_sender_id(), spot)
+
+
+## Host: `id` marks `spot` for everyone for `Config.PING_TIME` (one each: a new one replaces the old).
+func host_ping(id: int, spot: Vector3) -> bool:
+	if not players.has(id) or not spot.is_finite():
+		return false
+	ping_at.rpc(id, spot)
+	hooks.on_ping(id, spot)
+	return true
+
+
+@rpc("authority", "call_local", "reliable")
+func ping_at(id: int, spot: Vector3) -> void:
+	if pings.has(id):
+		(pings[id].node as Node).queue_free()
+	var mark := Label3D.new()
+	mark.text = "▼
+%s" % player_name(id)
+	mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	mark.no_depth_test = true
+	mark.fixed_size = true
+	mark.pixel_size = 0.0012
+	mark.font_size = 28
+	mark.outline_size = 8
+	mark.modulate = Color("ffd24a")
+	add_child(mark)
+	mark.global_position = spot
+	mark.offset = Vector2(0, 30) # the arrow's point just over the spot
+	pings[id] = { "node": mark, "left": Config.PING_TIME }
+	Sfx.play_ui("beep", -10.0, 1.5)
+
+
+## Pings fade out and go.
+func step_pings(delta: float) -> void:
+	for id: int in pings.keys():
+		var pg: Dictionary = pings[id]
+		pg.left = float(pg.left) - delta
+		var mark := pg.node as Label3D
+		if pg.left <= 0.0:
+			mark.queue_free()
+			pings.erase(id)
+		else:
+			mark.modulate.a = clampf(float(pg.left) / 1.0, 0.0, 1.0)
 
 
 ## A downed teammate reaches out when you, standing, come within `Config.REACH_RANGE`.

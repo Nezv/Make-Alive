@@ -10,6 +10,7 @@ var gun: GunModel
 var weapon_id := -1
 var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
 var hp := 100 ## from the last snapshot (temporary HP included)
+var mag := 0 ## rounds in their magazine, from the last snapshot (for spectators)
 var helper_near := false ## (set by the game) a standing teammate is close enough to get them up
 var _was_downed := false
 var _getup_left := 0.0

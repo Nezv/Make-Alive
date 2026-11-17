@@ -51,6 +51,16 @@ func on_player_respawned(player_id: int, reason: String) -> void:
 	fired.emit(&"on_player_respawned", [player_id, reason])
 
 
+## Someone said something in the chat (the dead too).
+func on_chat(player_id: int, text: String) -> void:
+	fired.emit(&"on_chat", [player_id, text])
+
+
+## Someone marked a spot for everyone.
+func on_ping(player_id: int, spot: Vector3) -> void:
+	fired.emit(&"on_ping", [player_id, spot])
+
+
 func on_player_joined(player_id: int) -> void:
 	fired.emit(&"on_player_joined", [player_id])
 	game.feed.rpc("%s joined" % game.player_name(player_id))

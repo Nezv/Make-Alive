@@ -6,7 +6,7 @@ extends CharacterBody3D
 ## Both sides animate the same rig from the same `state`, so everyone sees the same moves.
 
 enum Type { WALKER, RUNNER, LEAPER }
-enum State { CHASE, ATTACK, WINDUP, LEAP, LAND, STAGGER }
+enum State { CHASE, ATTACK, WINDUP, LEAP, LAND, STAGGER, FEED }
 
 ## Per-type stats: [min speed, max speed, hit points]
 const STATS := {
@@ -40,6 +40,7 @@ var heard := Vector3.ZERO ## where the last noise it heard came from
 var heard_left := 0.0     ## seconds it still cares (0 = heard nothing)
 var idle := false         ## a wanderer: stands about until a player comes close, a noise or a hit wakes it
 var route: Array = []     ## points of a horde route still to walk before it goes for a player (HordeDirector)
+var meal := Vector3.INF   ## a dead player's body it is going to (or feeding on); INF = none
 
 
 static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, severed := 0) -> Zombie:
@@ -103,6 +104,13 @@ func hear(spot: Vector3) -> void:
 	idle = false
 	heard = spot
 	heard_left = Config.NOISE_INVESTIGATE_TIME
+
+
+## A player died at `spot`: walk there and feed on the body for `Config.FEED_TIME`.
+func feed_at(spot: Vector3) -> void:
+	hear(spot)
+	heard_left = Config.FEED_TIME
+	meal = spot
 
 
 func investigating() -> bool:
@@ -197,6 +205,14 @@ func host_step(delta: float, game: Game) -> void:
 		State.LAND:
 			if state_t >= 0.3:
 				set_state(State.CHASE)
+		State.FEED:
+			var someone_close := target_id != 0 and to_target.length() <= Config.ZOMBIE_NOTICE_RANGE
+			if someone_close or heard_left <= 0.0:
+				meal = Vector3.INF
+				heard_left = 0.0
+				set_state(State.CHASE)
+			else:
+				_face(meal - global_position)
 		State.CHASE:
 			var player_close := target_id != 0 and to_target.length() <= Config.ZOMBIE_NOTICE_RANGE
 			if idle and (lured or player_close):
@@ -273,6 +289,8 @@ func _investigate(game: Game) -> Vector3:
 	to_spot.y = 0.0
 	var dist := to_spot.length()
 	if dist < Config.NOISE_ARRIVE:
+		if meal.is_finite() and meal.is_equal_approx(heard):
+			set_state(State.FEED) # down on the body
 		return Vector3.ZERO
 	var map := game.map
 	var door := map.door_in_the_way(here, heard)
@@ -341,6 +359,7 @@ func _anim_for_state() -> int:
 		State.LEAP: return Humanoid.Anim.LEAP
 		State.LAND: return Humanoid.Anim.LAND
 		State.STAGGER: return Humanoid.Anim.STAGGER
+		State.FEED: return Humanoid.Anim.FEED
 	if is_crawling():
 		return Humanoid.Anim.CRAWL
 	return Humanoid.Anim.RUN if type == Type.RUNNER else Humanoid.Anim.WALK

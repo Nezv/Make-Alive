@@ -4,6 +4,8 @@ extends CanvasLayer
 
 signal leave_pressed
 signal retry_pressed
+signal chat_submitted(text: String) ## Enter in the chat line
+signal chat_closed ## the chat line went away (sent or cancelled)
 
 const GAIN_AT := Vector2(-420, -116)
 const GAIN_COLOR := Color("9be29b")
@@ -17,6 +19,9 @@ var info_label: Label
 var perf_label: Label
 var toast_label: Label
 var feed_box: VBoxContainer
+var chat_box: VBoxContainer ## what was said, bottom left, above the status line
+var chat_edit: LineEdit ## the line you type in (the chat key opens it)
+var _chat: Array[String] = []
 var prompt_label: Label
 var weapon_label: Label
 var gain_label: Label ## "+30" rising over the ammo count after a pickup
@@ -180,6 +185,24 @@ void fragment() {
 	feed_box = VBoxContainer.new()
 	feed_box.position = Vector2(24, 20)
 	add_child(feed_box)
+	chat_box = VBoxContainer.new()
+	chat_box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	chat_box.position = Vector2(28, -330)
+	chat_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(chat_box)
+	chat_edit = LineEdit.new()
+	chat_edit.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	chat_edit.position = Vector2(28, -170)
+	chat_edit.size = Vector2(460, 30)
+	chat_edit.max_length = Config.CHAT_MAX_CHARS
+	chat_edit.placeholder_text = "Say something (Enter to send, Esc to cancel)"
+	chat_edit.visible = false
+	chat_edit.text_submitted.connect(_on_chat_submitted)
+	chat_edit.gui_input.connect(func(e: InputEvent):
+		if e.is_action_pressed("ui_cancel"):
+			close_chat()
+			chat_edit.accept_event())
+	add_child(chat_edit)
 
 	prompt_label = _label(20, Control.PRESET_CENTER, Vector2(-300, 60))
 	prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -501,6 +524,44 @@ func toast(text: String, color := Color.WHITE) -> void:
 	toast_label.text = text
 	toast_label.modulate = Color(color, 1.0)
 	_toast_t = 2.0
+
+
+## A chat line from someone, shown for a while.
+func push_chat(text: String) -> void:
+	_chat.append(text)
+	while _chat.size() > Config.CHAT_LINES:
+		_chat.pop_front()
+	var l := Label.new()
+	l.text = text
+	l.add_theme_color_override("font_shadow_color", Color.BLACK)
+	l.add_theme_color_override("font_color", Color("cfe8ff"))
+	chat_box.add_child(l)
+	while chat_box.get_child_count() > Config.CHAT_LINES:
+		chat_box.get_child(0).free()
+	get_tree().create_timer(Config.CHAT_SHOW).timeout.connect(l.queue_free)
+
+
+## The lines said so far (the last `Config.CHAT_LINES`).
+func chat_lines() -> Array[String]:
+	return _chat
+
+
+func open_chat() -> void:
+	chat_edit.text = ""
+	chat_edit.visible = true
+	chat_edit.grab_focus()
+
+
+func close_chat() -> void:
+	chat_edit.release_focus()
+	chat_edit.visible = false
+	chat_closed.emit()
+
+
+func _on_chat_submitted(text: String) -> void:
+	if text.strip_edges() != "":
+		chat_submitted.emit(text)
+	close_chat()
 
 
 func push_feed(text: String) -> void:

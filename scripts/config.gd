@@ -88,6 +88,15 @@ const DOWNED_FALL_TIME := 0.6   # seconds going down takes (camera and body)
 const GETUP_TIME := 1.0         # seconds getting back up takes
 const DOWNED_GREY_MIN := 0.35   # how grey the screen is the moment you go down (up to 0.9 as you bleed out)
 const REACH_RANGE := 4.0        # metres: a downed player reaches out to a standing teammate this close
+const FEED_RANGE := 15.0        # metres: zombies this close to a player who dies go to feed on the body
+const FEED_TIME := 25.0         # seconds they keep at it (unless someone alive comes within ZOMBIE_NOTICE_RANGE)
+const ARRIVE_DROP := 0.9        # metres the view drops coming back (off a truck bed)
+const ARRIVE_TIME := 0.45       # seconds the drop takes
+const CHAT_MAX_CHARS := 120     # a chat line is cut to this
+const CHAT_LINES := 8           # chat lines kept on screen
+const CHAT_SHOW := 15.0         # seconds a chat line stays
+const PING_TIME := 8.0          # seconds a ping marks its spot
+const PING_REACH := 80.0        # metres along the view a ping looks for something to mark
 const SPECTATE_BACK := 3.2      # metres behind the player being followed...
 const SPECTATE_HEIGHT := 1.9    # ...and above their feet
 const SPECTATE_SMOOTH := 5.0    # how fast the spectator camera catches up (per second)
@@ -244,7 +253,7 @@ const BUDGET := {
 	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 },
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
-const PROTOCOL_VERSION := 2    # bump when anything on the wire changes: a client of another build is refused with a message
+const PROTOCOL_VERSION := 3   # bump when anything on the wire changes: a client of another build is refused with a message
 const PACKET_OVERHEAD := 64    # what the RPC itself and the player block's framing take of a snapshot packet
 const INTEREST_NEAR_SHARE := 0.7 # over budget: this share of the packet is the zombies nearest the client, every tick
 const INTEREST_FAR_TICKS := 6  # ...and the rest of them are sent in turn, each at least this often
