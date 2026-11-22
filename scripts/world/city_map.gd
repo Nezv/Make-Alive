@@ -1,17 +1,20 @@
 class_name CityMap
 extends GameMap
-## Central Joinville, cut down to the five mission POIs and whatever lies between them.
+## The town on Joinville's plan, cut down to the five mission POIs and whatever lies between them.
 ##
 ## The edge is the convex hull of the POI lots grown by Config.CITY_MARGIN, so anything on a
 ## straight line between two POIs is in and the rest of the city is not. Inside it, CityData's
-## traced streets, river, hill and squares are painted onto a grid of CITY_CELL-metre cells:
+## streets, river, hill and squares are painted onto a grid of CITY_CELL-metre cells:
 ##
-##   OUT     beyond the edge wall            WATER   Rio Cachoeira (bridges are STREET cells)
-##   BLOCK   city blocks, filled with        FOREST  Morro da Boa Vista, closed except its road
-##           solid buildings                 PARK    squares and the cemetery, open ground
+##   OUT     beyond the edge wall            WATER   the river (bridges are STREET cells)
+##   BLOCK   city blocks, filled with        FOREST  the hill, closed except its road
+##           solid buildings                 PARK    the cemetery, open ground
 ##   STREET  roads, bridges, driveways       LOT     a POI's grounds;  BUILT  a POI's structures
+##   SQUARE  the paved places
 ##
-## The same grid is the navigation grid, so what zombies think is open is exactly what is open.
+## The grid is only for navigation and for where buildings stand: what zombies think is open is
+## exactly what is open. What people see of the streets is StreetNet's: carriageways, pavements,
+## malls and junctions at their real widths, as meshes that follow the polylines (`streets`).
 ## The city is flat at y = 0. Morro da Boa Vista rises out of it: forest cells, and the road and
 ## lot inside the forest, take their height from CityHeights (read off the topography map), eased
 ## in over Config.CITY_HILL_FADE from the forest's edge. `ground_y` answers for any point.
@@ -29,11 +32,21 @@ const FOREST := 4
 const PARK := 5
 const LOT := 6
 const BUILT := 7
+const SQUARE := 8
 
 const PLAN_COLORS := [Color("0c0d0f"), Color("6e675d"), Color("2c2e32"), Color("27506e"), Color("1f3d24"),
-	Color("3f6a3a"), Color("b0a070"), Color("f0e8d0")]
+	Color("3f6a3a"), Color("b0a070"), Color("f0e8d0"), Color("7a6a58")]
 const GROUND_COLORS := { OUT: Color("0d0e0f"), WATER: Color("0e1c26"), FOREST: Color("18261a"),
-	PARK: Color("26361f"), LOT: Color("4a4b4d") }
+	PARK: Color("26361f"), LOT: Color("4a4b4d"), SQUARE: Color("4d4741") }
+## The streets' surfaces (StreetNet pieces), in the world and on the plan.
+const SURFACE_COLORS := { "setts": Color("45403b"), "asphalt": Color("27282b"), "flags": Color("5c5954"),
+	"gravel": Color("6a604f"), "grass": Color("2b3a22") }
+const PLAN_SURFACE := { "setts": Color("9a8a72"), "asphalt": Color("3a3c42"), "flags": Color("cfc6b4"),
+	"gravel": Color("b8a77e"), "grass": Color("4f7a3a") }
+const PLAN_COVERED := Color("c08a3a")
+const LAYER_Y := [0.03, 0.05, 0.07, 0.07]   ## height of each StreetNet layer over the ground
+const GROUND := Color("302d2a")              ## unpaved ground between the streets and the houses
+const VERGE := Color("26291f")               ## the hill road's sides
 const FACADES := [Color("7b7469"), Color("6d7078"), Color("8a8377"), Color("5f5a55"), Color("77706a"),
 	Color("6a6e66"), Color("807a80"), Color("8d8a82")]
 const ASPHALT := Color("242528")
@@ -42,6 +55,9 @@ const PAINT := Color("b8b8a8")
 const LEAVES := [Color("1c3320"), Color("23402a"), Color("182b1c"), Color("2a4a2c")]
 
 var nav: NavGrid
+var streets: StreetNet                ## the street plan: graph, junctions, surfaces
+var detail_area := PackedVector2Array() ## (x, z) polygon: only streets in it are built (empty: all)
+var street_triangles := 0
 var grid := PackedByteArray()        ## one cell type per cell, row by row from the north-west
 var gw := 0
 var gh := 0
@@ -65,7 +81,7 @@ var _rng := RandomNumberGenerator.new()
 
 ## `full` false lays the city out (grid, building heights, POI footprints) without the ground,
 ## trees, navigation or any node but the empty root: enough for a picture of it.
-func _init(full := true) -> void:
+func _init(full := true, detail := PackedVector2Array()) -> void:
 	name = "city"
 	outdoor = true
 	all_weapons = true
@@ -77,6 +93,8 @@ func _init(full := true) -> void:
 	_body.collision_mask = 0
 	root.add_child(_body)
 
+	detail_area = detail
+	streets = StreetNet.new(CityData.STREETS, CityData.ROUNDABOUTS)
 	_edge()
 	_layout()
 	_hill()
@@ -88,6 +106,7 @@ func _init(full := true) -> void:
 	_navigation()
 	_ground()
 	_hill_ground()
+	_street_surfaces()
 	_street_dressing()
 	_forest()
 	_edge_wall()
@@ -306,20 +325,29 @@ func _stamp(line: PackedVector2Array, width: float, type: int, over: int) -> voi
 
 
 func _layout() -> void:
-	var inside := _mask([BLOCK, STREET, WATER, FOREST, PARK, LOT])
+	var inside := _mask([BLOCK, STREET, WATER, FOREST, PARK, LOT, SQUARE])
 	_fill(boundary, BLOCK, _mask([OUT]))
 	_fill(_plan(CityData.FOREST), FOREST, _mask([BLOCK]))
 	for park: Array in CityData.PARKS:
 		_fill(_plan(park), PARK, _mask([BLOCK]))
+	for sq: Dictionary in CityData.SQUARES:
+		_fill(_plan(sq.pts), SQUARE, _mask([BLOCK, PARK]))
 	_stamp(_plan(CityData.RIVER), CityData.RIVER_WIDTH, WATER, _mask([BLOCK, FOREST, PARK]))
-	for street: Array in CityData.STREETS:
-		_stamp(_plan(street.slice(2)), street[1], STREET, inside)
-	for path: Array in CityData.SQUARE_PATHS:
-		_stamp(_plan(path), CityData.LANE, STREET, _mask([BLOCK]))
+	for i in streets.lines.size():
+		var widest := 1.0
+		for f: float in streets.lines[i].f:
+			widest = maxf(widest, f)
+		var sp: Dictionary = streets.specs[i]
+		var w: float = sp.road * widest + sp.walk[0] + sp.walk[1]
+		_stamp(streets.lines[i].pts, maxf(w, CityData.NAV_MIN_WIDTH), STREET, inside)
+	for k in streets.nodes.size(): # a rond-point is round
+		if streets.nodes[k].round > 0.0:
+			var o: Vector2 = streets.nodes[k].at
+			_stamp(PackedVector2Array([o, o + Vector2(0.01, 0)]), streets.nodes[k].round * 2.0, STREET, inside)
 	for id: String in CityData.POIS:
 		var poi: Dictionary = CityData.POIS[id]
 		_fill(_plan(poi.lot), LOT, _mask([BLOCK, FOREST, PARK, WATER]))
-		_stamp(_plan([poi.at, poi.gate]), CityData.LANE, STREET, inside)
+		_stamp(_plan([poi.at, poi.gate]), CityData.DRIVE, STREET, inside)
 
 
 # --- The hill -------------------------------------------------------------------------
@@ -431,7 +459,7 @@ func _hill_ground() -> void:
 			if _raised[i] == 0 or done[i] == 1:
 				continue
 			var t := grid[i]
-			var color: Color = ASPHALT if t == STREET else GROUND_COLORS.get(t, GROUND_COLORS[LOT])
+			var color: Color = VERGE if t == STREET else GROUND_COLORS.get(t, GROUND_COLORS[LOT])
 			_g.ground_quad(_corner(r, c), _corner(r, c + 1), _corner(r + 1, c + 1), _corner(r + 1, c), color)
 	# One height-map collider over the raised area, scaled up from 1 m to one cell.
 	var w := c1 - c0 + 2
@@ -458,7 +486,7 @@ func _open(c: int, r: int) -> bool:
 	if c < 0 or r < 0 or c >= gw or r >= gh:
 		return false
 	var t := grid[r * gw + c]
-	return t == STREET or t == PARK or t == LOT
+	return t == STREET or t == PARK or t == LOT or t == SQUARE
 
 
 ## Carve every block into rectangles and stand a building on each.
@@ -785,7 +813,7 @@ func _navigation() -> void:
 	nav = NavGrid.new(lo, lo + (Vector2(gw, gh) - Vector2(0.5, 0.5)) * cell, cell)
 	for i in grid.size():
 		var t := grid[i]
-		nav.solid[i] = 0 if (t == STREET or t == PARK or t == LOT) else 1
+		nav.solid[i] = 0 if (t == STREET or t == PARK or t == LOT or t == SQUARE) else 1
 	nav.finish()
 
 
@@ -802,7 +830,7 @@ func _runs(each: Callable) -> void:
 func _ground() -> void:
 	var size := Vector3(gw * cell, 1.0, gh * cell)
 	var center := Vector3(lo.x + size.x * 0.5, -0.5, lo.y + size.z * 0.5)
-	_g.box(size, center, ASPHALT)
+	_g.box(size, center, GROUND)
 	_collide(center, size)
 	_runs(func(r: int, c: int, n: int, t: int) -> void:
 		# Split the run where it goes up the hill: raised cells are drawn by _hill_ground.
@@ -844,37 +872,73 @@ func _ground_run(r: int, c: int, n: int, t: int, raised: bool) -> void:
 			Vector3(m * cell, span.y - span.x + 3.0, cell))
 
 
-## Centre lines on every street and lamp posts along the avenues.
+func _in_detail(p: Vector2) -> bool:
+	return detail_area.is_empty() or Geometry2D.is_point_in_polygon(p, detail_area)
+
+
+func _on_ground(p: Vector2, lift: float) -> Vector3:
+	var y := ground_y(Vector3(p.x, 0.0, p.y))
+	return Vector3(p.x, y + lift + (0.1 if y > 0.01 else 0.0), p.y)
+
+
+## The streets as meshes: every StreetNet piece inside the detail area, laid on the ground (on the
+## hill the strips follow it: they have a cross-section every StreetNet.STEP metres). Each street's
+## surface is a shade off its neighbours'.
+func _street_surfaces() -> void:
+	for piece: Dictionary in streets.pieces_in(detail_area):
+		var tris: PackedVector2Array = piece.tris
+		var color: Color = SURFACE_COLORS[piece.surface]
+		var id: int = piece.street if piece.street >= 0 else 1000 + int(piece.node)
+		color = color.lightened(0.08 * fposmod(id * 0.6180339, 1.0))
+		var lift: float = LAYER_Y[piece.layer]
+		for t in range(0, tris.size(), 3):
+			_g.ground_tri(_on_ground(tris[t], lift), _on_ground(tris[t + 1], lift), _on_ground(tris[t + 2], lift), color)
+		street_triangles += tris.size() / 3
+
+
+## Dashed centre lines on the two-way asphalt roads, lamp posts down the boulevards' malls and on
+## the river side of the quays. (The real markings and lamps are S041 and S046.)
 func _street_dressing() -> void:
-	for street: Array in CityData.STREETS:
-		var width: float = street[1]
-		var line := _plan(street.slice(2))
+	for link: Dictionary in streets.links:
+		var sp: Dictionary = streets.specs[link.street]
+		var kind: String = streets.streets[link.street].kind
+		var line: PackedVector2Array = link.pts
+		var dashes: bool = sp.surface == "asphalt" and int(sp.oneway) == 0 and float(sp.mall) == 0.0 and float(sp.road) >= 7.0
+		var sides: Array = []
+		if float(sp.mall) > 0.0:
+			sides = [float(sp.mall) * 0.5 - 0.8, -(float(sp.mall) * 0.5 - 0.8)]
+		elif kind == "quai":
+			var river_left: bool = float(sp.walk[0]) < float(sp.walk[1])
+			sides = [(float(sp.road) * 0.5 + 0.8) * (1.0 if river_left else -1.0)]
+		var total := 0.0
+		for s in line.size() - 1:
+			total += line[s].distance_to(line[s + 1])
 		var walked := 0.0
-		var next_dash := 6.0
-		var next_lamp := 20.0
-		var lamp_side := 1.0
+		var next_dash := 10.0
+		var next_lamp := 12.0
+		var side := 0
 		for s in line.size() - 1:
 			var a := line[s]
 			var b := line[s + 1]
 			var length := a.distance_to(b)
 			var dir := (b - a) / maxf(length, 0.001)
 			var basis := Basis(Vector3.UP, atan2(-dir.y, dir.x))
-			while next_dash < walked + length:
+			while dashes and next_dash < walked + length and next_dash < total - 10.0:
 				var p := a + dir * (next_dash - walked)
 				next_dash += 12.0
-				if width > CityData.LANE and type_at(Vector3(p.x, 0, p.y)) == STREET:
-					_g.box(Vector3(3.5, 0.02, 0.22), Vector3(p.x, 0.03 + ground_y(Vector3(p.x, 0, p.y)), p.y), PAINT, basis)
-			while width >= CityData.AVENUE and next_lamp < walked + length:
-				var p := a + dir * (next_lamp - walked) + Vector2(-dir.y, dir.x) * (width * 0.5 - 1.0) * lamp_side
-				next_lamp += 48.0
-				lamp_side = -lamp_side
-				if type_at(Vector3(p.x, 0, p.y)) != STREET:
+				if _in_detail(p) and type_at(Vector3(p.x, 0, p.y)) == STREET:
+					_g.box(Vector3(3.5, 0.02, 0.18), _on_ground(p, 0.06), PAINT, basis)
+			while not sides.is_empty() and next_lamp < walked + length:
+				var p := a + dir * (next_lamp - walked) + dir.orthogonal() * float(sides[side % sides.size()])
+				next_lamp += 30.0
+				side += 1
+				if not _in_detail(p) or type_at(Vector3(p.x, 0, p.y)) != STREET:
 					continue
-				var y := ground_y(Vector3(p.x, 0, p.y))
-				_b.box(Vector3(0.2, 7.0, 0.2), Vector3(p.x, y + 3.5, p.y), Props.STEEL)
-				_collide(Vector3(p.x, y + 3.5, p.y), Vector3(0.2, 7.0, 0.2))
+				var at := _on_ground(p, 0.0)
+				_b.box(Vector3(0.2, 6.0, 0.2), at + Vector3(0, 3.0, 0), Props.STEEL)
+				_collide(at + Vector3(0, 3.0, 0), Vector3(0.2, 6.0, 0.2))
 				if _rng.randf() < 0.35: # most of the grid is down
-					_glow.box(Vector3(0.6, 0.2, 0.6), Vector3(p.x, y + 7.0, p.y), Color.WHITE)
+					_glow.box(Vector3(0.5, 0.25, 0.5), at + Vector3(0, 6.0, 0), Color.WHITE)
 			walked += length
 
 
@@ -924,30 +988,90 @@ func _edge_wall() -> void:
 
 # --- Pictures of the layout ----------------------------------------------------------------
 
-## The layout from above, `scale` pixels per cell: buildings lighter the taller they are, POI
-## structures near white, each POI ringed in red.
-func plan_image(scale := 2) -> Image:
-	var img := Image.create(gw, gh, false, Image.FORMAT_RGB8)
-	for r in gh:
-		for c in gw:
+## The layout from above, `scale` pixels per cell, over `rect` (x, z metres; empty: the whole grid).
+## The grid underneath (buildings lighter the taller they are, POI structures near white, the street
+## cells of the navigation grid a dull brown), and on it the street plan as it is built: pavements,
+## setts, asphalt, malls, islands, covered passages in amber. Each POI is ringed in red.
+func plan_image(scale := 2, rect := Rect2()) -> Image:
+	if rect.size == Vector2.ZERO:
+		rect = Rect2(lo, Vector2(gw, gh) * cell)
+	var ppm := float(scale) / cell
+	var w := ceili(rect.size.x * ppm)
+	var h := ceili(rect.size.y * ppm)
+	var img := Image.create(w, h, false, Image.FORMAT_RGB8)
+	var c0 := maxi(0, floori((rect.position.x - lo.x) / cell))
+	var c1 := mini(gw, ceili((rect.end.x - lo.x) / cell))
+	var r0 := maxi(0, floori((rect.position.y - lo.y) / cell))
+	var r1 := mini(gh, ceili((rect.end.y - lo.y) / cell))
+	for r in range(r0, r1):
+		for c in range(c0, c1):
 			var t := grid[r * gw + c]
 			var color: Color = PLAN_COLORS[t]
 			if t == BLOCK:
 				color = color.lightened(minf(_floors[r * gw + c], 16.0) / 16.0 * 0.55)
-			img.set_pixel(c, r, color)
+			elif t == STREET:
+				color = Color("4a4038")
+			var at := (Vector2(lo.x + c * cell, lo.y + r * cell) - rect.position) * ppm
+			var p0 := Vector2i(floori(at.x), floori(at.y))
+			img.fill_rect(Rect2i(p0, Vector2i(ceili(at.x + scale) - p0.x, ceili(at.y + scale) - p0.y)), color)
+	for layer in [StreetNet.WALK, StreetNet.ROAD, StreetNet.MALL, StreetNet.ISLAND]:
+		for piece: Dictionary in streets.pieces:
+			if piece.layer != layer or not (piece.box as Rect2).intersects(rect):
+				continue
+			var color: Color = PLAN_SURFACE[piece.surface]
+			if piece.street >= 0 and streets.specs[piece.street].covered:
+				color = PLAN_COVERED
+			var tris: PackedVector2Array = piece.tris
+			for t in range(0, tris.size(), 3):
+				_raster(img, (tris[t] - rect.position) * ppm, (tris[t + 1] - rect.position) * ppm, (tris[t + 2] - rect.position) * ppm, color)
 	for id: String in CityData.POIS:
 		var p := poi_pos(id)
-		var at := Vector2i(floori((p.x - lo.x) / cell), floori((p.z - lo.y) / cell))
-		for d in range(-14, 15):
-			for k in [-14, -13, 13, 14]:
-				_dot(img, at + Vector2i(d, k), 0, Color("ff3020"))
-				_dot(img, at + Vector2i(k, d), 0, Color("ff3020"))
-	img.resize(gw * scale, gh * scale, Image.INTERPOLATE_NEAREST)
+		var at := Vector2i(((Vector2(p.x, p.z) - rect.position) * ppm).round())
+		var ring := 14 * scale
+		for d in range(-ring, ring + 1):
+			for k in [-ring, ring]:
+				_dot(img, at + Vector2i(d, k), scale / 2, Color("ff3020"))
+				_dot(img, at + Vector2i(k, d), scale / 2, Color("ff3020"))
 	return img
 
 
-## The reference map with everything outside the edge dimmed, the edge in red, the traced
-## streets in blue and the POIs as red squares. Null if the reference picture is missing.
+## Fill a triangle (image pixels) with a colour: every pixel whose centre is inside.
+static func _raster(img: Image, a: Vector2, b: Vector2, c: Vector2, color: Color) -> void:
+	var x0 := maxi(0, floori(minf(a.x, minf(b.x, c.x))))
+	var x1 := mini(img.get_width() - 1, ceili(maxf(a.x, maxf(b.x, c.x))))
+	var y0 := maxi(0, floori(minf(a.y, minf(b.y, c.y))))
+	var y1 := mini(img.get_height() - 1, ceili(maxf(a.y, maxf(b.y, c.y))))
+	var area := (b - a).cross(c - a)
+	if absf(area) < 1e-6:
+		return
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var p := Vector2(x + 0.5, y + 0.5)
+			var w0 := (b - a).cross(p - a) / area
+			var w1 := (c - b).cross(p - b) / area
+			var w2 := (a - c).cross(p - c) / area
+			if w0 >= 0.0 and w1 >= 0.0 and w2 >= 0.0:
+				img.set_pixel(x, y, color)
+
+
+## The old town and what is just round it, in metres: for a close plan of the junctions.
+func core_rect() -> Rect2:
+	var ring := streets.ring_polygon()
+	var r := Rect2(ring[0], Vector2.ZERO)
+	for p in ring:
+		r = r.expand(p)
+	return r.grow(60.0)
+
+
+const KIND_LINE := { "boulevard": Color("ff7a00"), "quai": Color("00b8d8"), "pont": Color("00b8d8"),
+	"faubourg": Color("d000c0"), "route": Color("8040ff"), "chemin": Color("8040ff"), "grande_rue": Color("0030c0"),
+	"rue": Color("1060ff"), "ruelle": Color("40a0ff"), "impasse": Color("40a0ff"), "passage": Color("c08a3a") }
+
+
+## The reference map with everything outside the edge dimmed, the edge in red, the streets of the
+## plan over it by kind (boulevards orange, quays cyan, faubourg magenta, routes violet, rues blue,
+## lanes light blue, passages amber), the squares in yellow and the POIs as red squares. Null if the
+## reference picture is missing.
 func reference_overlay() -> Image:
 	var path := ProjectSettings.globalize_path(CityData.REF_IMAGE)
 	if not FileAccess.file_exists(path):
@@ -973,9 +1097,16 @@ func reference_overlay() -> Image:
 				k += 1
 			if not inside:
 				img.set_pixel(x, y, img.get_pixel(x, y).darkened(0.62))
-	for street: Array in CityData.STREETS:
-		for s in range(2, street.size() - 1):
-			_line(img, street[s], street[s + 1], 1, Color("1040ff"))
+	for i in streets.lines.size():
+		var pts: PackedVector2Array = streets.lines[i].pts
+		var kind: String = streets.streets[i].kind
+		var radius := maxi(0, roundi(CityData.width(streets.streets[i]) / CityData.M_PER_PX * 0.3))
+		for s in pts.size() - 1:
+			_line(img, pts[s] / CityData.M_PER_PX + CityData.ORIGIN_PX, pts[s + 1] / CityData.M_PER_PX + CityData.ORIGIN_PX, radius, KIND_LINE[kind])
+	for sq: Dictionary in CityData.SQUARES:
+		var pts: Array = sq.pts
+		for i in pts.size():
+			_line(img, pts[i], pts[(i + 1) % pts.size()], 0, Color("ffe000"))
 	for i in edge.size():
 		_line(img, edge[i], edge[(i + 1) % edge.size()], 2, Color("ff2010"))
 	for id: String in CityData.POIS:

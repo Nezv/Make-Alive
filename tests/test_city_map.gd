@@ -85,10 +85,11 @@ func test_player_spawn_points_are_all_clear() -> void:
 func test_streets_are_open_and_blocks_are_built_up() -> void:
 	var m := _map()
 	assert_gt(m.building_count, 400, "city blocks are filled with buildings")
-	for street: Vector3 in [_px(950, 523), _px(895, 400), _px(769, 300), _px(933, 610)]: # 9 de Marco, Joao Colin, Blumenau, JK
+	# rue de la Gare, rue Saint-Martin, the boulevard, the faubourg, a ruelle
+	for street: Vector3 in [_px(965, 526), _px(896, 450), _px(774, 440), _px(722, 674), _px(1020, 460)]:
 		assert_eq(m.type_at(street), CityMap.STREET, "street at %s" % street)
 		assert_false(m.nav.is_blocked(street))
-	var block := _px(830, 445) # between Blumenau and Joao Colin
+	var block := _px(806, 447) # between the boulevard and the rue des Carmes
 	assert_eq(m.type_at(block), CityMap.BLOCK)
 	assert_true(m.nav.is_blocked(block), "buildings are solid")
 
@@ -110,7 +111,7 @@ func test_the_hill_is_forest_with_one_road_up() -> void:
 ## joinville_topography.png (same scale, shifted by TOPO_OFFSET_PX).
 func test_the_mirante_road_climbs_the_real_hairpins_to_the_summit() -> void:
 	var m := _map()
-	var summit := _px(1866, 45) # the 230 m trig point, where Rua Pastor Guilherme Rau ends
+	var summit := _px(1866, 45) # the 230 m trig point, where the chemin du Télégraphe ends
 	var top := m.poi_pos("mirante")
 	assert_lt(Vector2(top.x, top.z).distance_to(Vector2(summit.x, summit.z)), 12.0, "the tower stands on the summit")
 	for bend: Vector2 in [Vector2(1648, 283), Vector2(1700, 148), Vector2(1668, 40), Vector2(1808, -90), Vector2(1823, -50)]:
@@ -135,9 +136,7 @@ func test_the_hill_rises_to_the_mirante_and_the_city_stays_flat() -> void:
 func test_the_hill_road_is_climbable_all_the_way() -> void:
 	var m := _map()
 	var road: Array = []
-	for street: Array in CityData.STREETS:
-		if street[0] == "Rua Pastor Guilherme Rau":
-			road.append_array(street.slice(2))
+	road.append_array(CityData.street("telegraphe").pts)
 	var prev := Vector3.INF
 	var steepest := 0.0
 	var where := Vector3.ZERO

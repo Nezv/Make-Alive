@@ -642,19 +642,20 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - What this gives the town: a plan to simplify (S040) and a density map for the blocks (S043), not footprints to rebuild one by one.
   - The tiles are at four times joinville.png's zoom (their scale bars); `--register` finds each tile's place by cross-correlating its buildings with joinville.png's (match 0.64 to 0.77) and the control points are kept in `TILES`. 1301 footprints (convex, simplified), streets as 1-pixel cells per class, areas as polygons; the overlay is generated, not committed. The nine tiles cover the centre in an uneven patchwork: what their bounding box leaves uncovered is `CityOsm.GAPS`
 
-### [ ] S040 · Street network 2
+### [x] S040 · Street network 2
 > needs: S039 | size: L | test: `tests/test_city_map.gd` | see: `--city-plan`
 - The plan, not a copy: Joinville's tiles give the bones (the river's line, the hill, where the five places stand, the main through-roads); the street grid is bent into a French town as Paris was around 1800, before Haussmann: a dense old core of narrow crooked streets, a few squares, quays along the river, boulevards on the line of the old walls, and every name invented and French.
-- [ ] `CityData.STREETS` redrawn from the tiles as a skeleton, not traced one to one
-  - [ ] Keep: the through-roads that link the five places, the quays, the road up the hill and its hairpin
-  - [ ] Bend: break Joinville's long straight grid into streets that wander, narrow and widen, meet at odd angles; dead-end impasses and covered passages through blocks
-  - [ ] Add: the old core round a place du marché, a tree-lined boulevard ring where the wall stood, a faubourg street running out of town from one of the old gates
-- [ ] Invented French street names, kept in a table in `CityData`: rue du Marché, rue des Tanneurs, rue de la Harpe-Rouge, quai des Bateliers, place de l'Église, impasse des Carmes, boulevard du Rempart, faubourg Saint-Rémy and the like; never a real street of a real town on purpose
-- [ ] Per street: carriageway width, one-way direction, pavement width each side (none in the narrowest lanes), surface kind (setts or asphalt)
-- [ ] Junctions as real shapes: chamfered corners (pans coupés), T and skewed cross, a small rond-point where the boulevard meets the quay
-- [ ] Streets as meshes following the polyline with mitred joints, not grid cells; the 4 m grid stays for navigation only
-- [ ] Only what lies inside a mission area is built in detail (S051)
-- [ ] `--city-plan` and the menu's map redrawn from the new plan
+- [x] `CityData.STREETS` redrawn from the tiles as a skeleton, not traced one to one
+  - [x] Keep: the through-roads that link the five places, the quays, the road up the hill and its hairpin
+  - [x] Bend: break Joinville's long straight grid into streets that wander, narrow and widen, meet at odd angles; dead-end impasses and covered passages through blocks
+  - [x] Add: the old core round a place du marché, a tree-lined boulevard ring where the wall stood, a faubourg street running out of town from one of the old gates
+- [x] Invented French street names, kept in a table in `CityData`: rue du Marché, rue des Tanneurs, rue de la Harpe-Rouge, quai des Bateliers, place de l'Église, impasse des Carmes, boulevard du Rempart, faubourg Saint-Rémy and the like; never a real street of a real town on purpose
+- [x] Per street: carriageway width, one-way direction, pavement width each side (none in the narrowest lanes), surface kind (setts or asphalt)
+- [x] Junctions as real shapes: chamfered corners (pans coupés), T and skewed cross, a small rond-point where the boulevard meets the quay
+- [x] Streets as meshes following the polyline with mitred joints, not grid cells; the 4 m grid stays for navigation only
+- [x] Only what lies inside a mission area is built in detail (S051)
+- [x] `--city-plan` and the menu's map redrawn from the new plan
+- Done as data and a graph: 48 streets of 11 kinds in `CityData.STREETS`, `StreetNet` for junctions and strips, meshes in `CityMap._street_surfaces`. Buildings still stand on the 4 m grid's BLOCK cells, set back a metre or two from the pavements' edge in places, until S043 builds the îlots along the street lines. The detail area is a parameter of `CityMap` that nothing sets yet (S051 will). The mall has no trees yet (S047 plants them).
 
 ### [ ] S041 · Road surface
 > needs: S040, S155 | size: L | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over the rue du Marché, `--street-rack`

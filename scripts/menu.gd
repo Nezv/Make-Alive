@@ -140,9 +140,9 @@ func _ready() -> void:
 ## Every street the game builds, as screen polylines (CityData.STREETS order).
 func street_lines() -> Array:
 	var out := []
-	for street: Array in CityData.STREETS:
+	for street: Dictionary in CityData.STREETS:
 		var line := PackedVector2Array()
-		for p: Vector2 in street.slice(2):
+		for p: Vector2 in street.pts:
 			line.append(px_point(p))
 		out.append(line)
 	return out
@@ -154,12 +154,13 @@ func _draw_lines() -> void:
 	var lines := street_lines()
 	for pass_i in 2: # a soft glow under, the line on top
 		for i in lines.size():
-			var width: float = CityData.STREETS[i][1]
-			var w := maxf(1.2, width * scale * (0.55 if width >= CityData.AVENUE else 0.4))
+			var width := CityData.width(CityData.STREETS[i])
+			var major := width >= 12.0
+			var w := maxf(1.0, width * scale * (0.5 if major else 0.4))
 			if pass_i == 0:
 				lines_layer.draw_polyline(lines[i], Color(RED, 0.16), w * 3.5, true)
 			else:
-				lines_layer.draw_polyline(lines[i], RED if width >= CityData.AVENUE else RED.darkened(0.15), w, true)
+				lines_layer.draw_polyline(lines[i], RED if major else RED.darkened(0.15), w, true)
 
 
 ## Pick a mission (a pin was clicked, or `--mission=` on the command line).

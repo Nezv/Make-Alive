@@ -89,6 +89,12 @@ class Builder:
 		_tri(a, c, d, n2 if n2.y > 0.0 else -n2, color)
 		return self
 
+	## A ground triangle (any heights), lit by its own upward normal.
+	func ground_tri(a: Vector3, b: Vector3, c: Vector3, color: Color) -> Builder:
+		var n := (c - a).cross(b - a).normalized()
+		_tri(a, b, c, n if n.y > 0.0 else -n, color)
+		return self
+
 	## Cylinder along local Y, centred at `pos`.
 	func cyl(radius: float, height: float, pos: Vector3, color: Color, segments := 8,
 			rot := Basis.IDENTITY, xf := Transform3D.IDENTITY) -> Builder:

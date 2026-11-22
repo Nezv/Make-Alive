@@ -506,10 +506,11 @@ func _city_plan(dir: String) -> void:
 	print("[city] built in %d ms: %.2f km2, %d x %d cells of %.0f m, %d buildings" % [
 		Time.get_ticks_msec() - t, city.area_km2(), city.gw, city.gh, city.cell, city.building_count])
 	city.plan_image().save_png(dir.path_join("city_plan.png"))
+	city.plan_image(8, city.core_rect()).save_png(dir.path_join("city_core.png"))
 	var over := city.reference_overlay()
 	if over != null:
 		over.save_png(dir.path_join("city_on_reference.png"))
-	print("[city] saved city_plan.png and city_on_reference.png in ", dir)
+	print("[city] saved city_plan.png, city_core.png and city_on_reference.png in ", dir)
 	city.root.free()
 	get_tree().quit()
 
