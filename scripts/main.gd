@@ -31,6 +31,8 @@ extends Node
 ##   --wheel                host: carry a little of everything and hold the item wheel up (pointer on the bandage)
 ##   --director             host: show the horde director's pace (state, stress, heat) on the HUD
 ##   --noise                host: draw an expanding ring wherever something made noise, out to where it is heard
+##   --prop-rack=hydrant    one element (scripts/models/elements.gd) alone in a neutral lit room; with --state=burnt,
+##                          --part=open, --view=0..10, and --review=C:/dir to shoot the review views and quit (tools/models/review.py)
 ##   --zones                draw the map data: zones, zombie closets (red), horde routes (orange), spawns (white)
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
@@ -66,6 +68,14 @@ func _ready() -> void:
 	if _args.has("city-plan"):
 		_city_plan(_args["city-plan"])
 		return
+	if _args.has("prop-rack"):
+		var rack := PropRack.new()
+		add_child(rack)
+		if rack.setup(_args["prop-rack"], _args) and _args.has("review"):
+			get_window().size = Vector2i(600, 800)
+			rack.review(_args.review)
+		_start_timers()
+		return
 
 	menu = Menu.new()
 	menu.host_pressed.connect(func(): _host("corridor"))
@@ -79,15 +89,20 @@ func _ready() -> void:
 	if _args.has("mission"):
 		menu.select(_args.mission)
 
+	_start_timers()
+	if _args.has("host"):
+		_host("city" if _args.has("mission") else _args.get("map", "city"), _args.get("mission", ""))
+	elif _args.has("join"):
+		_join(_args.join)
+
+
+## --screenshot and --quit-after.
+func _start_timers() -> void:
 	if _args.has("screenshot"):
 		for t in str(_args.get("shot-at", "5")).split(","): # e.g. --shot-at=2,4,6 saves x_0.png, x_1.png...
 			get_tree().create_timer(float(t)).timeout.connect(_screenshot)
 	if _args.has("quit-after"):
 		get_tree().create_timer(float(_args["quit-after"])).timeout.connect(_quit_with_summary)
-	if _args.has("host"):
-		_host("city" if _args.has("mission") else _args.get("map", "city"), _args.get("mission", ""))
-	elif _args.has("join"):
-		_join(_args.join)
 
 
 func _new_game(map_name := "city", mission := "") -> Game:

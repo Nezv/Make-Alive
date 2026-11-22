@@ -415,3 +415,95 @@ def render_views(obj, out_dir, prefix, views, size=(720, 1080)):
         cam.data.lens = lens
         scene.render.filepath = os.path.join(out_dir, f"{prefix}_{name}.png")
         bpy.ops.render.render(write_still=True)
+
+
+# --- Elements (tools/models/props.py) ---------------------------------------------------------
+
+def bake_edges(obj, size, radius=0.006, margin=8, samples=16):
+    """How much each texel sits on an edge (0 flat .. 1 a sharp corner): the angle between the
+    face's normal and the normal rounded over `radius` (Cycles' bevel). The painter chips paint
+    there first. Returns a float array (size, size)."""
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "GPU" if _use_gpu() else "CPU"
+    scene.cycles.samples = samples
+    _select_only(obj)
+    mat = bpy.data.materials.new("bake_edge")
+    mat.use_nodes = True
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    emit = nt.nodes.new("ShaderNodeEmission")
+    nt.links.new(emit.outputs[0], out.inputs["Surface"])
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    bevel = nt.nodes.new("ShaderNodeBevel")
+    bevel.samples = 8
+    bevel.inputs["Radius"].default_value = radius
+    dot = nt.nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    nt.links.new(bevel.outputs["Normal"], dot.inputs[0])
+    nt.links.new(geo.outputs["Normal"], dot.inputs[1])
+    inv = nt.nodes.new("ShaderNodeMath")
+    inv.operation = "MULTIPLY_ADD"  # (1 - dot) * 4, clamped
+    inv.use_clamp = True
+    inv.inputs[1].default_value = -4.0
+    inv.inputs[2].default_value = 4.0
+    nt.links.new(dot.outputs["Value"], inv.inputs[0])
+    nt.links.new(inv.outputs[0], emit.inputs["Color"])
+    img = bpy.data.images.new("bake_edge", size, size, alpha=True, float_buffer=True)
+    img.colorspace_settings.name = "Non-Color"
+    node = nt.nodes.new("ShaderNodeTexImage")
+    node.image = img
+    nt.nodes.active = node
+    bpy.ops.object.bake(type="EMIT", margin=margin, use_clear=True)
+    a = np.empty(size * size * 4, dtype=np.float32)
+    img.pixels.foreach_get(a)
+    obj.data.materials.clear()
+    return a.reshape(size, size, 4)[..., 0]
+
+
+def split_by_attr(obj, attr, value, name):
+    """A copy of `obj` holding only the faces whose FACE float `attr` is `value`."""
+    me = obj.data.copy()
+    me.name = name
+    vals = np.empty(len(me.polygons), dtype=np.float32)
+    me.attributes[attr].data.foreach_get("value", vals)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    drop = [f for f in bm.faces if abs(vals[f.index] - value) > 0.5]
+    bmesh.ops.delete(bm, geom=drop, context="FACES")
+    loose = [v for v in bm.verts if not v.link_faces]
+    bmesh.ops.delete(bm, geom=loose, context="VERTS")
+    bm.to_mesh(me)
+    bm.free()
+    out = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(out)
+    return out
+
+
+def set_origin(obj, pivot):
+    """Move the object's origin to `pivot` (game coordinates) without moving its faces."""
+    p = np.array(g2b(pivot))
+    me = obj.data
+    co = np.empty(len(me.vertices) * 3, dtype=np.float32)
+    me.vertices.foreach_get("co", co)
+    co = (co.reshape(-1, 3) - p).ravel()
+    me.vertices.foreach_set("co", co)
+    me.update()
+    obj.location = tuple(p)
+
+
+def transfer_uvs(src, dst):
+    """Give `dst` (a cheaper LOD) UVs from `src`'s nearest faces, so it wears the same texture."""
+    if "UVMap" not in dst.data.uv_layers:
+        dst.data.uv_layers.new(name="UVMap")
+    mod = dst.modifiers.new("uv", "DATA_TRANSFER")
+    mod.object = src
+    mod.use_loop_data = True
+    mod.data_types_loops = {"UV"}
+    mod.loop_mapping = "POLYINTERP_NEAREST"
+    _select_only(dst)
+    bpy.ops.object.modifier_apply(modifier=mod.name)

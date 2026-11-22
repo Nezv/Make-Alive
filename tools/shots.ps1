@@ -36,6 +36,7 @@ $shots = [ordered]@{
     'outfit_rack_3_stumps_back' = $corridor + '--outfit-rack=3', '--rack-sever=leg', '--back'
     'outfit_rack_1_headless' = $corridor + '--outfit-rack=1', '--rack-sever=head'
     'fx_rack'           = $corridor + '--fx-rack'
+    'prop_rack_hydrant' = @('--prop-rack=hydrant', '--state=abandoned')
     'corridor_zones'    = $corridor + '--zones', '--shot-cam=18,34,22,0,-62'
     'view_aim'          = $corridor + '--weapon=4', '--pose=aim'
     'view_sprint'       = $corridor + '--weapon=4', '--pose=sprint'

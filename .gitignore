@@ -3,6 +3,7 @@
 *.import
 # ...except the models' textures: they need mipmaps and VRAM compression
 !assets/models/*.png.import
+!assets/models/props/*.png.import
 export_presets.cfg
 build/
 
