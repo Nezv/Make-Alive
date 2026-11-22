@@ -125,3 +125,6 @@ Left over, each accepted:
 - accepted: the edge bake is weak on the facets of a lathe (15° between faces), so edge chipping shows mostly on the flanges, caps and collar; the patches carry the wear. The kit's bevelled shapes (S141) give real edges.
 - accepted: dents are not in the "damaged" state (texture only). A damaged geometry variant waits for the kit's damage tools (S141).
 - accepted: the plate's lettering is too small to read beyond 1 m, as on the real ones.
+
+## After S141
+Rebuilt on the detail kit's painter (`wear.py`, `noise.fbm_round`, the stroke font): `references/elements/reviews/hydrant_rkit.jpg`. Same form; "17" in the block font; chips round-edged. The baked normals were checked (`props.check_normals`): they point out of the model, so the leftover about a flipped Z is closed.

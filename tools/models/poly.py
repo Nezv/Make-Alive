@@ -42,6 +42,7 @@ class Mesh:
         self.faces = []
         self.tags = []
         self.vdata = []
+        self.units = []  # a whole number per face: which brick, sett or tile it belongs to (0 = none)
 
     # --- building ---------------------------------------------------------------------------
 
@@ -54,17 +55,26 @@ class Mesh:
             self.vdata.append(data[i] if isinstance(data, list) else data)
         return base
 
-    def face(self, idx, tag):
+    def face(self, idx, tag, unit=0):
         self.faces.append(tuple(int(i) for i in idx))
         self.tags.append(tag)
+        self.units.append(int(unit))
+
+    def units_list(self):
+        """One unit per face (faces set by hand without one count as unit 0)."""
+        return self.units if len(self.units) == len(self.faces) else [0] * len(self.faces)
+
+    def set_unit(self, unit):
+        self.units = [int(unit)] * len(self.faces)
+        return self
 
     def merge(self, other):
         base = len(self.verts)
         if other.verts:
             self.verts += [v.copy() for v in other.verts]
             self.vdata += list(other.vdata) if other.vdata else [None] * len(other.verts)
-        for f, t in zip(other.faces, other.tags):
-            self.face([base + i for i in f], t)
+        for f, t, u in zip(other.faces, other.tags, other.units_list()):
+            self.face([base + i for i in f], t, u)
         return self
 
     def copy(self):
@@ -73,6 +83,7 @@ class Mesh:
         m.faces = list(self.faces)
         m.tags = list(self.tags)
         m.vdata = list(self.vdata)
+        m.units = list(self.units_list())
         return m
 
     def mirrored(self):
@@ -82,6 +93,7 @@ class Mesh:
         m.verts = [v * np.array([-1.0, 1.0, 1.0]) for v in self.verts]
         m.faces = [tuple(reversed(f)) for f in self.faces]
         m.tags = list(self.tags)
+        m.units = list(self.units_list())
         m.vdata = [None if d is None else ({other_side(b): w for b, w in d[0].items()}, other_side(d[1]))
                    for d in self.vdata]
         return m
@@ -98,9 +110,9 @@ class Mesh:
         m = Mesh()
         m.verts = [v.copy() for v in self.verts]
         m.vdata = list(self.vdata)
-        for f, t in zip(self.faces, self.tags):
+        for f, t, u in zip(self.faces, self.tags, self.units_list()):
             if not drop(np.array([self.verts[i] for i in f])):
-                m.face(f, t)
+                m.face(f, t, u)
         return m
 
     def loft(self, rings, tag="skin", caps=(True, True), cap_tags=(None, None), band_tags=None,
@@ -189,6 +201,13 @@ class Mesh:
                     tris.append((f[0], f[i], f[i + 1]))
                     tags.append(t)
         return P, np.array(tris, dtype=np.int64), tags
+
+    def triangle_units(self):
+        """The unit of every triangle `triangles()` returns, in the same order."""
+        out = []
+        for f, u in zip(self.faces, self.units_list()):
+            out += [u] * (len(f) - 2)
+        return out
 
     def check_closed(self):
         """Every edge used by exactly two faces (a gib must not show a hole). Returns the

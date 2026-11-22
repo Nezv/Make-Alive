@@ -5,6 +5,8 @@ extends Node3D
 ## sizes by, a sky-grey ambient light, a key light that casts shadows and a soft fill.
 ##   --prop-rack=hydrant [--state=burnt] [--part=open] [--view=0..10]
 ##   --review=C:/dir       shoot every view, the parts open and every state into dir, then quit
+## An element with close-ups of its own (`views` in its .json: the kit's board) also gets each of
+## those shot in every state (`view_<name>_<state>.png`); `--view=name` puts the camera on one.
 
 ## The review's views, by name: eight angles round it, a 1 m close-up, 10 m and 50 m.
 const VIEWS := ["a0", "a45", "a90", "a135", "a180", "a225", "a270", "a315", "close_1m", "far_10m", "far_50m"]
@@ -30,8 +32,33 @@ func setup(elem: String, args: Dictionary) -> bool:
 	camera.far = 400.0
 	add_child(camera)
 	camera.make_current()
-	look(int(args.get("view", "1")))
+	var v := String(args.get("view", "1"))
+	if v.is_valid_int():
+		look(int(v))
+	else:
+		look_view(_view_index(v))
 	return true
+
+
+## The element's own close-ups (its .json's `views`: name, eye, at, fov).
+func views() -> Array:
+	return model.info.get("views", [])
+
+
+func _view_index(view_name: String) -> int:
+	for i in views().size():
+		if views()[i].name == view_name:
+			return i
+	return 0
+
+
+## Put the camera on the element's own close-up i.
+func look_view(i: int) -> void:
+	var v: Dictionary = views()[i]
+	var e: Array = v.eye
+	var a: Array = v.at
+	camera.fov = float(v.get("fov", 40.0))
+	camera.look_at_from_position(Vector3(e[0], e[1], e[2]), Vector3(a[0], a[1], a[2]))
 
 
 func _room() -> void:
@@ -96,7 +123,8 @@ func look(i: int) -> void:
 		var a := deg_to_rad(45.0 * i)
 		eye = c + Vector3(-sin(a) * r, r * 0.3, -cos(a) * r)
 	elif i == 8:
-		at = Vector3(0, size.y * 0.68, 0) # the head: outlets, plate, dome
+		# the head of a post (a hydrant's outlets, plate, dome); the middle of anything taller than a person
+		at = Vector3(0, size.y * (0.68 if size.y < 1.5 else 0.5), 0)
 		eye = at + Vector3(-0.34, 0.12, -0.93)
 	elif i == 9:
 		eye = Vector3(-5.0, 1.7, -8.66)
@@ -123,6 +151,15 @@ func review(dir: String) -> void:
 	for s: String in model.states():
 		_place(s)
 		await _shoot(dir.path_join("state_" + s + ".png"))
+	if views().size():
+		get_window().size = Vector2i(1280, 720) # close-ups are landscape, big enough to read lettering
+		for f in 3:
+			await get_tree().process_frame
+	for s: String in model.states():
+		_place(s)
+		for i in views().size():
+			look_view(i)
+			await _shoot(dir.path_join("view_%s_%s.png" % [views()[i].name, s]))
 	print("[review] ", dir)
 	get_tree().quit()
 

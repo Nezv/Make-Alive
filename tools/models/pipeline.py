@@ -497,13 +497,47 @@ def set_origin(obj, pivot):
 
 
 def transfer_uvs(src, dst):
-    """Give `dst` (a cheaper LOD) UVs from `src`'s nearest faces, so it wears the same texture."""
-    if "UVMap" not in dst.data.uv_layers:
-        dst.data.uv_layers.new(name="UVMap")
-    mod = dst.modifiers.new("uv", "DATA_TRANSFER")
-    mod.object = src
-    mod.use_loop_data = True
-    mod.data_types_loops = {"UV"}
-    mod.loop_mapping = "POLYINTERP_NEAREST"
-    _select_only(dst)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
+    """Give `dst` (a cheaper LOD) UVs from `src` so it wears the same texture. Each face of dst
+    takes ONE face of src (the one under its middle, facing the same way) and maps its corners
+    through that triangle's plane, so a face is never torn across islands; a dst face much bigger
+    than its src triangle (a far LOD's slab standing for many pieces) takes that point's colour
+    throughout instead of a stretched smear."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    sme = src.data
+    suv = sme.uv_layers["UVMap"].data
+    tree = BVHTree.FromObject(src, bpy.context.evaluated_depsgraph_get())
+    tri_uv = {}
+    for poly in sme.polygons:
+        tri_uv[poly.index] = ([sme.vertices[v].co.copy() for v in poly.vertices], [suv[li].uv.copy() for li in poly.loop_indices])
+    me = dst.data
+    if "UVMap" not in me.uv_layers:
+        me.uv_layers.new(name="UVMap")
+    duv = me.uv_layers["UVMap"].data
+    for poly in me.polygons:
+        c, n = poly.center, poly.normal
+        hit = tree.ray_cast(c + n * 0.02, -n, 0.06)
+        if hit[2] is None or (hit[1] is not None and hit[1].dot(n) < 0.7):
+            hit = tree.find_nearest(c)
+        idx = hit[2]
+        if idx is None:
+            continue
+        P, U = tri_uv[idx]
+        a, b, cc = P[0], P[1], P[2]
+        e1, e2 = b - a, cc - a
+        size_src = max(e1.length, e2.length, (cc - b).length)
+        pts = [me.vertices[v].co for v in poly.vertices]
+        size_dst = max((p - q).length for p in pts for q in pts)
+        d00, d01, d11 = e1.dot(e1), e1.dot(e2), e2.dot(e2)
+        den = d00 * d11 - d01 * d01
+        far = size_dst > 2.5 * size_src or abs(den) < 1e-14
+
+        def uv_of(q):
+            v = q - a
+            d20, d21 = v.dot(e1), v.dot(e2)
+            s = (d11 * d20 - d01 * d21) / den
+            t = (d00 * d21 - d01 * d20) / den
+            return U[0] + (U[1] - U[0]) * s + (U[2] - U[0]) * t
+        centre_uv = uv_of(Vector(hit[0])) if abs(den) >= 1e-14 else U[0]
+        for li, vi in zip(poly.loop_indices, poly.vertices):
+            duv[li].uv = centre_uv if far else uv_of(me.vertices[vi].co)

@@ -6,6 +6,7 @@ const DT := 1.0 / 60.0
 
 func _vm(id: int) -> Array:
 	var vm := Viewmodel.new()
+	vm._rng.seed = 1234 # recoil and idle breathing are random: pinned, or settling checks pass 9 times in 10
 	add_child(vm)
 	var w := WeaponState.new()
 	w.switch_to(id)

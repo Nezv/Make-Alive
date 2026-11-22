@@ -37,3 +37,31 @@ def fbm(P, freq, octaves=4, seed=0):
         norm += amp
         amp *= 0.5
     return total / norm
+
+
+# A fixed turn off the axes for each octave, so thresholds of the noise make round blobs rather
+# than the lattice's squares.
+_TURNS = []
+for _k in range(8):
+    _a, _b, _c = 0.61 + 0.37 * _k, 1.13 + 0.29 * _k, 0.47 + 0.53 * _k
+    _rx = np.array([[1, 0, 0], [0, np.cos(_a), -np.sin(_a)], [0, np.sin(_a), np.cos(_a)]])
+    _ry = np.array([[np.cos(_b), 0, np.sin(_b)], [0, 1, 0], [-np.sin(_b), 0, np.cos(_b)]])
+    _rz = np.array([[np.cos(_c), -np.sin(_c), 0], [np.sin(_c), np.cos(_c), 0], [0, 0, 1]])
+    _TURNS.append((_rx @ _ry @ _rz).astype(np.float32))
+
+
+def fbm_round(P, freq, octaves=4, seed=0, warp=0.35):
+    """Fractal noise in about 0..1 with no grid in it: each octave on its own turned lattice, the
+    points first pushed about by a coarser noise (`warp`, in cells), so patches thresholded out
+    of it (chips, burns, moss) have ragged round edges. For the element painters (wear.py)."""
+    P = np.asarray(P, np.float32)
+    if warp:
+        w = np.stack([value_noise(P @ _TURNS[5], freq * 0.5, seed + 101 + k * 7) for k in range(3)], 1) - 0.5
+        P = P + w * (warp / freq)
+    total = np.zeros(len(P), dtype=np.float32)
+    amp, norm = 0.5, 0.0
+    for o in range(octaves):
+        total += amp * value_noise(P @ _TURNS[o % 8], freq * (2.0 ** o), seed + o * 17)
+        norm += amp
+        amp *= 0.5
+    return total / norm

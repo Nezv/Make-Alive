@@ -13,4 +13,12 @@ const ALL := {
 		"parts": ["cap_front", "cap_l", "cap_r"],
 		"states": ["clean", "abandoned", "damaged", "burnt"],
 	},
+	"kit": {
+		"family": "kit",
+		"tris": [90000, 30000, 6000],
+		"draws": 3,
+		"lod_ends": [30.0, 90.0, 300.0],
+		"parts": ["shutter", "fallen"],
+		"states": ["clean", "abandoned", "damaged", "burnt"],
+	},
 }

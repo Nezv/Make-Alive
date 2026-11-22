@@ -1,7 +1,7 @@
 # Make Alive — steps
 
 The build order for everything in `TODO.md`, cut into steps one agent can finish in one session.
-Finishing every step leaves a LAN co-op zombie extraction game set in a recognisable central Joinville.
+Finishing every step leaves a LAN co-op zombie extraction game set in an invented French town in the style of Paris around 1800, laid out on the bones of central Joinville.
 
 ## How to use this file
 
@@ -21,7 +21,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ## Rules every step obeys
 
-- **Real Joinville:** streets, sidewalks, river, squares and hill follow the references (`references/joinville.png`, the OpenStreetMap tiles `references/1.png` to `9.png`, the photos). Only the five POIs are real buildings with interiors. Every other building is a solid block with a believable facade and doors that do not open.
+- **A French town on Joinville's plan:** Joinville is the plan, not the look. `references/joinville.png`, the OpenStreetMap tiles `references/1.png` to `9.png` and `joinville_topography.png` give the bones: the river's line, the hill and its height, where the five places stand, the main roads between them, how dense each part is. The streets are simplified from them (S040), never traced one to one, and everything people see is dressed as a French town in the style of Paris around 1800, before Haussmann: narrow crooked streets of setts between tall plastered houses with shutters, mansards and chimney stacks, timber-framed houses in the old core, quays along the river, boulevards on the line of the old walls, a few post-war blocks at the edge. Life is today's (cars, buses, a hospital tower, an army), set in that old fabric. Every name, sign and word on a wall is French. The Joinville photos (`terminal1.png`, `hospital*.png`, `prefeitura*.jpg`, `batalhao*.jpg`, `mirante_*.jpg`, `praça_da_bandeira.jpg`) give only arrangement and scale; no building, sign or name is copied from them, and every name is invented. Only the five POIs have interiors. Every other building is a solid block with a believable facade and doors that do not open.
 - **Budget:** 144 fps on a laptop. Two shadow-casting lamps. Every effect has a cap in `Config` and a pool. Watch "draws".
 - **Network:** new effects travel as *what happened* (kind, position, direction, one argument), never as particles or physics. Zombie snapshots stay 13 bytes each unless the step says otherwise and the packet test still passes.
 - **Looks are deterministic:** seeded from ids or the map's own RNG, never `randf`, so every peer sees the same city.
@@ -31,10 +31,10 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 - **The bar is the zombies, not the boxes.** Everything on screen is made to the level of the zombie bodies and outfits (S136, S137): low-poly and flat-shaded, but every form that catches light is modelled (chamfers, lips, frames, seams, bolts, hinges, handles), proportions are measured from references, and surfaces carry baked shading, wear, dirt and lettering. Plain boxes are a blockout, never a result. The gap today: the first-person hands are two boxes per arm, next to zombies with knuckles and nails.
 - **One element, one step.** An agent given one well-bounded thing (the street signs) does it well; given "make the city detailed" it makes garbage. An element step makes one element, or one small family that shares one design. Assembly steps place finished elements. A step that would model two unrelated things is split, and the new part appended as a new step.
-- **References first.** Read every reference the step names before any geometry. Where `references/` has nothing for the element, put at least two photos of the real thing in `references/elements/` first (from the user, or found, with the source on the card). Never model from memory.
+- **References first.** Read every reference the step names before any geometry. Where `references/` has nothing for the element, put at least two photos of real French examples (old Paris first) in `references/elements/` first (from the user, or found, with the source on the card). Never model from memory.
 - **The card.** Every element has `references/elements/<name>.md` (from `_template.md`): its references, its measurements in metres taken against something of known size (a 2.1 m door, a 12 m bus, a 15 cm kerb, a 1.75 m person), every visible detail as a list, the materials, the triangle budget per LOD, the moving parts, the states (clean, abandoned, damaged, burnt), and one section per round.
 - **The loop.** A round: shoot the review sheet (`python tools/models/review.py <name> --round=N`: the rack's eight angles, a 1 m close-up, 10 m and 50 m, beside the references), write on the card every difference from the references, fix them, write what was fixed. Round 1 is form (silhouette, proportions, real size), Round 2 structure (the secondary forms), Round 3 surface (wear, lettering, colour variation, states); later rounds are named in the step. A round with nothing written down does not count. The step is done when the last round's list is empty, or each leftover is marked accepted with a reason. The final sheet is shown in chat.
-- **Photo match for places.** Assembly steps rebuild each reference photo's viewpoint with `--shot-cam` and review the screenshot beside the photo, round by round, the same way.
+- **Style match for places.** Assembly steps shoot fixed viewpoints with `--shot-cam` and review each screenshot beside the French references on the place's card, round by round, the same way. They are never rebuilt to match a Joinville photo.
 - **The data says it.** Element and assembly steps carry `rounds: N` and the features `Round 1` .. `Round N` and `Review`; `python tools/steps_map.py --check` fails a step that names rounds without them.
 - **Budgets hold.** Detail lives in silhouettes and baked textures, not in triangle soup: LODs, draw calls and triangles per LOD are on the card and checked by `tests/test_elements.gd`; repeated elements are instanced.
 - **Later steps too.** Every weapon of P09 gets its model from its own element step, appended before its gameplay step starts. Effects and surfaces (P10) take rounds the same way on their racks when they are started.
@@ -156,25 +156,25 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] `--shot-cam=x,y,z,yaw,pitch` places a free camera so shots repeat exactly, `--poi-cam` looks at a mission's place
 - [x] Contact sheet `references/shots/index.html`
 
-### [ ] S140 · Element pipeline and review loop
+### [x] S140 · Element pipeline and review loop
 > needs: S136 | size: L | test: `tests/test_elements.gd` | see: `python tools/models/review.py hydrant`
 - Props, building parts, vehicles and guns are made the way the characters are: Python geometry, baked and exported by Blender into `assets/models/props/`, never edited by hand. GDScript boxes stay only for blockouts and the test maps.
-- [ ] `python tools/models/props.py <name>` builds one element from `tools/models/props/<family>.py`; `--sketch` draws it flat-shaded without Blender in seconds, `--quick` shapes only
-- [ ] Bake per element: albedo with ambient occlusion, a wear mask (edges, cavities, what faces the sky) painted from the card's materials, emission for anything lit, a LOD chain
-- [ ] Named moving parts and states in the .glb (doors, lids, shutters, magazines, actions, wheels; clean, abandoned, damaged, burnt), loaded by `PropModel` with their nodes; repeated elements as MultiMesh
-- [ ] Registry `scripts/models/elements.gd`: name, model, size, triangles per LOD, draws, parts, states; `tests/test_elements.gd` checks every entry (loads, size within 5 % of the card, budgets, parts, states, LODs)
-- [ ] `--prop-rack=<name>` (with `--state=` and `--part=open`) in a neutral, evenly lit room; `python tools/models/review.py <name> --round=N` shoots the sheet (eight angles, 1 m, 10 m, 50 m) beside the card's references into `references/shots/review_<name>_r<N>.png`
-- [ ] `references/elements/_template.md`, the card
-- [ ] A fire hydrant taken through three rounds as the worked example, its card and sheets kept
+- [x] `python tools/models/props.py <name>` builds one element from `tools/models/props/<family>.py`; `--sketch` draws it flat-shaded without Blender in seconds, `--quick` shapes only
+- [x] Bake per element: albedo with ambient occlusion, a wear mask (edges, cavities, what faces the sky) painted from the card's materials, emission for anything lit, a LOD chain
+- [x] Named moving parts and states in the .glb (doors, lids, shutters, magazines, actions, wheels; clean, abandoned, damaged, burnt), loaded by `PropModel` with their nodes; repeated elements as MultiMesh
+- [x] Registry `scripts/models/elements.gd`: name, model, size, triangles per LOD, draws, parts, states; `tests/test_elements.gd` checks every entry (loads, size within 5 % of the card, budgets, parts, states, LODs)
+- [x] `--prop-rack=<name>` (with `--state=` and `--part=open`) in a neutral, evenly lit room; `python tools/models/review.py <name> --round=N` shoots the sheet (eight angles, 1 m, 10 m, 50 m) beside the card's references into `references/elements/reviews/<name>_r<N>.jpg`
+- [x] `references/elements/_template.md`, the card
+- [x] A fire hydrant taken through three rounds as the worked example, its card and sheets kept
 
-### [ ] S141 · Detail kit
+### [x] S141 · Detail kit
 > needs: S140 | size: L | test: `tests/test_elements.gd` | see: `python tools/models/review.py kit`
-- [ ] Shapes: chamfered and bevelled boxes, lathed profiles, sweeps along a path (pipes, rails, handrails, cables with sag), extrusions with inset and raised panels, linear and radial arrays, window and door frames, vents and slots
-- [ ] Surfaces as geometry or bake: brick bonds, concrete block, stone setts, interlocking pavers, clay roof tiles in rows with ridge caps, corrugated and ribbed sheet, grilles and mesh, louvres, board-formed concrete
-- [ ] Lettering: block and stencil fonts as geometry or painted into the bake (signs, plates, roof paint, road words), numbers
-- [ ] Wear: chipped paint on edges, rust running from fixings, water stains below sills and joints, soot, moss and algae on shaded faces, dirt at the foot of walls, posters and graffiti as decals
-- [ ] Damage: dents, broken glass with holes and cracks, bullet pocks, a burnt version of every material, cut lines for collapse
-- [ ] The kit sheet: every helper side by side on the rack
+- [x] Shapes: chamfered and bevelled boxes, lathed profiles, sweeps along a path (pipes, rails, handrails, cables with sag), extrusions with inset and raised panels, linear and radial arrays, window and door frames, vents and slots
+- [x] Surfaces as geometry or bake: brick bonds, concrete block, stone setts, interlocking pavers, clay roof tiles in rows with ridge caps, corrugated and ribbed sheet, grilles and mesh, louvres, board-formed concrete
+- [x] Lettering: block and stencil fonts as geometry or painted into the bake (signs, plates, roof paint, road words), numbers
+- [x] Wear: chipped paint on edges, rust running from fixings, water stains below sills and joints, soot, moss and algae on shaded faces, dirt at the foot of walls, posters and graffiti as decals
+- [x] Damage: dents, broken glass with holes and cracks, bullet pocks, a burnt version of every material, cut lines for collapse
+- [x] The kit sheet: every helper side by side on the rack
 
 ---
 
@@ -400,7 +400,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 ### [ ] S154 · Helicopter model 2
 > needs: S141, S179 | size: L | rounds: 4 | test: `tests/test_helicopter.gd` | see: `--prop-rack=helicopter`, `--host --map=corridor --heli --shot-at=3,6,9`
 - Today it is twenty boxes (S024), and it ends every mission. `Helicopter`'s nodes and `HeliFlight` stay; the look is rebuilt.
-- [ ] Card: a medium military transport helicopter of the Brazilian forces (photos in `references/elements/` first), its real length and rotor span
+- [ ] Card: a medium military transport helicopter of a French-style army (no one army's markings copied) (photos in `references/elements/` first), its real length and rotor span
 - [ ] Round 1 · form: the fuselage's curves, the nose and its glazing, the cabin, the tail boom's taper, the fin and stabiliser, the engine housing; skids or wheels as in the photos
 - [ ] Round 2 · structure: sliding doors on rails, window frames, engine intakes and exhausts, the rotor head with its hub and pitch links, blade tips, the tail rotor's gearbox, steps, antennas, the door gun's mount
 - [ ] Round 3 · surface: matt olive paint with panel lines and rivet rows baked, soot behind the exhausts, oil streaks, worn walkway paint, stencilled national markings and serials
@@ -627,7 +627,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ---
 
-## P05 · The real Joinville
+## P05 · The town
 
 ### [x] S039 · Trace the OpenStreetMap tiles
 > needs: none | size: L | test: `tests/test_city_osm.gd` | see: redraw `references/city_plan.png`
@@ -639,119 +639,125 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [x] Overlay picture `references/osm_on_reference.png` proves the registration by eye
 - [x] Test: the terminal, the Prefeitura and the hospital footprints land inside their `CityData.POIS` lots
 - [x] Gaps between tiles reported, not guessed
+- What this gives the town: a plan to simplify (S040) and a density map for the blocks (S043), not footprints to rebuild one by one.
   - The tiles are at four times joinville.png's zoom (their scale bars); `--register` finds each tile's place by cross-correlating its buildings with joinville.png's (match 0.64 to 0.77) and the control points are kept in `TILES`. 1301 footprints (convex, simplified), streets as 1-pixel cells per class, areas as polygons; the overlay is generated, not committed. The nine tiles cover the centre in an uneven patchwork: what their bounding box leaves uncovered is `CityOsm.GAPS`
 
 ### [ ] S040 · Street network 2
 > needs: S039 | size: L | test: `tests/test_city_map.gd` | see: `--city-plan`
-- [ ] `CityData.STREETS` checked street by street against the tiles: missing ones added, names fixed
-  - [ ] Centre: Rua do Príncipe, Rua Nove de Março, Rua XV de Novembro, Rua Jerônimo Coelho, Rua Rio Branco, Rua Itajaí, Rua Abdon Batista, Rua Sete de Setembro, Rua Três de Maio, Rua Padre Carlos, Alameda Brüstlein
-  - [ ] River roads: Avenida Hermann August Lepper, Avenida José Vieira, Avenida Doutor Paulo Medeiros, Rua Aubé
-  - [ ] Foot of the hill: Rua Saguaçu, Rua Amazonas, Rua Chapecó, Rua Curitiba, Rua Cantareira, Rua Bela Vista
-- [ ] Per street: carriageway width, lanes, one-way direction, sidewalk width each side, surface kind
-- [ ] Junctions as real shapes: rounded kerb corners by radius, T and cross, the riverside interchange as slip roads
+- The plan, not a copy: Joinville's tiles give the bones (the river's line, the hill, where the five places stand, the main through-roads); the street grid is bent into a French town as Paris was around 1800, before Haussmann: a dense old core of narrow crooked streets, a few squares, quays along the river, boulevards on the line of the old walls, and every name invented and French.
+- [ ] `CityData.STREETS` redrawn from the tiles as a skeleton, not traced one to one
+  - [ ] Keep: the through-roads that link the five places, the quays, the road up the hill and its hairpin
+  - [ ] Bend: break Joinville's long straight grid into streets that wander, narrow and widen, meet at odd angles; dead-end impasses and covered passages through blocks
+  - [ ] Add: the old core round a place du marché, a tree-lined boulevard ring where the wall stood, a faubourg street running out of town from one of the old gates
+- [ ] Invented French street names, kept in a table in `CityData`: rue du Marché, rue des Tanneurs, rue de la Harpe-Rouge, quai des Bateliers, place de l'Église, impasse des Carmes, boulevard du Rempart, faubourg Saint-Rémy and the like; never a real street of a real town on purpose
+- [ ] Per street: carriageway width, one-way direction, pavement width each side (none in the narrowest lanes), surface kind (setts or asphalt)
+- [ ] Junctions as real shapes: chamfered corners (pans coupés), T and skewed cross, a small rond-point where the boulevard meets the quay
 - [ ] Streets as meshes following the polyline with mitred joints, not grid cells; the 4 m grid stays for navigation only
 - [ ] Only what lies inside a mission area is built in detail (S051)
+- [ ] `--city-plan` and the menu's map redrawn from the new plan
 
 ### [ ] S041 · Road surface
-> needs: S040, S155 | size: L | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over Rua Nove de Março, `--street-rack`
+> needs: S040, S155 | size: L | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over the rue du Marché, `--street-rack`
 - [ ] Surfaces as vertex colour and one shared material, no textures
-  - [ ] Asphalt: dark, patched rectangles, tar seams, a lighter worn track per lane
-  - [ ] Paralelepípedo (stone setts) on old centre streets and the terminal apron: rows drawn in vertex colour, slight height noise
-  - [ ] Grey concrete pavers on the Mirante road
-- [ ] Markings as thin overlay meshes in one draw per street
-  - [ ] Centre line single or double yellow, white lane dashes, edge lines
-  - [ ] Zebra crossings with a stop line before them, at every traced junction that has one
-  - [ ] Bus lane and bus box lettering near the terminal, painted arrows, PARE on the ground, words and numbers as on the Prefeitura's avenue (CURVA, 60 in `prefeitura2.jpg`)
-  - [ ] Yellow painted kerbs where parking is forbidden
-- [ ] The road details of S155 placed: manholes, drains at the kerb, speed humps, cracks and potholes seeded per street
-- [ ] Camber: the road crown is a few centimetres above the gutters
+  - [ ] Pavés: square sandstone and granite setts in rows on the old streets, the squares and the quays, slightly domed each, the joints dark; drawn in vertex colour with height noise
+  - [ ] The old lanes dished to a gutter (ruisseau) down the middle, as before pavements
+  - [ ] Asphalt on the boulevards and the newer roads: dark, patched, a lighter worn track per lane
+- [ ] Markings as thin overlay meshes in one draw per street, French style
+  - [ ] White dashed centre and lane lines on the asphalt, none on the setts
+  - [ ] Zebra crossings (passages piétons) as white bars, on the setts too
+  - [ ] BUS lettering and lanes near the bus station, painted arrows, give-way triangles, yellow zigzags at the bus stops, parking bays and PAYANT lettering
+- [ ] The road details of S155 placed: manholes, gutters and kerb drains, raised crossings, cracks and potholes seeded per street, setts missing in patches
+- [ ] Camber: the boulevards crowned, the old lanes falling to the middle
 - [ ] `--street-rack`: a 30 m strip of every surface and marking side by side
-- [ ] Round 1 · form: the strips' crowns, kerb lines and the markings' widths against the Brazilian standards
-- [ ] Round 2 · structure: patches, seams, worn tracks, faded and cracked paint, the setts' rows and joints
-- [ ] Round 3 · wet and night: the same strips at night and wet (S110 when it exists), lamp pools, oil sheen
-- [ ] Review: the street rack sheet and the Rua Nove de Março shot
+- [ ] Round 1 · form: the strips' crowns and dishes, kerb lines and the markings' widths against the card's French references
+- [ ] Round 2 · structure: the setts' rows and joints, sunk and lifted ones, asphalt patches over setts, faded and cracked paint
+- [ ] Round 3 · wet and night: the same strips at night and wet (S110 when it exists), lamp pools, the setts' shine, water running in the ruisseau
+- [ ] Review: the street rack sheet and the rue du Marché shot
 
 ### [ ] S042 · Sidewalks
 > needs: S040, S156 | size: M | rounds: 3 | test: `tests/test_sidewalks.gd` | see: `--host --shot-cam` on a street corner, `--street-rack`
-- [ ] Kerb as a real 15 cm step with a granite edge, players and zombies walk it without a jump
+- [ ] Kerb as a real 12 to 15 cm step of long granite blocks, players and zombies walk it without a jump
 - [ ] Paving kinds by street
-  - [ ] Red interlocking brick pavers (the squares and the Mirante walkway: `praça_da_bandeira.jpg`, `mirante_street.jpg`)
-  - [ ] Grey concrete slabs with joints
-  - [ ] Petit-pavé black and white mosaic bands on the main shopping streets
-- [ ] Dropped kerbs at driveways and crossings, yellow tactile strips at corners
-- [ ] Tree pits with white kerbs as in the square, grass verges; the front walls, fences and gates of S156 along the lot lines
+  - [ ] Poured grey asphalt pavements with the granite kerb, the Parisian kind
+  - [ ] Stone flags on the squares and in front of the public buildings
+  - [ ] No pavement in the narrowest lanes: setts wall to wall, stone bollards (bornes chasse-roues) guarding the house corners and the carriage gates
+- [ ] Dropped kerbs at the portes cochères and crossings, studded tactile strips at corners
+- [ ] Tree pits with cast-iron grilles on the boulevards; the walls, railings and gates of S156 where buildings stand back
 - [ ] Sidewalks are nav cells: zombies use them, hordes spill onto the road
-- [ ] Round 1 · form: kerb heights and sidewalk widths per street, the pavers' sizes and bonds against the photos
-- [ ] Round 2 · structure: joints, broken and missing pavers, sunken slabs, roots lifting the paving by the trees
-- [ ] Round 3 · surface: grime, gum, stains, weeds in the joints, darker where wet
-- [ ] Review: the street rack and the corner shot beside the photos
+- [ ] Round 1 · form: kerb heights and pavement widths per street, the flags' sizes against the photos
+- [ ] Round 2 · structure: joints, cracked and patched asphalt, broken kerb stones, the bornes' worn tops
+- [ ] Round 3 · surface: grime, gum, stains, moss and weeds in the joints, darker where wet
+- [ ] Review: the street rack and the corner shot beside the references
 
 ### [ ] S043 · Block massing
 > needs: S039, S040 | size: L | rounds: 2 | test: `tests/test_city_blocks.gd` | see: `--host --shot-cam` skyline
-- [ ] Every traced footprint inside a mission area becomes a solid extruded block, in the right place and shape
-- [ ] Height from a class picked by footprint area, street and seed
-  - [ ] House: one or two floors, hipped red clay tile roof
-  - [ ] Shop row: two or three floors, flat roof behind a parapet
-  - [ ] Slab block: 8 to 20 floors, set back, with a podium
-  - [ ] Shed: large low footprint, shallow metal roof (the works along Rua Aubé)
-- [ ] Known heights for buildings visible in the photos (the towers behind Praça da Bandeira, the blocks around the hospital) in a small override table
+- The traced footprints say how dense each part of town is and where the big buildings sit; the blocks are Paris's before Haussmann, not Joinville's lots.
+- [ ] Îlots: each block between the new streets is closed by a row of narrow houses along its edge with courtyards and passages inside, seeded widths per house (two to four windows); footprints from `CityOsm` inside it set its density and where a big hall, court or garden breaks the row
+- [ ] Height from a class picked by street, place and seed
+  - [ ] Old core: four to six floors on narrow fronts, steep roofs with dormers, leaning a little
+  - [ ] Faubourg and boulevard houses: four or five floors, stone ground floor, plastered above, mansard roofs
+  - [ ] Hôtels particuliers: a stone house between a front court behind a gate and a garden behind
+  - [ ] A few post-war blocks at the edge of town, where the hospital tower and the bus station stand; no skyline of towers
+  - [ ] Ateliers: long low halls with glass roofs by the river
+- [ ] Roofs are part of the mass: pitched and mansard roofs with ridges and hips, the tall party-wall chimney stacks left to the kits
 - [ ] Collision is the block, one mesh per city block, test counts draws
 - [ ] Blocks outside every mission area: low-detail silhouettes only
-- [ ] Round 1 · skyline: the towers behind Praça da Bandeira and round the hospital, from the viewpoints of `praça_da_bandeira.jpg` and `hospital1.jpg`
-- [ ] Round 2 · roofscape: the blocks and roofs from the helicopter's height against the OSM tiles and `prefeitura3.png`
-- [ ] Review: the photo views side by side
+- [ ] Round 1 · skyline: from the place du marché, the bridge and the hill: a sea of grey slate and red tile roofs bristling with chimney pots, the church tower and the town hall's campanile above it
+- [ ] Round 2 · roofscape: the îlots and courtyards from the helicopter's height against old Paris views and plans on the card (the Turgot plan's bird's-eye view)
+- [ ] Review: the three views side by side with the references
 
 ### [ ] S044 · Facades
 > needs: S043, S157, S158, S159, S160, S161, S162, S163, S164 | size: L | rounds: 2 | test: `tests/test_facades.gd` | see: `--host --shot-cam` street level, day and night
 - Assembly: the blocks of S043 dressed from the facade kits; nothing modelled here.
-- [ ] Facade grammar per block class: which kit, how many floors, where the shops, doors and signs go, seeded per building
-  - [ ] Plaster houses (S162) and enxaimel houses (S161) on the residential streets; shop rows of shopfronts (S158) under windows (S157) in the centre; towers (S163) set back on podiums; sheds (S164) along Rua Aubé
-  - [ ] Rooftops and balconies (S159), signs (S160) by the shop kinds of the street
-- [ ] Joinville's mix: enxaimel gables among pastel houses and modernist towers, as in the background of `praça_da_bandeira.jpg`
-- [ ] Night: a seeded few windows lit warm or TV-blue, some flickering, most dark
-- [ ] Decay by street: boarded and broken windows, soot above burnt ones, quarantine tape across doors (the kits' states)
-- [ ] House numbers by the doors
-- [ ] Round 1 · composition: three street views (centre, residential, Rua Aubé) for variety; no two neighbours alike
+- [ ] Facade grammar per block class: which kit, how many floors, where the shops, carriage gates and signs go, seeded per building
+  - [ ] Timber-framed houses (S161) in the old core; plastered stone houses (S162) on the main streets and boulevards with wooden shopfronts (S158) under French windows (S157); the few post-war blocks (S163) at the edge; ateliers (S164) by the river
+  - [ ] Roofs, dormers and balconies (S159), painted and hanging signs (S160) by the shop kinds of the street
+- [ ] The town's mix: plaster fronts in creams, ochres and greys, a stone hôtel behind its gate, a leaning timber house, a later infill where one burnt
+- [ ] Night: a seeded few windows lit warm or TV-blue behind the shutters, some flickering, most dark
+- [ ] Decay by street: shutters closed or hanging, broken windows, soot above burnt ones, quarantine tape across doors (the kits' states)
+- [ ] House numbers on blue enamel plates by the doors
+- [ ] Round 1 · composition: three street views (old core, boulevard, the river ateliers) for variety; no two neighbours alike
 - [ ] Round 2 · night and decay: the same views at night and in the abandoned state
 - [ ] Review: the three views, day and night
 
-### [ ] S045 · Rio Cachoeira
+### [ ] S045 · The river
 > needs: S040, S004, S165, S174 | size: L | rounds: 3 | test: `tests/test_river.gd` | see: `--host --shot-cam` on a bridge
-- [ ] Channel cut below street level: sloped grass and stone banks, a retaining wall where the avenues run beside it, the green railing and shrubs along the Prefeitura's bank (`prefeitura2.jpg`)
+- The river runs where Joinville's does; its banks are Paris's quays.
+- [ ] Channel cut below street level: high stone quay walls with mooring rings, cobbled ramps (ports) and stairs down to a lower quay at the water, the quay road above with its parapet; grass banks and willows out of the centre
 - [ ] Water: one mesh, shader in code with slow flow along the river line, small ripples, dark green-brown, sky and lamp reflections as stretched streaks
-- [ ] The bridges of S165 at the traced crossings
-- [ ] Floating things drifting with the flow: debris, a body, an upturned boat (S184), seeded
-- [ ] Imperial palm row along the riverside avenue as in `prefeitura3.png` (S174)
-- [ ] Water is not walkable; falling in wades the player to the bank slowly, zombies stay out
+- [ ] The bridges of S165 at the crossings of the new plan
+- [ ] Floating things drifting with the flow: debris, a body, a sunk barge, an upturned rowing boat (S184), seeded
+- [ ] Plane trees (S174) along the upper quay; the parapet's empty bouquinistes' boxes
+- [ ] Water is not walkable; falling in wades the player to a ramp or stairs slowly, zombies stay out
 - [ ] Mist over the water at night
-- [ ] Round 1 · form: the channel's width, depth and banks against the OSM water and `prefeitura2.jpg`
-- [ ] Round 2 · water: colour, flow, reflections, the line where water meets the bank
+- [ ] Round 1 · form: the channel's width, depth, quay walls and ramps against the OSM water and the card's references of the Paris quays
+- [ ] Round 2 · water: colour, flow, reflections, the line where water meets the wall
 - [ ] Round 3 · night: the lamps' reflections, mist
-- [ ] Review: the bridge shot and the `prefeitura2.jpg` view side by side
+- [ ] Review: the bridge shot and a view along the lower quay
 
 ### [ ] S046 · Street furniture placement
 > needs: S041, S042, S166, S167, S168, S169, S170, S171, S172, S173 | size: M | rounds: 2 | test: `tests/test_street_furniture.gd` | see: `--furniture-rack`, `--host --shot-cam` on a street corner
 - Assembly: places the finished street furniture; nothing modelled here.
-- [ ] Rules along streets, seeded, merged per block: lamps by street class and spacing, poles and cables along every street with their spans, traffic lights at the traced junctions that have them, name plates on corners with the real street names, bus stops where the lines run, an orelhão and a banca now and then, benches, bins and bollards by the squares and shops
+- [ ] Rules along streets, seeded, merged per block: réverbères hung on ropes over the old streets and lanterns on wall brackets, cast-iron candelabra on the boulevards and quays, the ropes and wires of S167, traffic lights at the bigger junctions, street names carved in the corner stones and on blue plates, bus stops where the lines run, a colonne Morris and a kiosk now and then, benches, bins, bornes and railings by the squares and shops
 - [ ] Lamps follow the two-shadow rule: emission and a cheap light, shadows only from the manager (S108)
-- [ ] States by street: a few lamps flicker or are bent and dead, a pole leans with its cables down, a sign is bent
+- [ ] States by street: a few lamps flicker or hang dead, a réverbère down in the street on its rope, a sign bent
 - [ ] Small props are cover; thin poles do not block bullets
 - [ ] `--furniture-rack`: every piece of S166 to S173 in a row
-- [ ] Round 1 · placement: a centre street, the riverside avenue and a residential street against the photos' streets
-- [ ] Round 2 · density and light: enough clutter to read as a real street, the lamps' pools at night
+- [ ] Round 1 · placement: an old lane, the quay and a boulevard against the card's references
+- [ ] Round 2 · density and light: enough clutter to read as a lived-in town, the lamps' pools at night
 - [ ] Review: the corner shot by day and night
 
 ### [ ] S047 · Vegetation placement and wind
-> needs: S042, S174, S175, S176, S177, S178 | size: M | rounds: 2 | test: `tests/test_vegetation.gd` | see: `--tree-rack`, `--host --shot-cam` on Alameda Brüstlein
+> needs: S042, S174, S175, S176, S177, S178 | size: M | rounds: 2 | test: `tests/test_vegetation.gd` | see: `--tree-rack`, `--host --shot-cam` on the boulevard
 - Assembly and the shared systems: places the finished plants of S174 to S178.
-- [ ] Planting rules: palms on the avenues and medians, ipê and street trees in the sidewalk pits, shrubs and hedges in front gardens and squares, the forest wall where the hill rises
+- [ ] Planting rules: double rows of plane trees and elms on the boulevard and the quays, the old chestnuts on the squares, limes trained flat in the courts, box parterres in the formal gardens, window boxes and climbing ivy on the old houses, the forest wall where the hill rises
 - [ ] Wind: vertex sway in a shader, stronger at the tips, gusts that travel across a street
 - [ ] Grass tufts on lawns and verges as one MultiMesh, pressed down where zombies ran
 - [ ] Leaves fall and skitter along the gutter in gusts
 - [ ] `--tree-rack`: every species and size in a row
-- [ ] Round 1 · placement: Alameda Brüstlein, the Prefeitura's avenue, a residential street, the edge of the hill
+- [ ] Round 1 · placement: the boulevard, the quay, a square, the edge of the hill
 - [ ] Round 2 · motion: wind strength by place, gusts, nothing swimming
-- [ ] Review: the four views beside `prefeitura2.jpg` and `praça_da_bandeira.jpg`
+- [ ] Review: the four views beside the card's references
 
 ### [ ] S048 · Apocalypse dressing
 > needs: S046, S180, S181, S182, S183, S184, S185, S186, S203 | size: M | rounds: 2 | test: `tests/test_dressing.gd` | see: `--host --shot-cam` on the avenue
@@ -769,30 +775,30 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Review: the avenue shot and a checkpoint shot
 
 ### [ ] S049 · Squares and landmarks
-> needs: S044, S047, S166, S173, S187, S188, S189, S190 | size: M | rounds: 3 | test: `tests/test_landmarks.gd` | see: `--host --shot-cam` on Praça da Bandeira
-- Assembly of the finished landmarks, each on its traced footprint, exterior only.
-- [ ] Praça da Bandeira from `praça_da_bandeira.jpg`: the red paver field, the monument (S187) on its plinth, the flagpole, the white-edged tree beds with young trees, the green double-globe lamps (S166), the green square bins and benches (S173), the palms and the araucária by the monument
-- [ ] Alameda Brüstlein: the double row of imperial palms on a long median
-- [ ] The cathedral (S188) on Rua do Príncipe
-- [ ] Cemitério do Imigrante (S189) on its slope
-- [ ] Zoobotânico at the foot of the hill (S190), seen only on the Mirante mission
-- [ ] Round 1 · layout: the square's plan against the OSM tiles and the photo's view from above
-- [ ] Round 2 · photo match: the viewpoint of `praça_da_bandeira.jpg` rebuilt with `--shot-cam`, side by side
-- [ ] Round 3 · decay: the abandoned square (litter, a fallen lamp, a car crashed into a tree bed) without losing the place
-- [ ] Review: the photo match sheet
+> needs: S044, S047, S166, S173, S187, S188, S189, S190 | size: M | rounds: 3 | test: `tests/test_landmarks.gd` | see: `--host --shot-cam` on the place du marché
+- Assembly of the finished landmarks, exterior only. They stand where the plan of S040 puts them (the place du marché where Praça da Bandeira is, the church near it), not on traced footprints.
+- [ ] The place du marché: setts, the fountain (S187) in the middle, old chestnuts, lanterns (S166), benches and bins (S173), the empty market stalls, tall plastered houses with shops closing it
+- [ ] The boulevard: a wide gravel walk under double rows of plane trees between two carriageways, benches and lamps along it
+- [ ] The church (S188) on its parvis off the market
+- [ ] The old cemetery (S189) on the slope behind the church
+- [ ] The jardin public at the foot of the hill (S190), seen only on the lookout mission
+- [ ] Round 1 · layout: the square's plan against old French market squares on the card (how irregular it is, how the streets enter it)
+- [ ] Round 2 · style match: fixed `--shot-cam` views of the square and the church beside the card's references (old Paris engravings and photos of its surviving pre-Haussmann streets)
+- [ ] Round 3 · decay: the abandoned square (litter, a fallen lantern, a car crashed into the fountain's basin) without losing the place
+- [ ] Review: the style match sheet
 
 ### [ ] S050 · Sky and time of day
 > needs: S004 | size: L | rounds: 3 | test: `tests/test_sky.gd` | see: `--time=day|dusk|night --shot-at=2`
-- [ ] Sky shader in code: gradient, sun or moon disc, stars that twinkle, two drifting cloud layers lit from below by the city at night
+- [ ] Sky shader in code: gradient, sun or moon disc, stars that twinkle, two drifting cloud layers lit from below by the town at night
 - [ ] Presets per mission in map data: overcast day, orange dusk with long shadows, moonlit night, storm
 - [ ] One directional light per preset, shadows only by day and dusk
 - [ ] Distance fog tinted by the preset, hides the draw distance limit
-- [ ] Far backdrop: skyline silhouette of towers and the dark mass of Morro da Boa Vista with the lit Mirante on top, visible from every mission
+- [ ] Far backdrop: the roofscape bristling with chimneys, the church tower and the campanile, and the dark wooded hill with the old telegraph tower and its windmill on top, visible from every mission
 - [ ] Columns of smoke on the horizon, a distant fire glow under the clouds
 - [ ] `--time=` flag, sent in `welcome`
-- [ ] Round 1 · day: the clear and overcast presets against `praça_da_bandeira.jpg` and `prefeitura2.jpg` (sky colour, clouds, the light on the facades)
-- [ ] Round 2 · dusk and night: the night of `hospital1.jpg` (the city's glow under the clouds, the dark hill), the moon and stars
-- [ ] Round 3 · storm and backdrop: the storm preset, the skyline and Morro da Boa Vista seen from each mission's start
+- [ ] Round 1 · day: the clear and overcast presets (sky colour, clouds, the light on the plaster) against the card's references
+- [ ] Round 2 · dusk and night: the town's glow under the clouds, the dark hill, the moon and stars
+- [ ] Round 3 · storm and backdrop: the storm preset, the roofscape and the hill seen from each mission's start
 - [ ] Review: every preset from the same three viewpoints in one sheet
 
 ### [ ] S051 · Mission areas
@@ -808,240 +814,242 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 > needs: S051, S028 | size: M | test: `tests/test_city_nav.gd`
 - [ ] Nav grid built per mission area at 1 m near the POI, 4 m in the streets
 - [ ] Kerbs, wreck gaps, fences with holes and stairs are walkable links
-- [ ] Spawn closets authored per area: alleys, garage ramps, behind buses, manholes, each proven out of sight
-- [ ] Horde routes authored per area so streams come down real streets
+- [ ] Spawn closets authored per area: portes cochères, courtyard passages, impasses, cellar stairs, behind buses, manholes, each proven out of sight
+- [ ] Horde routes authored per area so streams come down the town's streets and lanes
 - [ ] Zombies do not walk through hedges, railings or water
 - [ ] Bot scenario: walk the whole mission route without getting stuck
 
 ### [ ] S155 · Road details: manholes, drains, humps
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=road_details`
-- [ ] Card: photos of the city's manhole covers, kerb inlets (bocas de lobo), grated drains and speed humps
-- [ ] Round 1 · form: round and square covers with their frames, the kerb inlet's concrete lintel and mouth, grates, the hump's profile to the Brazilian standard
-- [ ] Round 2 · structure: cast patterns and lettering on the covers, the grate bars, the hump's painted chevrons and its sign post, cracked asphalt rings round the covers
+- [ ] Card: photos of French manhole covers (regards), kerb drains (bouches d'égout) with their cast-iron mouths, the stone gutter channels, raised crossings
+- [ ] Round 1 · form: round and square covers with their frames, the kerb drain's mouth and its stone, the gutter's dish, the raised crossing's ramps
+- [ ] Round 2 · structure: cast patterns and lettering on the covers (the town's invented name and arms), the grate bars, the crossing's painted marks, setts laid round the covers
 - [ ] Round 3 · surface: rust and polish where tyres pass, leaves and silt in the drains, faded paint, patches and potholes as decals with depth
 - [ ] States: a missing cover (an open hole), a drain overflowing in rain (S110)
 - [ ] Review: the rack and a street strip at 1 m and 10 m
 
-### [ ] S156 · Front walls, fences and gates
+### [ ] S156 · Front walls, railings and gates
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=boundaries`
-- The muro is the face of a Brazilian street: most houses show a wall and a gate, not a facade.
-- [ ] Card: photos of Joinville street fronts: plastered walls with pillars, iron bar gates, sliding sheet gates with grilles, low walls with railings, chain-link, hedges
-- [ ] Round 1 · form: heights (1.8 to 2.2 m walls, 0.6 m low walls), pillar spacing, gate widths for a car and for a person
-- [ ] Round 2 · structure: copings, pillar caps, the gates' bars and patterns, hinges and rollers, letterboxes and intercoms, house numbers, spikes or broken glass along the top, electric fence wires on insulators
-- [ ] Round 3 · surface: painted plaster with damp rising from the ground, peeling paint, rust on the gates, tags, moss
+- Most houses stand on the street; walls and gates are for the courts of the hôtels, the gardens and the villas on the hill road.
+- [ ] Card: photos of old Paris street fronts: portes cochères with their great wooden leaves, a court wall with a carved gateway, stone walls with iron railings on a low plinth, garden walls with copings
+- [ ] Round 1 · form: heights (0.6 m plinths, 2 m railings, 3 to 4 m court walls), pier spacing, gate widths for a carriage and for a person
+- [ ] Round 2 · structure: copings and pier caps with urns, the railings' bars and spear finials, the gate leaves' panels, studs, knockers and the wicket door, chasse-roues at the gate's foot
+- [ ] Round 3 · surface: stone and plaster with damp rising from the ground, flaking paint, rust on the railings, tags, moss
 - [ ] Modules that join along any lot line, with corners and ends; states: gate open, rammed, burnt
 - [ ] Review: a street front of ten lots at 10 m and the rack at 1 m
 
 ### [ ] S157 · Window kit
 > needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=windows`
-- [ ] Card: photos of the windows of Joinville's houses, shop rows and towers: aluminium sliders, wooden venezianas, iron grilles (grades), office ribbon glazing
-- [ ] Round 1 · form: sizes and proportions per kind, how deep each sits in the wall, sills
-- [ ] Round 2 · structure: frames and mullions, sliding sashes, the shutters' louvres, the grilles' patterns, drip edges, an AC box in some
-- [ ] Round 3 · surface: glass that reflects the sky, dirt in the frame corners, rust running from the grilles, faded shutters, curtains and blinds behind some
-- [ ] States: open, shut, broken (shards left in the frame), boarded, burnt with soot above; lit warm, TV-blue or dark at night (emission)
+- [ ] Card: photos of old Paris windows: tall French casements (fenêtres à la française) with small panes, louvred wooden shutters folding against the wall, low iron railings across the opening (garde-corps), the small windows of the timber houses, post-war ribbon glazing for the few new blocks
+- [ ] Round 1 · form: sizes and proportions per kind (tall, narrow, regular), how deep each sits in the wall, sills, the plaster or stone surrounds
+- [ ] Round 2 · structure: frames and glazing bars, the shutters' louvres, hinges and catches, the garde-corps' bars and scrolls, drip edges
+- [ ] Round 3 · surface: old glass that reflects the sky unevenly, dirt in the frame corners, flaking paint on the frames and shutters, net curtains behind some
+- [ ] States: open, shut, shutters closed, broken (shards left in the frame), boarded, burnt with soot above; lit warm, TV-blue or dark at night (emission)
 - [ ] Review: each kind at 1 m and on a test wall at 10 m, by day and night
 
 ### [ ] S158 · Shopfront kit
 > needs: S141, S157 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shopfronts`
-- [ ] Card: photos of the centre's shopfronts (Rua do Príncipe, Rua XV de Novembro)
-- [ ] Round 1 · form: bay widths, the glass front and its doorway, the box of the roll-down shutter above, awning depths
-- [ ] Round 2 · structure: aluminium frames, the steel shutter's slats, locks and bottom bar, fabric and metal awnings on brackets, a recessed doorway with a tiled step, counters and shelves seen through the glass
-- [ ] Round 3 · surface: posters and prices in the windows, dirty glass, scratched and tagged shutters, faded awnings
-- [ ] States: open, shutter down, shutter half up, forced (bent up), looted (glass out, shelves bare)
+- [ ] Card: photos of old Paris shopfronts: the wooden front applied to the house (devanture en applique) with pilasters, a deep fascia and the side boxes that hold the night shutters, painted in dark green, oxblood or black
+- [ ] Round 1 · form: bay widths, the glazed front and its door, the fascia, the shutter boxes, awning depths
+- [ ] Round 2 · structure: the panels and mouldings, small-paned shop windows, the wooden shutter panels put up at night, the bars across them, striped fabric awnings (stores) on arms, a stone step, counters and shelves seen through the glass
+- [ ] Round 3 · surface: gilded or painted lettering on the fascia, posters and prices in the windows, dirty glass, flaking paint, tags on the shutters
+- [ ] States: open, shutters up, half shuttered, forced (panels torn off), looted (glass out, shelves bare)
 - [ ] Review: a row of six fronts at 1 m and 10 m
 
-### [ ] S159 · Rooftops and balconies
+### [ ] S159 · Roofs, dormers and balconies
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=rooftops`
-- [ ] Card: photos of the centre's roofs and the towers' balconies (the backgrounds of `praça_da_bandeira.jpg` and `hospital1.jpg`)
-- [ ] Round 1 · form: balcony slabs and railings, split-AC outdoor units, water tanks (caixas d'água), lift overruns, parapets
-- [ ] Round 2 · structure: railing bars and glass, the AC units' fans and pipes, tank lids and pipes, TV antennas and dishes, gutters, downpipes, roof ladders
-- [ ] Round 3 · surface: rust streaks under the AC units, black water stains below the parapets, laundry and plants on some balconies
-- [ ] Review: a tower top and a stack of balconies at 10 m and 50 m
+- [ ] Card: photos of old Paris roofs: slate and tile, mansards with their steep and shallow slopes, dormers (lucarnes), the tall party-wall chimney stacks with rows of pots, wrought-iron balconies
+- [ ] Round 1 · form: roof faces and mansard breaks, dormers with their pediments, chimney stacks, skylights, balconies on brackets
+- [ ] Round 2 · structure: slate and tile rows, ridge and hip caps, zinc flashing and gutters, downpipes, chimney pots (mitrons) in rows, the balconies' scrolled railings and stone brackets, TV antennas and dishes
+- [ ] Round 3 · surface: moss and lichen, soot round the chimneys, black stains below the gutters, laundry and plants on some balconies
+- [ ] Review: a roofscape and a balcony at 10 m and 50 m
 
 ### [ ] S160 · Shop signs and lettering
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_shops`
-- [ ] Card: photos of the centre's shop signs; the kinds: FARMÁCIA with a green cross, PADARIA, LOTÉRICA, LANCHONETE, FERRAGENS, AÇOUGUE, BAR, OFICINA, ÓTICA, never a real brand
-- [ ] Round 1 · form: fascia boards, lightboxes, projecting signs, the pharmacy cross
-- [ ] Round 2 · structure: letters raised or painted, the boxes' frames and fixings, the cables to the lit ones
-- [ ] Round 3 · surface: faded paint, cracked acrylic, missing letters, rust running from the fixings
+- [ ] Card: photos of old French shop signs; the kinds: PHARMACIE with a green cross, BOULANGERIE, BOUCHERIE, CAFÉ, BRASSERIE, TABAC with its red lozenge, QUINCAILLERIE, HERBORISTERIE, OPTICIEN, COIFFEUR, never a real brand
+- [ ] Round 1 · form: lettering painted on the fascia and on the wall over the shop, wrought-iron hanging signs on brackets with a shape cut out (a key, a boot, a bunch of grapes), the pharmacy cross
+- [ ] Round 2 · structure: letters painted, gilded or raised, the brackets' scrolls and chains, the cross's box and its cable
+- [ ] Round 3 · surface: faded paint, ghost signs of old trades on the blank walls, missing letters, rust running from the fixings
 - [ ] Seeded per building from its shop kind; states: lit, dead, flickering (S108), half fallen
 - [ ] Review: a street of signs by day and at night
 
-### [ ] S161 · The enxaimel house
-> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=enxaimel`
-- Joinville's German heritage: dark timber frames on white walls under steep red roofs.
-- [ ] Card: photos of Joinville's half-timbered houses: the frame patterns, the proportions, the gables (the red gable in the background of `praça_da_bandeira.jpg`)
-- [ ] Round 1 · form: the steep gable, the floors, the roof's overhang; a two-storey and a one-storey variant
-- [ ] Round 2 · structure: posts, rails and diagonal braces, sills and lintels, small casements with shutters and flower boxes, roof tiles, bargeboards and the ridge
-- [ ] Round 3 · surface: weathered dark timber, whitewash with hairline cracks, moss on the tiles, a date carved over the door
-- [ ] Round 4 · use: a variant with a shop or café on the ground floor (S158), and the abandoned state
-- [ ] Review: front, gable and three-quarter at 1 m and 10 m beside the photos
+### [ ] S161 · The timber-framed house
+> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=half_timber`
+- Old Paris's houses on narrow medieval lots: timber frames (pans de bois), most plastered over, a few left bare, leaning with age.
+- [ ] Card: photos of the surviving timber houses of old Paris and French old towns: the narrow front, the jettied floors, the gable or the eaves to the street
+- [ ] Round 1 · form: four or five floors on a two-window front, the upper floors jutting, the steep roof; a plastered and a bare variant
+- [ ] Round 2 · structure: posts, rails and cross-braces (bare variant), the plaster's mouldings over them (plastered variant), small casements, the shop floor's beam, roof tiles and the dormer
+- [ ] Round 3 · surface: weathered dark timber, cracked plaster showing the frame, the lean of the old front, moss on the tiles
+- [ ] Round 4 · use: a variant with a shop or a cabaret on the ground floor (S158), and the abandoned state
+- [ ] Review: front, side and three-quarter at 1 m and 10 m beside the references
 
-### [ ] S162 · Plaster houses
+### [ ] S162 · Plastered stone houses
 > needs: S156, S157 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=houses`
-- [ ] Card: photos of Joinville's single-family houses: pastel plaster, tiled hip roofs, porches, garages behind the front wall
-- [ ] Round 1 · form: one and two floors, roof pitches, the porch, the garage; modules that fit the traced footprints
-- [ ] Round 2 · structure: windows (S157), the porch's columns and tiles, eaves with fascia and gutters, garage doors, the front wall and gate (S156), an outdoor laundry sink, a water tank
-- [ ] Round 3 · surface: pastel paints faded by the sun, damp stains, mould under the eaves, pots of plants, satellite dishes
+- [ ] Card: photos of Paris houses of the late 1700s and early 1800s: four to six floors, plaster fronts in cream and grey over stone, a stone ground floor with arches, string courses at each floor, tall French windows with iron railings, a porte cochère, a mansard roof
+- [ ] Round 1 · form: floors and their heights (the ground floor and the first floor tallest), the arched ground floor, the porte cochère; modules that fill a block's row at any width
+- [ ] Round 2 · structure: windows (S157), string courses and the cornice, the arches' keystones, the gate's leaves, downpipes, the long iron balcony on the second floor of some
+- [ ] Round 3 · surface: plaster faded and patched, damp stains at the foot, flaking render showing the rubble, soot streaks under the cornice, pigeon spikes, satellite dishes
 - [ ] Seeded variants so a street of them never repeats; abandoned and burnt states
 - [ ] Review: a street of eight houses at 10 m and one at 1 m
 
-### [ ] S163 · Tower facades
+### [ ] S163 · Post-war blocks
 > needs: S157, S159 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=towers`
-- [ ] Card: the towers in `praça_da_bandeira.jpg` and `hospital1.jpg`: a white tower with vertical slots, a dark glass block, a 1970s block with a crowned top, balcony slabs, brise-soleil fins
-- [ ] Round 1 · form: the facade modules by kind (balcony bays, ribbon windows, punched windows, fin screens), the podium with its shops, the crown
-- [ ] Round 2 · structure: slab edges, mullions, railings, fins with their brackets, the lit lobby with its glass doors, plant on the roof
-- [ ] Round 3 · surface: water stains running from every slab edge, faded tiles, AC units scattered, a few burnt flats with soot above
-- [ ] Round 4 · night: a seeded handful of lit windows, the lobby's light, aircraft lights on the tallest
-- [ ] Review: the photos' backgrounds rebuilt with `--shot-cam`, side by side
+- Only a few, at the edge of the old town (round the hospital and the bus station): the contrast that makes the old town read as old.
+- [ ] Card: photos of French 1960s and 70s blocks: a rendered slab with loggias, a panel block, an office building with ribbon windows
+- [ ] Round 1 · form: the facade modules by kind (loggia bays, ribbon windows, punched windows), the shop floor at the foot, the roof edge
+- [ ] Round 2 · structure: slab edges, panel joints, railings, the stair towers' glass, the entrance canopy with its glass doors, plant on the roof
+- [ ] Round 3 · surface: water stains running from every slab edge, faded render, mismatched new windows, a few burnt flats with soot above
+- [ ] Round 4 · night: a seeded handful of lit windows, the lit stairwells, a red light on the tallest
+- [ ] Review: each kind at 10 m and 50 m beside the references
 
-### [ ] S164 · Works sheds
+### [ ] S164 · Ateliers
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=sheds`
-- [ ] Card: photos of the industrial sheds along Rua Aubé (the OSM tiles show their footprints)
-- [ ] Round 1 · form: long low halls, shallow and sawtooth roofs, loading bays
-- [ ] Round 2 · structure: corrugated cladding, roller doors, clerestories and translucent roof panels, steel frames at the ends, loading docks with bumpers, brand-free gantry signs
-- [ ] Round 3 · surface: rust, faded paint, oil on the yards, broken panels
-- [ ] Review: the street front at 10 m and a loading bay at 1 m
+- [ ] Card: photos of old French riverside workshops and manufactures: stone and brick halls, glazed roofs, a tall brick chimney, a yard behind a gate
+- [ ] Round 1 · form: long low halls, pitched and glazed roofs, the yard, the chimney
+- [ ] Round 2 · structure: stone piers and arched windows, the roof glazing's bars, big wooden doors, a hoist beam over a loft door, painted names without brands
+- [ ] Round 3 · surface: soot, rust, faded paint, oil on the yards, broken panes
+- [ ] Review: the street front at 10 m and the yard at 1 m
 
 ### [ ] S165 · Bridges
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bridges`
-- [ ] Card: photos of the bridges over the Rio Cachoeira at the traced crossings
-- [ ] Round 1 · form: deck widths and spans, piers in the water, sidewalks; a road bridge and a footbridge
-- [ ] Round 2 · structure: parapets or railings as in the photos, expansion joints, the piers' cutwaters, drainage spouts, lamp posts, kerbs
-- [ ] Round 3 · surface: stains below the spouts, moss at the waterline, graffiti under the deck, rust on the railings
-- [ ] Review: each bridge from the road and from the water at 10 m and 50 m
+- [ ] Card: photos of old Paris bridges: a stone bridge of round arches with half-round bays over the piers, and an early cast-iron footbridge
+- [ ] Round 1 · form: deck widths and spans, the arches and piers in the water, pavements; a road bridge and a footbridge
+- [ ] Round 2 · structure: stone parapets with copings and the bays' benches, the piers' cutwaters, carved masks on the cornice, lanterns on the parapet, the footbridge's iron arches and wooden deck
+- [ ] Round 3 · surface: stains below the spouts, moss at the waterline, graffiti under the arches, rust on the ironwork
+- [ ] Review: each bridge from the quay and from the water at 10 m and 50 m
 
 ### [ ] S166 · Street lamps
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=lamps_street`
-- [ ] Card: the avenue lamps of `prefeitura2.jpg`, the square's green double-globe lamps of `praça_da_bandeira.jpg`, the hill road's arm on a pole (`mirante_street.jpg`)
-- [ ] Round 1 · form: pole heights and tapers, the arms' curves, heads and globes, bases
-- [ ] Round 2 · structure: base plates with bolts and the access door, the arm's bracket, the luminaire's housing and glass, the globes' fittings
-- [ ] Round 3 · surface: galvanised or green paint with chips, stickers and posters on the poles, rust at the foot, insects in the globes
-- [ ] States: lit (sodium orange, LED white), dead, flickering (S108), bent by a crash
+- [ ] Card: the réverbère of about 1800 (a lantern with a reflector hung on a rope across the street), the lantern on an iron wall bracket (potence), the cast-iron candelabrum of the boulevards and quays, the modern mast on the outer roads
+- [ ] Round 1 · form: the lanterns' shapes, the brackets' curves, the candelabrum's height, base and arms
+- [ ] Round 2 · structure: the réverbère's glass, reflector and hook, the bracket's scrolls, the candelabrum's base with its access door and fluted column, the lantern's panes and crown
+- [ ] Round 3 · surface: dark green or black paint with chips, stickers on the posts, rust at the foot, insects in the glass
+- [ ] States: lit (warm, a little flicker in the old lanterns), dead, flickering (S108), bent by a crash, a lantern hanging askew
 - [ ] Review: each lamp at 1 m and 10 m, and lit at night
 
-### [ ] S167 · Utility poles and cables
+### [ ] S167 · Lantern ropes and wires
 > needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=poles`
-- The tangle of cables on concrete poles is one of the strongest signatures of a Brazilian street.
-- [ ] Card: photos of the city's poles: double-T and round concrete poles, crossarms, transformers, telecom bundles (`mirante_street.jpg`)
-- [ ] Round 1 · form: pole heights and sections, the crossarms' levels, the transformer's place
-- [ ] Round 2 · structure: insulators, fuse cutouts, the transformer's fins and bushings, ground wires, telecom boxes, cable bundles with coiled spare loops, a lamp arm
-- [ ] Round 3 · surface: concrete stains, rust on the fittings, posters and stickers stapled on, stencilled numbers
-- [ ] Round 4 · cables: catenaries between poles with their sag, bundles of different thickness, slack ones over the street, a few hanging down
-- [ ] States: a leaning pole, a broken one with its cables down, sparks (S114)
-- [ ] Review: a street of six spans at 10 m against the photo, and a pole at 1 m
+- What hangs in the air of the old town is the réverbères' ropes across the streets, run through pulleys to a locked box on the wall to lower them; wooden poles only on the hill road and the outskirts.
+- [ ] Card: engravings and photos of réverbères on their ropes, the wall boxes and pulleys, later wires on wall brackets, wooden poles with crossarms on the edge of town
+- [ ] Round 1 · form: the anchors' heights, the ropes' spans across a street, the boxes' size, the pole heights and crossarms' levels
+- [ ] Round 2 · structure: pulleys and hooks, the wall box with its iron door and lock, wall brackets with insulators, the pole's crossarms, stays and their ground anchors, cable boxes at the poles' foot
+- [ ] Round 3 · surface: weathered grey wood with cracks, rust on the fittings, stapled flyers, stencilled numbers
+- [ ] Round 4 · cables: catenaries with their sag, the lantern's weight pulling the span into a V, wires between poles along the hill road, a few broken and hanging down
+- [ ] States: a rope cut and its lantern smashed in the street, a leaning pole, sparks (S114)
+- [ ] Review: a street of three spans and a stretch of hill road at 10 m, and a wall box at 1 m
 
 ### [ ] S168 · Traffic lights
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=traffic_lights`
-- [ ] Card: photos of the city's semáforos on mast arms and short poles
-- [ ] Round 1 · form: masts and arms, signal heads with three lenses, pedestrian heads
-- [ ] Round 2 · structure: visors, backplates with yellow borders, push-button boxes, the controller cabinet and its door, bolts and clamps
-- [ ] Round 3 · surface: faded paint, dirty lenses, stickers on the cabinet
-- [ ] States: dead, blinking yellow, a head hanging by its cable (swung by S115)
+- [ ] Card: photos of French traffic lights on short poles at the kerb, with the small repeater lights at eye height and the pedestrian heads
+- [ ] Round 1 · form: poles, signal heads with three lenses, the repeaters, pedestrian heads, the controller cabinet
+- [ ] Round 2 · structure: visors, backplates, push-button boxes, the cabinet's door and vents, bolts and clamps
+- [ ] Round 3 · surface: faded paint, dirty lenses, stickers on the poles and cabinet
+- [ ] States: dead, blinking amber, a head hanging by its cable (swung by S115)
 - [ ] Review: a junction at 10 m and a head at 1 m, lit at night
 
 ### [ ] S169 · Street signs
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_street`
 - The model of a good element step: one family, every sign as an extremely detailed low-poly model.
-- [ ] Card: photos of the city's street-name plates (their colour, layout and the neighbourhood line) and its traffic signs: PARE, speed limits, no parking, one-way, lombada, pedestrian crossing, bus stop
-- [ ] Round 1 · form: plate and sign sizes from the Brazilian standards, mounting heights, the poles
-- [ ] Round 2 · structure: rolled edges, the backs with their brackets and clamps, bolts, pole caps, two-sided name plates on corners
-- [ ] Round 3 · surface: retroreflective faces that catch headlights and the flashlight, faded red, stickers, rust bleeding from the bolts, bullet holes
-- [ ] Name plates take any real street name and neighbourhood; states: bent, knocked over, shot
+- [ ] Card: photos of the street names carved in the corner stones of old Paris, the blue enamel street plates with their green frame and the quarter's line, and French traffic signs: STOP, CÉDEZ LE PASSAGE, speed limits, no parking, one-way, raised crossing, pedestrian crossing, bus stop, the white town direction signs
+- [ ] Round 1 · form: plate and sign sizes from the French standards, mounting heights, the poles
+- [ ] Round 2 · structure: the carved letters' depth, enamel plates' rims and screw holes, rolled edges, the backs with their brackets and clamps, bolts, pole caps
+- [ ] Round 3 · surface: retroreflective faces that catch headlights and the flashlight, faded red, chipped enamel, worn carving, stickers, rust bleeding from the bolts, bullet holes
+- [ ] Name plates and carvings take any of the invented street names; states: bent, knocked over, shot
 - [ ] Review: every sign at 1 m and 10 m, lit by the flashlight at night
 
 ### [ ] S170 · Bus stop shelter
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bus_stop`
-- [ ] Card: photos of Joinville's bus shelters
-- [ ] Round 1 · form: the canopy, the frame, the seat, the panels
-- [ ] Round 2 · structure: glass or perforated panels, the ad box with its light, the timetable frame, a bin, the line numbers
+- [ ] Card: photos of French glass bus shelters (abribus) and a plain pole stop with its sign
+- [ ] Round 1 · form: the canopy, the frame, the bench, the panels
+- [ ] Round 2 · structure: glass panels, the lit poster case, the timetable frame, the map of the lines, a bin, the stop's sign with line numbers
 - [ ] Round 3 · surface: scratched glass, stickers, posters, grime
-- [ ] States: smashed glass, the ad light flickering
+- [ ] States: smashed glass, the poster light flickering
 - [ ] Review: at 1 m and 10 m, by day and night
 
-### [ ] S171 · Orelhão
-> needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=orelhao`
-- [ ] Card: photos of the egg-shaped public phone hoods and their phones
-- [ ] Round 1 · form: the shell's curve and opening, the post, the height
-- [ ] Round 2 · structure: the phone's body, keypad, the handset on its armoured cord, the hood's fixing ring
-- [ ] Round 3 · surface: the shell's colours faded, scratches and stickers, grime
-- [ ] States: the handset hanging, the shell cracked
+### [ ] S171 · Colonne Morris
+> needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ad_column`
+- [ ] Card: photos of the dark green Paris advertising column with its fringed dome and finial
+- [ ] Round 1 · form: the drum's height and diameter, the dome, the plinth
+- [ ] Round 2 · structure: the dome's scalloped fringe and ribs, the finial, the plinth's ring, the service door, the paper edges of the posters
+- [ ] Round 3 · surface: theatre and concert posters pasted over each other (invented, no real brands), torn layers, grime at the foot
+- [ ] States: posters half torn off, a quarantine notice pasted over them, knocked over by a car
 - [ ] Review: at 1 m and 10 m
 
-### [ ] S172 · Banca de jornal
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=banca`
-- [ ] Card: photos of the centre's newsstands
-- [ ] Round 1 · form: the kiosk box, the fold-up shutters that make its awning, the counter
-- [ ] Round 2 · structure: magazine racks and clips, the shutters' hinges and props, the roof's lip, the sign
-- [ ] Round 3 · surface: magazine covers as a texture (no real titles), faded paint, rust
+### [ ] S172 · Kiosk
+> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=kiosk`
+- [ ] Card: photos of the dark green Paris newspaper kiosk with its domed roof and its hatch
+- [ ] Round 1 · form: the kiosk's octagon or box, the serving hatch with its fold-up shutter, the dome and the roof's overhang
+- [ ] Round 2 · structure: newspaper racks and clips, the hatch's hinges and props, the dome's ribs and finial, the name panel, the cast-iron frame
+- [ ] Round 3 · surface: front pages as a texture (no real titles), faded paint, rust
 - [ ] States: open, shut, looted (papers blowing, S115)
 - [ ] Review: at 1 m and 10 m
 
 ### [ ] S173 · Small street furniture
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_small`
-- [ ] Card: the square's benches and green square bins (`praça_da_bandeira.jpg`), bollards, a column fire hydrant, the yellow post box, bike racks, tree guards, planters
+- [ ] Card: French double benches on cast legs, the green bins on a hoop, stone bornes and cast-iron bollards, a cast-iron drinking fountain, the column fire hydrant, the yellow post box on a wall, bike racks, tree grilles, the low hoop railings round the lawns
 - [ ] Round 1 · form: each at its real size
-- [ ] Round 2 · structure: slats and brackets, the bins' frames and lids, the hydrant's caps and chains, the post box's slot and door
+- [ ] Round 2 · structure: slats and brackets, the bins' hoops and lids, the fountain's basin and button, the hydrant's caps and chains, the post box's slot and door
 - [ ] Round 3 · surface: worn paint, rust, stickers, litter in and round the bins
 - [ ] Review: everything at 1 m
 
-### [ ] S174 · Imperial palm
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=palm`
-- [ ] Card: the palms of `prefeitura2.jpg` and `praça_da_bandeira.jpg`: a smooth grey trunk with a slight swelling, the green crownshaft, arching fronds
-- [ ] Round 1 · form: heights from 12 to 25 m, the trunk's taper and swelling, the crownshaft's length, the crown's spread
-- [ ] Round 2 · structure: ring scars on the trunk, fronds as stems with drooping leaflets, a dead frond hanging under the crown
-- [ ] Round 3 · surface: lichen patches, the trunk's greys, the leaflets' light and dark sides
-- [ ] Three variants and a LOD chain down to a card at 200 m; the wind of S047 bends the fronds
-- [ ] Review: a row of six against `prefeitura2.jpg`
+### [ ] S174 · Plane tree
+> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=plane_tree`
+- [ ] Card: photos of French boulevard and quay plane trees: the mottled bark, the high broad crown, the pollarded ones in the squares
+- [ ] Round 1 · form: heights from 12 to 25 m, the trunk's lean and fork, the crown's spread; a pollarded variant with knuckled branch ends
+- [ ] Round 2 · structure: branching, leaf clusters, the hanging seed balls
+- [ ] Round 3 · surface: the bark's patches of grey, olive and cream, the leaves' light and dark sides, autumn colour by preset
+- [ ] Three variants and a LOD chain down to a card at 200 m; the wind of S047 moves the crown
+- [ ] Review: a row of six along the quay
 
-### [ ] S175 · Araucária
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=araucaria`
-- [ ] Card: the araucária of `praça_da_bandeira.jpg` and photos of old ones: the straight trunk, branches only at the top, the candelabra crown
-- [ ] Round 1 · form: young (conical) and old (flat-topped) shapes, trunk heights
-- [ ] Round 2 · structure: whorls of branches turning up at the ends, needle tufts at the tips, plate bark
-- [ ] Round 3 · surface: dark green tufts, grey-brown bark plates
+### [ ] S175 · The old chestnut
+> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=chestnut`
+- [ ] Card: photos of the old horse chestnuts (marronniers) of French squares and gardens: a thick trunk, a dome crown, the white candles of flowers in spring
+- [ ] Round 1 · form: young and centuries-old shapes, trunk girths
+- [ ] Round 2 · structure: burrs on the old trunk, branching, the hand-shaped leaves, the flower candles, the conkers on the ground
+- [ ] Round 3 · surface: furrowed bark, moss on the north side, the leaves' greens and their early brown
 - [ ] Review: young and old at 10 m and 50 m
 
-### [ ] S176 · Ipê and street trees
+### [ ] S176 · Street trees
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_trees`
-- [ ] Card: ipê amarelo and roxo in bloom, the broad street trees of the centre, the young trees in the square's beds
+- [ ] Card: the trees of French streets and courts: elm, lime, a paulownia, a flowering cherry, a fig against a court wall; young trees with stakes in their pits
 - [ ] Round 1 · form: crown shapes and sizes, trunks
-- [ ] Round 2 · structure: branching, flower clusters, the petals' carpet on the ground (decals), tree guards
-- [ ] Round 3 · surface: bark, the leaves' colour variation, the bloom against the sky
+- [ ] Round 2 · structure: branching, the cherry's and paulownia's blossom, the petals' carpet on the ground (decals), stakes and guards
+- [ ] Round 3 · surface: bark, the leaves' colour variation, autumn and bare variants by preset
 - [ ] Review: each at 10 m and in a street
 
 ### [ ] S177 · Shrubs and flowers
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shrubs`
-- [ ] Card: the hibiscus and quaresmeira of `mirante_entrance.jpg`, bougainvillea, clipped hedges, the Prefeitura's flower beds
-- [ ] Round 1 · form: sizes and shapes, the hedge modules
-- [ ] Round 2 · structure: flowers, branch structure, bed edges
+- [ ] Card: box parterres and clipped yews of a jardin à la française, roses, lilac, ivy and wisteria on walls, geraniums in window boxes, limes trained flat, the town hall's beds
+- [ ] Round 1 · form: sizes and shapes, the parterre and hedge modules, the window box
+- [ ] Round 2 · structure: flowers, branch structure, bed edges, ivy and wisteria following a wall
 - [ ] Round 3 · surface: the blooms' colours, dead leaves, overgrown versions
-- [ ] Review: the Mirante gate's planting rebuilt beside the photo
+- [ ] Review: a parterre and a window row at 1 m and 10 m
 
-### [ ] S178 · Atlantic forest wall
+### [ ] S178 · Forest wall
 > needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=forest`
-- [ ] Card: the hill in `prefeitura1.jpg` and `prefeitura2.jpg`, the walls along the road in `mirante_street.jpg` and `mirante_entrance.jpg`: emergent trees, embaúbas with silver leaves, palms, tree ferns, lianas, undergrowth
-- [ ] Round 1 · form: the layers (emergent, canopy, understorey, ground) and the hill's silhouette
-- [ ] Round 2 · structure: each plant kind as a model: embaúba, palmito palm, tree fern, a canopy tree, hanging lianas, bromeliads on the trunks, ferns and grasses below
-- [ ] Round 3 · surface: the many greens, the dark under the canopy
+- The hill keeps Joinville's place and height; its forest is the oak and chestnut woods round Paris.
+- [ ] Card: photos of the forests of the Île-de-France hills: oak, beech, sweet chestnut and hornbeam, the road's edge with brambles, ferns and ivy, sandstone boulders
+- [ ] Round 1 · form: the layers (canopy, understorey, ground) and the hill's silhouette
+- [ ] Round 2 · structure: each plant kind as a model: oak, beech, sweet chestnut, hornbeam, a dead standing trunk, hazel and holly below, ferns, brambles and grasses, fallen logs, boulders
+- [ ] Round 3 · surface: the many greens, the beech's smooth grey bark, the chestnut's twisted ridges, ivy up the trunks
 - [ ] Round 4 · distance: near models, middle cards, the far silhouette, the joins invisible; mist between the trunks at night
-- [ ] Review: the road views and the hill from the Prefeitura beside the photos
+- [ ] Review: the hill road views and the hill from the town hall
 
 ### [ ] S179 · Vehicle kit
 > needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=vehicle_kit`
-- [ ] Card: what every vehicle shares, so each vehicle step is only its body: references of wheels, lamps, Mercosul plates, interiors, wrecks
+- [ ] Card: what every vehicle shares, so each vehicle step is only its body: references of wheels, lamps, French plates, interiors, wrecks
 - [ ] Round 1 · form: a test car built from the kit: wheels, glass, lights, plates, mirrors
-- [ ] Round 2 · structure: rims (steel, alloy) with tyres whose tread and sidewall lettering show, hubcaps; headlamp and tail clusters with emission and indicators that blink for the hazard state; Mercosul plates with the BRASIL band and seeded letters; door seams and handles cut as parts so doors open; seats, dash and steering wheel
+- [ ] Round 2 · structure: rims (steel, alloy) with tyres whose tread and sidewall lettering show, hubcaps; headlamp and tail clusters with emission and indicators that blink for the hazard state; long white plates with a blue band at each end and seeded letters (an invented code and region number, no real one); door seams and handles cut as parts so doors open; seats, dash and steering wheel
 - [ ] Round 3 · surface: the state generator on the test car: dust, smashed (dents, cracked and shattered glass), burnt shell (no tyres, brown-black metal, soot), rolled; flat and missing wheels
 - [ ] Review: the test car in every state at 1 m and 10 m
 
-### [ ] S180 · Hatchback and sedan
+### [ ] S180 · Hatchback and estate
 > needs: S179 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=cars`
-- [ ] Card: photos of the commonest compact hatchback and mid sedan on Brazilian streets (no badges, no brand's shapes copied)
+- [ ] Card: photos of the commonest small hatchback and family estate on French streets (no badges, no brand's shapes copied)
 - [ ] Round 1 · form: proportions, the glasshouse, the wheel arches
 - [ ] Round 2 · structure: bumpers, grilles, lamps, door lines, mirrors, roof rails
-- [ ] Round 3 · surface: paint colours by seed, chips and scratches, mud on the sills
-- [ ] Round 4 · variants: a white taxi with its roof sign and door number, a Polícia Militar car with its livery and light bar
+- [ ] Round 3 · surface: paint colours by seed, chips and scratches, parking dents on every corner, mud on the sills
+- [ ] Round 4 · variants: a taxi with its lit roof sign, a police car in a generic blue-and-white livery with its light bar (no real force's markings)
 - [ ] Review: both bodies and the variants at 1 m and 10 m, in every state
 
 ### [ ] S181 · Pickup and van
@@ -1054,17 +1062,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S182 · Ambulance
 > needs: S179, S181 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ambulance`
-- [ ] Card: photos of SAMU 192 ambulances
+- [ ] Card: photos of French box ambulances
 - [ ] Round 1 · form: the van with its raised box
 - [ ] Round 2 · structure: light bars, the rear doors open on the stretcher, the side door, the inside (stretcher, cabinets, oxygen)
-- [ ] Round 3 · surface: the livery and lettering, reflective stripes, blood inside
+- [ ] Round 3 · surface: a generic livery (white with a reflective chequer band and the town's invented hospital name), blood inside
 - [ ] Review: doors open and shut, lights on, at 1 m and 10 m
 
-### [ ] S183 · Motorbike
+### [ ] S183 · Scooter and moped
 > needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=motorbike`
-- [ ] Card: the common 150 cc commuter bike, and a delivery bike with its box
-- [ ] Round 1 · form: frame, tank, seat, wheels
-- [ ] Round 2 · structure: forks, chain, exhaust, mirrors, lights, the delivery box
+- [ ] Card: the common 125 cc scooter, and a delivery moped with its box
+- [ ] Round 1 · form: frame and bodywork, seat, wheels
+- [ ] Round 2 · structure: forks, exhaust, mirrors, lights, the leg cover, the top box and the delivery box
 - [ ] Round 3 · surface: a worn seat, scratches, dirt
 - [ ] States: on its stand, fallen, burnt
 - [ ] Review: at 1 m and 10 m
@@ -1079,52 +1087,60 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S185 · Barricades and checkpoint gear
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=checkpoint`
-- [ ] Card: concrete New Jersey barriers, sandbags, concertina wire on pickets, water-filled plastic barriers, cones, police tape, body bags, tarps (shared with the Batalhão)
-- [ ] Round 1 · form: sizes, how sandbags stack and slump
-- [ ] Round 2 · structure: the barriers' lifting slots and joints, sandbag seams and ties, the wire's coils and barbs, the tape's sag
+- [ ] Card: concrete barriers, the grey metal crowd barriers of French streets, red-and-white works barriers, sandbags, concertina wire on pickets, water-filled plastic barriers, cones, police tape, body bags, tarps, and the old-town classic: a barricade of setts torn up from the street, carts and furniture (shared with the barracks)
+- [ ] Round 1 · form: sizes, how sandbags and setts stack and slump
+- [ ] Round 2 · structure: the barriers' feet and hooks, sandbag seams and ties, the wire's coils and barbs, the tape's sag, the sett barricade's pile with a cart wheel and a wardrobe in it
 - [ ] Round 3 · surface: stencils, spray paint, torn bags spilling sand, rust on the wire
 - [ ] Review: a checkpoint of each at 1 m and 10 m
 
 ### [ ] S186 · Posters, flyers and painted words
 > needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=decals`
-- [ ] Card: spray-painted QUARENTENA, NÃO ENTRE, MORTOS DENTRO, arrows to ZONA SEGURA, missing-person flyers, official notices, old election posters
+- [ ] Card: spray-painted QUARANTAINE, NE PAS ENTRER, MORTS À L'INTÉRIEUR, arrows to ZONE SÛRE, missing-person flyers (DISPARU), official notices (AVIS À LA POPULATION) with the town's invented arms, old election posters, DÉFENSE D'AFFICHER painted on the walls
 - [ ] Round 1 · form: sizes, and where they go (walls, shutters, cars, the road)
 - [ ] Round 2 · structure: paint drips, layered and torn posters, tape holding the flyers
 - [ ] Round 3 · surface: rain fading, sun bleaching, paint over paint
 - [ ] Review: a wall of them at 1 m
 
-### [ ] S187 · Praça da Bandeira monument
+### [ ] S187 · The market fountain
 > needs: S141 | size: M | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=monument`
-- [ ] Card: `praça_da_bandeira.jpg` and photos of the monument close up
-- [ ] Round 1 · form: the column's height and section, the stepped plinth, the bronze group
-- [ ] Round 2 · structure: the medallion, the inscriptions, the column's courses and capital, the plinth's steps and corner blocks
-- [ ] Round 3 · surface: stone weathering, bronze patina with streaks, graffiti and a quarantine notice taped on
-- [ ] Round 4 · figures: the bronze figures as low-poly sculptures that read as people from 10 m
-- [ ] Review: from the photo's viewpoint and at 1 m
+- [ ] Card: photos of the Paris fountains of about 1800: a stone basin with a column or an obelisk in the middle, lion-mask spouts, a figure on top, the iron railing round it
+- [ ] Round 1 · form: the basin's plan and rim height, the column's height and section, the steps round it
+- [ ] Round 2 · structure: the spouts and their masks, the column's courses and capital, carved garlands and an inscription on the base, the railing
+- [ ] Round 3 · surface: stone weathering, green streaks under the spouts, graffiti and a quarantine notice taped on, still water with leaves
+- [ ] Round 4 · figure: the figure on top (a winged Victory) as a low-poly sculpture that reads from 10 m
+- [ ] Review: from the square's corners and at 1 m
 
-### [ ] S188 · The cathedral
-> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=cathedral`
-- [ ] Card: no photo yet: put photos of the cathedral on Rua do Príncipe in `references/elements/` first
-- [ ] Round 1 · form: its silhouette and roof as seen from the street and from the hill
-- [ ] Round 2 · structure: the facade's openings, the tower or cross, the doors and steps
-- [ ] Round 3 · surface: the materials as in the photos, weathering
-- [ ] Review: beside the photos at 10 m and 100 m
+### [ ] S188 · The church
+> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=church`
+- [ ] Card: photos of old Paris parish churches: a Gothic nave and apse with flying buttresses, a classical front of columns and a pediment added in the 1700s, a square bell tower (put them in `references/elements/` first)
+- [ ] Round 1 · form: its silhouette and roof as seen from the street and from the hill; the tower is the town's landmark
+- [ ] Round 2 · structure: the front's columns, pediment and portal, the tracery windows, the buttresses and pinnacles, the belfry's louvres, the doors and steps of the parvis
+- [ ] Round 3 · surface: limestone gone grey and black with soot, the slate roofs, a clock face, weathering
+- [ ] Review: beside the references at 10 m and 100 m
 
-### [ ] S189 · Cemitério do Imigrante
+### [ ] S189 · The old cemetery
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=cemetery`
-- [ ] Card: photos of the immigrants' cemetery: old German gravestones, iron crosses, slabs, the gate and the wall
-- [ ] Round 1 · form: the stones' shapes and sizes, their rows on the slope
-- [ ] Round 2 · structure: carved lettering, the iron crosses' scrolls, the gate's bars and posts
-- [ ] Round 3 · surface: lichen, tilt and cracks, rust
-- [ ] Review: a row at 1 m and the slope at 30 m
+- [ ] Card: photos of the Paris cemeteries of the early 1800s: family chapels like little houses, obelisks, columns, iron crosses and railings round graves, cobbled alleys under trees, the gate and the wall
+- [ ] Round 1 · form: the chapels', tombs' and stones' shapes and sizes, their rows on the slope along the alleys
+- [ ] Round 2 · structure: carved lettering and urns, the chapels' doors and stained glass, the iron crosses' scrolls and railings, the gate's bars and posts
+- [ ] Round 3 · surface: lichen, tilt and cracks, rust, broken chapel doors
+- [ ] Review: an alley at 1 m and the slope at 30 m
 
-### [ ] S190 · Zoobotânico gate and pond
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=zoo`
-- [ ] Card: no photo yet: put photos of the Zoobotânico's gate and pond in `references/elements/` first; tile 1 shows its plan
-- [ ] Round 1 · form: the gate, the pond's edge and the ring of paths
-- [ ] Round 2 · structure: railings, signs, the pond's stones
-- [ ] Round 3 · surface: water plants, moss, rust
-- [ ] Review: beside the photos
+### [ ] S190 · Jardin public gate and pond
+> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=park`
+- [ ] Card: photos of French public gardens: the gilded iron gate between stone piers, a round basin with a stone rim, a bandstand (kiosque à musique), gravel paths, iron chairs (put them in `references/elements/` first); tile 1 shows where the garden lies
+- [ ] Round 1 · form: the gate, the basin's edge, the bandstand and the ring of paths
+- [ ] Round 2 · structure: railings, signs, the basin's rim and jet, the bandstand's columns and roof, the chairs
+- [ ] Round 3 · surface: water plants, moss, rust, chairs tipped into the basin
+- [ ] Review: beside the references
+
+### [ ] S245 · From Joinville to the town
+> needs: S040 | size: M | test: `tests/test_city_map.gd` | see: `--host`, the menu
+- The game's text still names Joinville and its real places; the town becomes an invented French one in the style of Paris around 1800, on the same plan.
+- [ ] An invented French town name, its street names (S040) and its coat of arms (one shape, used by S155, S186, S218), in `CityData`
+- [ ] `Missions` titles and briefs in French names: the gare routière, the Hôtel-Dieu, the hôtel de ville, the caserne, the telegraph tower on the hill; mission ids (`terminal`, `hospital`, `prefeitura`, `batalhao`, `mirante`) stay as they are
+- [ ] The menu's map: the invented names on the pins, the old core, the boulevards and the quays drawn
+- [ ] `CLAUDE.md` and `TODO.md` follow: the city is described as the town, the Joinville references as its plan
 
 ---
 
@@ -1164,7 +1180,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Card: wooden swing doors, double doors, glass doors with push bars, fire doors with wired glass, roller shutters, frames and architraves, handles and locks
 - [ ] Round 1 · form: sizes (0.8 to 0.9 m by 2.1 m, doubles, shop shutters), frame depths
 - [ ] Round 2 · structure: panels, hinges, handles, kick plates, door closers, vision panels, push bars, locks, the shutter's slats and guides
-- [ ] Round 3 · surface: worn paint round the handles, scuffs at the foot, signs (SAÍDA, PRIVATIVO), blood handprints
+- [ ] Round 3 · surface: worn paint round the handles, scuffs at the foot, signs (SORTIE, PRIVÉ), blood handprints
 - [ ] States and parts: open, shut, locked (it rattles), splintered and broken in stages by the door's HP
 - [ ] Review: each on the rack at 1 m, and the corridor's door in its four states
 
@@ -1187,7 +1203,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S194 · Light fittings and signs
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=fittings`
-- [ ] Card: recessed and hanging tube fixtures, emergency lights, exit signs (the green running figure), switches, fire alarm points, extinguishers
+- [ ] Card: recessed and hanging tube fixtures, emergency lights, exit signs (the green running figure, SORTIE DE SECOURS), switches, fire alarm points, extinguishers
 - [ ] Round 1 · form: sizes and mountings
 - [ ] Round 2 · structure: diffusers and bare tubes, chains and wires, the exit sign's box, switch plates
 - [ ] Round 3 · surface: dead insects in the diffusers, yellowed plastic, dust
@@ -1221,127 +1237,128 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Plank piles as pickups
 - [ ] State through `get_state` / `apply_state`
 
-### [ ] S197 · Terminal: roof slab and pleated fascia
+### [ ] S197 · Bus station: roof slab and fascia
 > needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_roof`
-- The signature of the Terminal Central.
-- [ ] Card: `terminal1.png` and `praça_da_bandeira.jpg` (and any other photo of the terminal): the slab's thickness at the edge, the soffit's curve, the pleats' width and depth, the cladding band under them, measured against the 12 m buses under it
-- [ ] Round 1 · form: the two slab halves and the gap of the skylight between them, the soffit curving up from the edges, the run of pleated V plates along the square's front, the corrugated cladding band
-- [ ] Round 2 · structure: drip edges, expansion joints every bay, gutters and downpipes at the columns, recessed light cans in the soffit, the pleats' seams and fixings
-- [ ] Round 3 · surface: raw concrete with board marks, black water stains running from every joint, algae on the shaded edge, grime under the pleats, rust weeping from the brackets
+- The town's gare routière is a 1970s concrete canopy dropped into the old fabric by the boulevard; `terminal1.png` gives only the idea (a long slab on steel columns over platform islands) and the scale.
+- [ ] Card: photos of French bus stations of the 1960s and 70s: a long concrete canopy, its edge band, the soffit; measured against 12 m buses under it
+- [ ] Round 1 · form: the two slab halves and the gap of the skylight between them, the soffit, the fascia band along the boulevard
+- [ ] Round 2 · structure: drip edges, expansion joints every bay, gutters and downpipes at the columns, recessed light cans in the soffit, the fascia's panels and fixings
+- [ ] Round 3 · surface: raw concrete with board marks, black water stains running from every joint, algae on the shaded edge, grime, rust weeping from the brackets
 - [ ] Round 4 · night: the soffit's lights (half dead), their pools on the wet setts (with S200), the stains still readable under them
-- [ ] Review: both photos' viewpoints and the rack sheet
+- [ ] Review: the rack sheet and a view from the boulevard beside the references, with the old houses behind
 
-### [ ] S198 · Terminal: steel tree columns and trusses
+### [ ] S198 · Bus station: steel columns and trusses
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_columns`
-- [ ] Card: the dark steel columns of `terminal1.png`: arms opening from a node into an X, on white concrete pedestals
-- [ ] Round 1 · form: the X's height and spread, the pedestal, where the arms meet the slab
-- [ ] Round 2 · structure: I-section members, gusset plates at the node, bolts, base plates, the trusses along the slab edges with their bracing
-- [ ] Round 3 · surface: chipped black paint, rust at the bases, posters taped to the pedestals, bird mess
-- [ ] Review: at 1 m and from the photo's viewpoint
+- [ ] Card: the columns of French canopy stations: steel trees opening from a node, on concrete pedestals (photos first)
+- [ ] Round 1 · form: the tree's height and spread, the pedestal, where the arms meet the slab
+- [ ] Round 2 · structure: I-section or tube members, gusset plates at the node, bolts, base plates, the trusses along the slab edges with their bracing
+- [ ] Round 3 · surface: chipped paint, rust at the bases, posters taped to the pedestals, pigeon mess
+- [ ] Review: at 1 m and from the platforms
 
-### [ ] S199 · Terminal: the skylight
+### [ ] S199 · Bus station: the skylight
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_skylight`
-- [ ] Card: the lit box frame hanging in the gap between the slab halves (`terminal1.png`, centre)
-- [ ] Round 1 · form: the frame's size and depth, how it hangs
-- [ ] Round 2 · structure: glass panes in frames, diagonal lattice members, fixtures inside, the hangers
+- [ ] Card: the glazed lantern in the gap between the slab halves (photos of French station roof lights)
+- [ ] Round 1 · form: the frame's size and depth, how it sits or hangs
+- [ ] Round 2 · structure: glass panes in frames, lattice members, fixtures inside, the hangers
 - [ ] Round 3 · surface: dirty glass, dead insects, broken panes letting the rain through
 - [ ] Night: the light from inside it (S108)
-- [ ] Review: from below at the photo's viewpoint
+- [ ] Review: from below on the platforms
 
-### [ ] S200 · Terminal: platforms, bays and setts
+### [ ] S200 · Bus station: platforms, bays and setts
 > needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_platforms`
-- [ ] Card: the ground of `terminal1.png`: worn granite setts, raised platform islands with yellow kerbs, white concrete blocks at their ends, signs on poles
-- [ ] Round 1 · form: the islands' heights and widths, bays long enough for 12 m buses, kerb radii
-- [ ] Round 2 · structure: the setts' rows and worn joints, tactile strips, drainage channels with grates, bus stop poles with round signs, bay numbers, painted lines
+- [ ] Card: photos of French bus station ground: granite setts in the bays, raised platform islands with high kerbs, the quay letters on posts
+- [ ] Round 1 · form: the islands' heights and widths, bays long enough for 18 m articulated buses, kerb radii
+- [ ] Round 2 · structure: the setts' rows and worn joints, tactile strips, drainage channels with grates, stop posts with their signs, quay letters, painted lines
 - [ ] Round 3 · surface: oil stains in the bays, wet low spots (puddles for S110), gum and litter on the platforms
-- [ ] Review: from the photo's viewpoint, wet
+- [ ] Review: along a platform, wet
 
-### [ ] S201 · Terminal: booths, turnstiles, kiosks and toilets
+### [ ] S201 · Bus station: ticket office, kiosks and toilets
 > needs: S141, S158 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_kiosks`
-- [ ] Card: photos of the terminal's platform buildings: ticket booths, lines of turnstiles, snack kiosks, the toilet block
+- [ ] Card: photos of French bus station buildings: the ticket office (GUICHETS), ticket machines, a snack kiosk and a café counter, the toilet block
 - [ ] Round 1 · form: sizes and their places on the islands
-- [ ] Round 2 · structure: the booths' glass with speaking grilles and trays, turnstiles with card readers, the kiosks' counters and shutters, the toilet block's doors and vents
+- [ ] Round 2 · structure: the office's glass with its counter, the ticket machines' screens and slots, the kiosks' counters and shutters, the toilet block's doors and vents
 - [ ] Round 3 · surface: stickers, timetables, grime, graffiti
-- [ ] States: shutters down, smashed, a turnstile torn out
+- [ ] States: shutters down, smashed, a ticket machine torn open
 - [ ] Review: a platform at eye height
 
-### [ ] S202 · Terminal: route boards and wayfinding
+### [ ] S202 · Bus station: route boards and wayfinding
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_signs`
-- [ ] Card: the terminal's line boards and signs; the destinations are real Joinville neighbourhoods (Itaum, Vila Nova, Pirabeiraba, Boa Vista, Costa e Silva, Iririú, Comasa...)
-- [ ] Round 1 · form: board sizes and heights, the platform letters
+- [ ] Card: French bus station signs: quay letters, line boards, the departure display (DÉPARTS); the destinations are invented quarters and villages (Vieille Ville, Gare, Faubourg Saint-Rémy, La Butte, Les Moulins, Saint-Martin-des-Prés, Zone Industrielle...)
+- [ ] Round 1 · form: board sizes and heights, the quay letters
 - [ ] Round 2 · structure: line numbers and destinations as lettering, the LED departure board, arrows, frames and hangers
 - [ ] Round 3 · surface: faded print, the LED board dead or showing a last message
 - [ ] Review: from the platforms at 5 m
 
-### [ ] S203 · The yellow city bus
+### [ ] S203 · The city bus
 > needs: S179 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=bus`
-- Joinville's buses are yellow (`terminal1.png`); they fill the terminal and the jams.
-- [ ] Card: photos of the city's 12 m buses and the midibus (`terminal1.png`, right)
-- [ ] Round 1 · form: the 12 m body, the big split windscreen, the doors' places; the midibus variant
-- [ ] Round 2 · structure: the LED destination board, the headlamps and the black lower front, mirrors on arms, folding doors with rubber edges, sliding window panes, the wheels, the AC unit on the roof
-- [ ] Round 3 · surface: the yellow livery with the line number, grime, stickers
-- [ ] Round 4 · inside and states: seats in rows, yellow handrails and straps, the turnstile and fare box at the front, the driver's seat and dash, windows you see through; doors open with the lights on, crashed across a road, a burnt shell
-- [ ] Review: from the viewpoint of `terminal1.png` and at 1 m outside and inside
+- The town's buses fill the bus station and the jams; one livery, the town's own (white with a deep green band), no real operator's.
+- [ ] Card: photos of French low-floor 12 m city buses and the 18 m articulated one
+- [ ] Round 1 · form: the 12 m body, the big windscreen, the doors' places; the articulated variant with its bellows
+- [ ] Round 2 · structure: the LED destination board, the headlamps, mirrors on arms, double sliding-plug doors, window panes, the wheels, the roof's AC and the bellows' joint
+- [ ] Round 3 · surface: the livery with the line number, grime, stickers
+- [ ] Round 4 · inside and states: low-floor seats, handrails and straps, the ticket validators and the driver's cab, windows you see through; doors open with the lights on, crashed across a road, a burnt shell
+- [ ] Review: in a bay and at 1 m outside and inside
 
-### [ ] S056 · Terminal Central
+### [ ] S056 · The bus station
 > needs: S053, S048, S049, S197, S198, S199, S200, S201, S202, S203 | size: L | rounds: 3 | test: `tests/test_poi_terminal.gd` | see: `--mission=terminal --shot-at=2`
-- Assembly of the finished elements on the terminal's traced footprint (`CityOsm`); nothing modelled here.
-- [ ] The slab (S197) on its columns (S198) with the skylight (S199), over the platforms and bays (S200), the booths, kiosks and toilets (S201) and the boards (S202)
-- [ ] Yellow city buses (S203): some in the bays, one jack-knifed across the exit, one with its doors open and lights on
+- Assembly of the finished elements where the plan puts the gare routière (`--mission=terminal`); nothing modelled here.
+- [ ] The slab (S197) on its columns (S198) with the skylight (S199), over the platforms and bays (S200), the ticket office, kiosks and toilets (S201) and the boards (S202)
+- [ ] City buses (S203): some in the bays, one jack-knifed across the exit, one with its doors open and lights on
 - [ ] Lighting: cold tube lights under the slab, half dead, puddles catching them
-- [ ] The square in front (S049) joined to it
+- [ ] The old houses of the boulevard round it, the place du marché (S049) a street away and joined to it
 - [ ] Player start on the platforms, first weapon spots, first ammo
-- [ ] Round 1 · layout: the plan against the OSM footprint, bays and islands where the photo puts them
-- [ ] Round 2 · photo match: `terminal1.png` and `praça_da_bandeira.jpg` rebuilt with `--shot-cam`, side by side
-- [ ] Round 3 · light and rain: the night and the rain against `terminal1.png` (with S108 and S110 when they exist)
-- [ ] Review: the photo match sheets
+- [ ] Round 1 · layout: bays and islands laid out like the French references on the card, sized for the buses
+- [ ] Round 2 · style match: fixed `--shot-cam` views from the platforms and the boulevard beside the card's references
+- [ ] Round 3 · light and rain: the night and the rain (with S108 and S110 when they exist)
+- [ ] Review: the style match sheets
 
-### [ ] S057 · Mission: the terminal run
+### [ ] S057 · Mission: the bus station run
 > needs: S056, S052, S022, S025 | size: L | test: `tests/test_mission_terminal.gd` | see: `--mission=terminal --bot`
-- [ ] Route along real streets from the terminal to the Prefeitura's steps, drawn in map data
+- [ ] Route along the town's streets from the bus station to the town hall's garden, drawn in map data
 - [ ] Beats
-  - [ ] Leave the terminal: the buses block the easy exit, out through the square
-  - [ ] The centre streets: jammed cars, a horde from the side streets
-  - [ ] Checkpoint halfway: a shop with its shutter half up
-  - [ ] The river: cross a bridge that is a choke point
-  - [ ] The riverside avenue under the palms, then the Prefeitura lawn
-- [ ] Extraction on the lawn's concrete pad
+  - [ ] Leave the station: the buses block the easy exit, out through the place du marché
+  - [ ] The old town: narrow crooked streets, jammed cars, a horde out of the portes cochères and passages
+  - [ ] Checkpoint halfway: a shop with its shutters half up
+  - [ ] The river: cross the stone bridge, a choke point
+  - [ ] The quay under the plane trees, then the town hall's garden
+- [ ] Extraction on the garden's lawn
 - [ ] Director tuned for a moving fight: spawns ahead and behind, never on the route in view
 - [ ] Bot scenario finishes it on easy
 
-### [ ] S204 · Hospital: the old block
+### [ ] S204 · Hospital: the old Hôtel-Dieu
 > needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_old`
-- [ ] Card: `hospital2.png` (left): white, five floors, horizontal sunshade ledges, the entrance bay's tall dark fins flaring at the foot with beige bands, the name panel on the blank wall, the entrance stairs, the green canopy
-- [ ] Round 1 · form: the block's proportions, the bay of fins, the ledges, the blank wall
-- [ ] Round 2 · structure: each fin with its flare and bands, dark glazing behind, the ledges and their soffits, windows (S157), the entrance stairs with railings, the canopy, AC units
-- [ ] Round 3 · surface: white paint with black water stains under the ledges, the hospital's name on its panel (no logo copied), grime at street level
+- The town's hospital grew over centuries: the old Hôtel-Dieu, a post-war wing and a new tower. `hospital1.jpg` and `hospital2.png` give only the arrangement (three volumes along one street, the tower tallest) and the scale.
+- [ ] Card: photos of the old French hospitals of the 1600s and 1700s (Hôtel-Dieu, hospices): long stone wings round an arcaded court, a chapel with a dome, a gate pavilion on the street
+- [ ] Round 1 · form: the wings' proportions round the court, the arcade, the chapel's dome, the gate pavilion
+- [ ] Round 2 · structure: the arcade's piers and arches, tall windows (S157), string courses and cornice, the dome's lantern, the gate's pediment and leaves, a glass porch added later
+- [ ] Round 3 · surface: limestone dark with soot, HÔTEL-DIEU carved over the gate, the court's worn flags, grime at street level
 - [ ] Round 4 · night and decay: dark windows with a few lit, smoke stains from a burnt floor (the blocked floors of S059)
-- [ ] Review: the viewpoint of `hospital2.png` rebuilt, side by side
+- [ ] Review: from the street and the court at 10 m and 50 m beside the references
 
-### [ ] S205 · Hospital: the middle block and the yellow house
+### [ ] S205 · Hospital: the post-war wing
 > needs: S141, S157 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_middle`
-- [ ] Card: `hospital2.png` (middle): four floors, cream walls, olive-green spandrel bands, recessed bays; the low yellow two-storey house with its canopy over the sidewalk
-- [ ] Round 1 · form: both volumes and how they meet the old block
-- [ ] Round 2 · structure: the spandrels, the window bays (S157), the house's windows, cornice and canopy
-- [ ] Round 3 · surface: faded olive and cream, stains, the house's peeling yellow
-- [ ] Review: the viewpoint of `hospital2.png`
+- [ ] Card: photos of French hospital wings of the 1960s and 70s: four or five floors, ribbon windows between coloured spandrel bands, a flat roof; an old house left standing beside it
+- [ ] Round 1 · form: the wing and how it meets the Hôtel-Dieu, the house
+- [ ] Round 2 · structure: the spandrels, the window bands (S157), the link bridge to the old wing, the house's windows, cornice and shopfront
+- [ ] Round 3 · surface: faded spandrel colour, stains, the house's peeling plaster
+- [ ] Review: at 10 m beside the references
 
 ### [ ] S206 · Hospital: the new tower
 > needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_tower`
-- [ ] Card: `hospital1.jpg` and `hospital2.png` (right): about twelve floors of white vertical volumes, blue glazing grids, a taller central core carrying the lit sign, a wing of white ribbon bands, plant on the roof and a red aircraft light
-- [ ] Round 1 · form: the volumes' heights and widths, the core, the wing
-- [ ] Round 2 · structure: the frames and mullions of the glazing, the ribbon bands, the sign's letters, the roof's plant, the canopy at the foot
-- [ ] Round 3 · surface: white panels with joints, blue glass reflecting, stains
-- [ ] Round 4 · night: the blue floodlight from below, the sign glowing, most windows dark and a few flickering (`hospital1.jpg`)
-- [ ] Review: the viewpoint of `hospital1.jpg` at night, side by side
+- [ ] Card: photos of new French hospital buildings: about eight floors of white panels and glass, a taller core carrying the lit sign, plant on the roof, a red aircraft light
+- [ ] Round 1 · form: the volumes' heights and widths, the core
+- [ ] Round 2 · structure: the frames and mullions of the glazing, sunshade fins, the sign's letters, the roof's plant, the canopy at the foot
+- [ ] Round 3 · surface: white panels with joints, glass reflecting, stains
+- [ ] Round 4 · night: a floodlight from below, the sign glowing, most windows dark and a few flickering
+- [ ] Review: at night from the street and from the roof's height, over the old roofs
 
 ### [ ] S207 · Hospital: the street front
 > needs: S141, S166 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_front`
-- [ ] Card: `hospital1.jpg` and `hospital2.png`: the long drop-off canopy along Rua Blumenau, the ramp, the zebra crossing, the ambulance bay, the low wall and the lamps
+- [ ] Card: photos of French hospital entrances: the drop-off canopy, the ramp, the ambulance bay, the low wall and the lamps
 - [ ] Round 1 · form: the canopy's length and height, the ramp's slope, the bay
-- [ ] Round 2 · structure: the canopy's posts, glass and gutters, railings, bollards, signs (EMERGÊNCIA, ambulances only)
+- [ ] Round 2 · structure: the canopy's posts, glass and gutters, railings, bollards, signs (URGENCES, RÉSERVÉ AMBULANCES)
 - [ ] Round 3 · surface: grime, blood trails into the entrance, triage leftovers
-- [ ] Review: from the street at eye height and from the height of `hospital1.jpg`
+- [ ] Review: from the street at eye height and from the tower's roof
 
 ### [ ] S208 · Hospital: rooftop helipad
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=helipad`
@@ -1354,7 +1371,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S209 · Hospital: lobby and emergency room
 > needs: S193, S194 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_er`
-- [ ] Card: photos of a Brazilian hospital's reception and pronto-socorro: the desk, waiting chairs, triage, curtained bays
+- [ ] Card: photos of a French hospital's reception and urgences: the desk, waiting chairs, triage, curtained bays
 - [ ] Round 1 · form: the reception desk, the waiting rows, a curtained bay with its bed
 - [ ] Round 2 · structure: curtain rails and curtains, ER beds with rails, monitors on arms, a crash cart, wall gas outlets, signs
 - [ ] Round 3 · surface: blood, overturned chairs, scattered paperwork, a flickering monitor
@@ -1362,8 +1379,8 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S210 · Hospital: ward and corridor kit
 > needs: S193, S194 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_ward`
-- [ ] Card: ward rooms and corridors of a Brazilian hospital
-- [ ] Round 1 · form: the ward bed, bedside cabinet, over-bed table, the room's window and door, the nurses' station
+- [ ] Card: ward rooms and corridors of a French hospital, and the long vaulted wards of the old Hôtel-Dieu
+- [ ] Round 1 · form: the ward bed, bedside cabinet, over-bed table, the room's window and door, the nurses' station, the old ward's vault
 - [ ] Round 2 · structure: bed rails and controls, curtain tracks, the bed-head panel with gas outlets and the nurse call, corridor handrails and bumper rails, vision panels in the doors
 - [ ] Round 3 · surface: stained sheets, a ward barricaded from outside, handprints on the glass
 - [ ] Review: a corridor and a ward at eye height
@@ -1386,16 +1403,16 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] States: dead, and running (shaking, exhaust smoke, the lights coming on)
 - [ ] Review: the room at eye height before and after the restart
 
-### [ ] S058 · Hospital Dona Helena, outside
+### [ ] S058 · The hospital, outside
 > needs: S053, S048, S182, S228, S204, S205, S206, S207, S208 | size: L | rounds: 3 | test: `tests/test_poi_hospital.gd` | see: `--mission=hospital --shot-at=2`
-- Assembly on Rua Blumenau of the finished blocks and street front; nothing modelled here.
-- [ ] The old block (S204), the middle block and the yellow house (S205), the new tower (S206), the street front (S207) and the helipad on the roof (S208), on their traced footprints
-- [ ] Night look: the tower washed in blue floodlight from below, the sign glowing, most windows dark, a few flickering
-- [ ] Street scene: abandoned ambulances (S182), triage tents (S228), a queue of cars that never got in (S048)
-- [ ] Round 1 · layout: the blocks' places and heights against the OSM footprints and both photos
-- [ ] Round 2 · photo match: `hospital1.jpg` (night, from above) and `hospital2.png` (the street) rebuilt, side by side
+- Assembly along the hospital's street of the finished wings and street front; nothing modelled here.
+- [ ] The Hôtel-Dieu round its court (S204), the post-war wing and the house (S205), the new tower (S206), the street front (S207) and the helipad on the tower's roof (S208), where the plan puts them
+- [ ] Night look: the tower lit from below, the sign glowing, most windows dark, a few flickering
+- [ ] Street scene: abandoned ambulances (S182), triage tents in the old court (S228), a queue of cars that never got in (S048)
+- [ ] Round 1 · layout: the three volumes' places and heights, the tower rising over the old town's roofs
+- [ ] Round 2 · style match: fixed `--shot-cam` views (night from above, the street, the court) beside the card's references
 - [ ] Round 3 · story: the street reads as a hospital overrun
-- [ ] Review: the photo match sheets
+- [ ] Review: the style match sheets
 
 ### [ ] S059 · Hospital, inside
 > needs: S058, S054, S195, S209, S210, S211, S212 | size: L | rounds: 2 | test: `tests/test_poi_hospital_interior.gd` | see: `--mission=hospital --floor=3`
@@ -1422,82 +1439,83 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Roof finale: wind, the city spread out below, the helicopter's light finding the pad
 - [ ] Bot scenario finishes it on easy
 
-### [ ] S213 · Prefeitura: the facade bay
+### [ ] S213 · Town hall: the front's bay
 > needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_bay`
-- The long bar is one bay repeated: get one bay exactly right.
-- [ ] Card: `prefeitura1.jpg` and `prefeitura2.jpg`: floor heights, the slab edges' depth, the window bands' height, the brick pilasters' spacing
-- [ ] Round 1 · form: three floors of deep exposed concrete slab edges shading recessed ribbon windows, brick pilasters between, the salmon ground-floor wall
-- [ ] Round 2 · structure: planters along the upper slab edge with plants spilling over, black window frames and their divisions, AC units on the slabs, the brick bond, rainwater pipes
-- [ ] Round 3 · surface: weathered concrete with dark streaks, the salmon paint faded, moss in the planters
+- The town hall (`--mission=prefeitura`) is a French hôtel de ville in the classical style of about 1800: a long stone front with a central pavilion carrying a campanile, an office wing behind. Joinville's Prefeitura gives only its place between the river and the hill and its garden in front.
+- The front is one bay repeated: get one bay exactly right.
+- [ ] Card: photos of French town halls of the 1700s and early 1800s: rusticated ground floor with round-arched doors and windows, tall windows of the first floor under pediments, pilasters, the balustrade along the roof
+- [ ] Round 1 · form: two floors over a rusticated ground floor, the tall first-floor windows, the pavilions at the ends and the middle, the mansard over it
+- [ ] Round 2 · structure: the rustication's joints, keystones, window pediments and the iron balconies, pilasters and their capitals, the cornice and the balustrade, niches with statues in the pavilions
+- [ ] Round 3 · surface: weathered limestone with dark streaks, the motto LIBERTÉ ÉGALITÉ FRATERNITÉ over the door, the town's invented arms in the pediment
 - [ ] Round 4 · decay: broken windows on the ground floor, barricade points (S055) in the openings
-- [ ] Review: a run of bays from the viewpoint of `prefeitura1.jpg`, side by side
+- [ ] Review: a run of bays from the garden at 10 m and 1 m
 
-### [ ] S214 · Prefeitura: brick towers, buttresses and roof boxes
+### [ ] S214 · Town hall: the campanile
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_towers`
-- [ ] Card: the two square red-brick stair towers with their pale band, the sloped brick buttresses at the base, the smaller brick boxes and the white machine room on the roof
-- [ ] Round 1 · form: heights and plans, the buttresses' slopes
-- [ ] Round 2 · structure: the brick bond, the band, vents and louvres, the buttresses' copings
-- [ ] Round 3 · surface: the bricks' colour variation, efflorescence, moss at the foot
-- [ ] Review: from the viewpoint of `prefeitura2.jpg`
+- [ ] Card: photos of French town hall campaniles: a square stone lantern on the central pavilion's roof, the clock face in the pediment below it, the bell, the dome and its finial
+- [ ] Round 1 · form: the campanile's height and plan, the dome
+- [ ] Round 2 · structure: the clock face and hands, the open arches and the bell, the dome's ribs and lead, the flagstaffs
+- [ ] Round 3 · surface: the stone's colour variation, the lead gone grey-white with streaks below, a clock stopped at one time
+- [ ] Review: from the garden and from the quay
 
-### [ ] S215 · Prefeitura: space-frame panels
+### [ ] S215 · Town hall: the office wing
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_frames`
-- [ ] Card: the blue steel lattice panels over the centre entrance and on the wings, and the tall lattice tower at the left corner
-- [ ] Round 1 · form: panel sizes and how far they stand off the facade
-- [ ] Round 2 · structure: tubes and nodes, the X lattice, the white edge members, brackets
-- [ ] Round 3 · surface: faded blue paint, rust at the nodes
-- [ ] Review: the entrance at eye height and from the photos' viewpoints
+- [ ] Card: photos of the later administrative wings behind French town halls: three or four floors of plain windows, a glazed stair tower, a link to the old house
+- [ ] Round 1 · form: the wing's length and floors, the stair tower, the link
+- [ ] Round 2 · structure: window bands and spandrels, the stair tower's mullions, the entrance canopy, the link bridge's glazing
+- [ ] Round 3 · surface: faded render, stains under the sills, blinds half down
+- [ ] Review: from the car park and at eye height
 
-### [ ] S216 · Prefeitura: the roof
+### [ ] S216 · Town hall: the roofs
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_roof`
-- [ ] Card: `prefeitura3.png` from above: a ribbed light-grey metal roof, plant boxes, the towers rising through
-- [ ] Round 1 · form: the roof's plan and pitch over both wings
-- [ ] Round 2 · structure: ribs, ridge, flashing round the towers, gutters, plant and vents
-- [ ] Round 3 · surface: rust streaks, dirt in the ribs, patches
-- [ ] Review: from the helicopter's height beside `prefeitura3.png`
+- [ ] Card: aerial photos of French town halls: the slate mansard with its oeil-de-boeuf dormers, the pavilions' steeper roofs, the wing's flat roof
+- [ ] Round 1 · form: the roofs' plans and pitches, the campanile rising out of the middle
+- [ ] Round 2 · structure: slate rows, dormers, ridge and hips with lead, the balustrade behind which they rise, gutters, the flat roof's plant and vents
+- [ ] Round 3 · surface: moss, rust and lead streaks, patches, gull mess
+- [ ] Review: from the helicopter's height
 
-### [ ] S217 · Prefeitura: the lawn mound
+### [ ] S217 · Town hall: the garden
 > needs: S141, S177 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_lawn`
-- [ ] Card: `prefeitura1.jpg` and `prefeitura2.jpg`: the grass mound, brick stairs zigzagging up with dark steel pipe railings, curved brick-edged paths, flower beds, the concrete landing pad, the flagpoles at the entrance
-- [ ] Round 1 · form: the mound's shape and height, the stairs' flights and landings, the paths
-- [ ] Round 2 · structure: steps and edges, railings with posts and joints, bed edging, the pad's markings, flagpoles with three flags
-- [ ] Round 3 · surface: worn brick, rust on the railings, overgrown grass, torn flags and a banner across the entrance
-- [ ] Review: both photos' viewpoints, side by side
+- [ ] Card: photos of jardins à la française before French civic buildings: a raised terrace with stone stairs and balustrades, box parterres, gravel walks, clipped yews, a round basin, flagpoles
+- [ ] Round 1 · form: the terrace's shape and height, the stairs' flights and landings, the parterres and walks, the open lawn the helicopter lands on
+- [ ] Round 2 · structure: steps and copings, balusters, bed edging, the basin's rim, flagpoles with three flags, benches and urns
+- [ ] Round 3 · surface: worn stone, moss, overgrown box, torn flags and a banner across the entrance
+- [ ] Review: from the town hall's door and from the quay
 
-### [ ] S218 · Prefeitura: the letter sign
+### [ ] S218 · Town hall: the name and the arms
 > needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_sign`
-- [ ] Card: the blue panel with white letters reading Prefeitura Municipal de Joinville in its dark steel frame, set at an angle into the lawn
-- [ ] Round 1 · form: length, height, the frame and its legs
-- [ ] Round 2 · structure: letters as geometry, the frame's bars, lights at its foot
-- [ ] Round 3 · surface: faded blue, dirty letters, one letter missing
-- [ ] Review: from the avenue and at 1 m
+- [ ] Card: the carved and gilded HÔTEL DE VILLE over a French town hall's door, the motto on the frieze, and the town's coat of arms in the pediment; the arms are invented, never a real town's
+- [ ] Round 1 · form: the letters' height and spacing, the shield's shape and frame
+- [ ] Round 2 · structure: letters as geometry, the shield's charges in relief, the mural crown and the garlands round it
+- [ ] Round 3 · surface: worn gilding, dirty letters, one letter missing
+- [ ] Review: from the garden and at 1 m
 
-### [ ] S219 · Prefeitura: main hall and council chamber
+### [ ] S219 · Town hall: main hall and council chamber
 > needs: S192, S193 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_hall`
-- [ ] Card: photos of the Prefeitura's hall and its council chamber (put them in `references/elements/` first)
-- [ ] Round 1 · form: the hall's height, the wide stair, the chamber's tiers
-- [ ] Round 2 · structure: the stair's balustrade, reception counters, the chamber's desks with microphones, the presiding table, flags and the coat of arms
-- [ ] Round 3 · surface: polished floors scuffed, papers everywhere, barricade attempts
+- [ ] Card: photos of French town halls' stair halls and salles du conseil (put them in `references/elements/` first)
+- [ ] Round 1 · form: the hall's height, the wide stone stair, the chamber's panelled room and its rows
+- [ ] Round 2 · structure: the stair's wrought-iron railing, reception counters, the chamber's desks with microphones, the mayor's table, flags, the bust of Marianne and the town's arms, paintings on the panelling
+- [ ] Round 3 · surface: parquet scuffed, papers everywhere, barricade attempts
 - [ ] Review: both rooms at eye height
 
-### [ ] S061 · Prefeitura, outside
+### [ ] S061 · Town hall, outside
 > needs: S053, S045, S047, S213, S214, S215, S216, S217, S218 | size: L | rounds: 3 | test: `tests/test_poi_prefeitura.gd` | see: `--mission=prefeitura --shot-at=2`
 - Assembly between the river and the hill of the finished parts; nothing modelled here.
-- [ ] The bar from its bays (S213), the towers and buttresses (S214), the space frames (S215), the roof (S216)
-- [ ] The lawn mound (S217) with the letter sign (S218); the concrete pad on it is the landing zone
-- [ ] Car parks on both sides (S048's cars), the riverside avenue and its palms in front (S045, S047), the forested hill rising behind (S178)
-- [ ] Round 1 · layout: the plan against `prefeitura3.png` and the OSM footprint
-- [ ] Round 2 · photo match: `prefeitura1.jpg` and `prefeitura2.jpg` rebuilt, side by side
-- [ ] Round 3 · abandoned: the car parks jammed, the lawn overgrown, the flags torn, without losing the place
-- [ ] Review: the photo match sheets
+- [ ] The front from its bays (S213) with the campanile (S214), the office wing behind (S215), the roofs (S216)
+- [ ] The garden (S217) with the name and arms over the door (S218); the open lawn is the landing zone
+- [ ] A car park beside the wing (S048's cars), the quay and its plane trees in front (S045, S047), the wooded hill rising behind (S178)
+- [ ] Round 1 · layout: the plan (front, wing, garden, car park) against French town halls on the card
+- [ ] Round 2 · style match: fixed `--shot-cam` views from the quay and the garden beside the card's references
+- [ ] Round 3 · abandoned: the car park jammed, the garden overgrown, the flags torn, without losing the place
+- [ ] Review: the style match sheets
 
-### [ ] S062 · Mission: hold the Prefeitura
+### [ ] S062 · Mission: hold the town hall
 > needs: S061, S054, S055, S023, S024, S219 | size: L | test: `tests/test_mission_prefeitura.gd` | see: `--mission=prefeitura --bot`
-- [ ] Inside: main hall with a wide stair, council chamber, office wings, the brick stair towers, roof access
+- [ ] Inside: the stair hall, the salle du conseil, the office wing, the campanile's stair, roof access
 - [ ] Defend the hall: many windows and three doors to barricade, plank piles, ammo crate
-- [ ] Three waves, each from more sides: the lawn, the car parks, then out of the forest behind
+- [ ] Three waves, each from more sides: the garden, the car park, then out of the forest behind
 - [ ] Between waves: restock, repair
-- [ ] Finale: fall back to the lawn pad, the helicopter lands among the horde
+- [ ] Finale: fall back to the lawn, the helicopter lands among the horde
 - [ ] Bot scenario survives on easy
 
 ### [ ] S063 · Mounted gun
@@ -1518,66 +1536,67 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] It sits in a sandbag nest from S185
 - [ ] Review: the first-person manned view with the hands on the grips, and the rack
 
-### [ ] S220 · Batalhão: barracks block
+### [ ] S220 · Barracks: barrack blocks
 > needs: S141, S157 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_barracks`
-- [ ] Card: `batalhao.jpg` and `batalhao2.jpg`: long low buildings with red clay-tile hip roofs round the parade ground, white walls, long words painted on one roof and 62 BI on the far one
-- [ ] Round 1 · form: lengths, widths, roof pitches and hips, eave depths
-- [ ] Round 2 · structure: tile rows with ridge and hip caps, eaves with fascia and gutters, windows and doors, a veranda where the photos show one
-- [ ] Round 3 · surface: the tiles' colour variation, moss and lichen, white paint with stains, the roof lettering painted and weathered
-- [ ] Review: from the viewpoint of `batalhao.jpg`
+- The army barracks (`--mission=batalhao`) is a French caserne of the 1700s and the Empire: long stone blocks round a cour d'honneur. `batalhao.jpg` and `batalhao2.jpg` give only the arrangement (a quadrangle with a front building, a gym, a field behind) and the scale.
+- [ ] Card: photos of French casernes of about 1800: long three- or four-storey blocks of stone and plaster, regular windows, mansard or hipped slate roofs, a pediment on the middle pavilion
+- [ ] Round 1 · form: lengths, widths, floors, roof pitches and hips, the pavilions
+- [ ] Round 2 · structure: slate rows with ridge and hip caps, dormers, string courses, stone window frames, doors with their steps, the middle pavilion's pediment
+- [ ] Round 3 · surface: the stone's and slates' colour variation, moss, an invented regiment's number painted on one pavilion
+- [ ] Review: from the cour d'honneur and from above
 
-### [ ] S221 · Batalhão: the front building
+### [ ] S221 · Barracks: the gate pavilion
 > needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_front`
-- [ ] Card: `batalhao.jpg` (front): two floors, green below and white above, the central portico with the entrance arch, the projecting gable wings
-- [ ] Round 1 · form: the front's length, the portico, the wings, the roof
-- [ ] Round 2 · structure: the arch and its pilasters, windows in frames, the cornice and the band between the colours, the gate under the arch
-- [ ] Round 3 · surface: the green and white weathered, the army's insignia over the arch (simplified), stains
+- [ ] Card: photos of French caserne gates: a two-storey stone pavilion with a great arch through it, carved trophies of arms over it, sentry boxes at both sides, wings at both ends
+- [ ] Round 1 · form: the front's length, the arch, the wings, the roof
+- [ ] Round 2 · structure: the arch and its rustication, the trophies and the carved QUARTIER name (invented), windows in stone frames, the cornice, the gate leaves under the arch, the sentry boxes
+- [ ] Round 3 · surface: stone weathered and sooty, an invented army's crest (simplified), stains
 - [ ] Round 4 · battle: sandbags in the windows, bullet pocks, a burnt room
-- [ ] Review: from the front lawn and from the height of `batalhao.jpg`
+- [ ] Review: from the street and from the cour d'honneur
 
-### [ ] S222 · Batalhão: parade ground and centre garden
+### [ ] S222 · Barracks: the cour d'honneur
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_ground`
-- [ ] Card: the concrete slab grid with painted lines, the centre lawn with its monument and flagpoles (`batalhao.jpg`)
-- [ ] Round 1 · form: the ground's size, the slabs, the garden
-- [ ] Round 2 · structure: joints, painted lines and markers, the monument, flagpoles and their bases, kerbs
-- [ ] Round 3 · surface: oil stains where vehicles stand, cracks with grass, faded paint
-- [ ] Review: from above at the height of `batalhao.jpg`
+- [ ] Card: photos of French barracks courts: setts or gravel with painted lines, a lawn with a memorial and flagpoles
+- [ ] Round 1 · form: the court's size, the surface, the lawn
+- [ ] Round 2 · structure: joints, painted lines and markers, the memorial (a column with names), flagpoles and their bases, kerbs
+- [ ] Round 3 · surface: oil stains where vehicles stand, grass between the setts, faded paint
+- [ ] Review: from above
 
-### [ ] S223 · Batalhão: perimeter, gate and guard tower
+### [ ] S223 · Barracks: perimeter, gate and guard tower
 > needs: S141, S185 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gate`
-- [ ] Card: the lot's wall with a fence on top, the main gate with its guard house and boom barrier, a guard tower with a searchlight, the front lawn's white star beds (`batalhao.jpg`)
+- [ ] Card: photos of French barracks perimeters: a high stone wall with a mesh fence and barbed wire on top, the vehicle gate with its guard house and boom barrier, a guard tower with a searchlight
 - [ ] Round 1 · form: wall height, gate width, the tower's height and cabin
-- [ ] Round 2 · structure: wall pillars and fence, the barrier's arm and post, the guard house's windows, the tower's ladder and rail, the searchlight's yoke, the star beds' white borders
-- [ ] Round 3 · surface: stains, rust, the army's signs at the gate
+- [ ] Round 2 · structure: the wall's piers and coping, the fence, the barrier's arm and post, the guard house's windows, the tower's ladder and rail, the searchlight's yoke
+- [ ] Round 3 · surface: stains, rust, the warning signs at the gate (TERRAIN MILITAIRE, DÉFENSE D'ENTRER)
 - [ ] Review: from the street at eye height
 
-### [ ] S224 · Batalhão: gym and sports court
+### [ ] S224 · Barracks: the riding hall and court
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gym`
-- [ ] Card: the gym with its barrel-vault metal roof and red end wall, the green court beside it (`batalhao.jpg`, top left)
-- [ ] Round 1 · form: the vault's span and length, the end walls, the court
-- [ ] Round 2 · structure: the roof's ribs, the end walls' windows and doors, the court's lines, posts and nets
-- [ ] Round 3 · surface: rust on the roof, the court's paint faded
-- [ ] Review: from the viewpoint of `batalhao.jpg`
+- [ ] Card: photos of the old riding halls (manèges) of French casernes, now gyms: a long stone hall with a big timber or iron roof, the sports court beside it
+- [ ] Round 1 · form: the roof's span and length, the end walls, the court
+- [ ] Round 2 · structure: the roof's trusses, the end walls' round windows and great doors, the court's lines, posts and nets
+- [ ] Round 3 · surface: moss on the roof, the court's paint faded
+- [ ] Review: from the cour d'honneur
 
 ### [ ] S225 · Army truck
 > needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_truck`
-- [ ] Card: photos of the Brazilian army's cargo trucks
+- [ ] Card: photos of European armies' cargo trucks (no one army's markings copied)
 - [ ] Round 1 · form: cab, chassis, the cargo bed under its canvas
 - [ ] Round 2 · structure: the canvas hoops and straps, tailgate, spare wheel, jerrycans, bumpers, mirrors
-- [ ] Round 3 · surface: olive drab, mud, stencils
+- [ ] Round 3 · surface: an invented green and brown camouflage, mud, stencils
 - [ ] Review: at 1 m and 10 m in every state
 
 ### [ ] S226 · Light 4×4
 > needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_4x4`
-- [ ] Card: photos of the Brazilian army's light 4×4 utility vehicles
+- [ ] Card: photos of European armies' light 4×4 utility vehicles
 - [ ] Round 1 · form: body, soft top or open, wheels
 - [ ] Round 2 · structure: roll bar, gun mount, jerrycans, antennas, tow hooks
-- [ ] Round 3 · surface: olive paint, mud, stencils
+- [ ] Round 3 · surface: the same invented camouflage, mud, stencils
 - [ ] Review: at 1 m and 10 m
 
-### [ ] S227 · 6×6 armoured personnel carrier
+### [ ] S227 · Wheeled armoured personnel carrier
 > needs: S179 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=apc`
-- [ ] Card: photos of the Brazilian army's 6×6 wheeled APC
+- [ ] Card: photos of European 6×6 and 8×8 wheeled APCs (no one model copied)
 - [ ] Round 1 · form: the faceted hull, six wheels, the turret
 - [ ] Round 2 · structure: hatches, periscopes, the rear ramp, lights in their guards, smoke launchers, the turret's gun
 - [ ] Round 3 · surface: camouflage, mud, scorch from a fire
@@ -1591,7 +1610,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Round 3 · surface: mud, stencils, wear
 - [ ] Review: a corner of the camp at eye height
 
-### [ ] S229 · Batalhão interiors
+### [ ] S229 · Barracks interiors
 > needs: S191, S193 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_rooms`
 - [ ] Card: photos of barracks rooms, an armoury and a mess hall (put them in `references/elements/` first)
 - [ ] Round 1 · form: the armoury's cage, rows of bunks and lockers, mess tables, the command room's desk and map wall
@@ -1599,97 +1618,98 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Round 3 · surface: order left in panic: kit spilled, beds overturned
 - [ ] Review: each room at eye height
 
-### [ ] S064 · 62º Batalhão, outside
+### [ ] S064 · The barracks, outside
 > needs: S053, S048, S220, S221, S222, S223, S224, S225, S226, S227, S228 | size: L | rounds: 3 | test: `tests/test_poi_batalhao.gd` | see: `--mission=batalhao --shot-at=2`
-- Assembly on Rua Ministro Calógeras of the finished parts; nothing modelled here.
-- [ ] The quadrangle of barracks blocks (S220) round the parade ground and centre garden (S222), the front building (S221), the gym and court (S224), the field behind
+- Assembly where the plan puts the caserne of the finished parts; nothing modelled here.
+- [ ] The quadrangle of barrack blocks (S220) round the cour d'honneur (S222), the gate pavilion (S221), the riding hall and court (S224), the field behind
 - [ ] The perimeter, gate and guard tower (S223); the searchlight still turns
-- [ ] Vehicles on the parade ground (S225, S226, S227), gun pits and tents (S228, S185)
-- [ ] Round 1 · layout: the plan against `batalhao.jpg`, `batalhao2.jpg` and the OSM footprint
-- [ ] Round 2 · photo match: both photos' viewpoints rebuilt, side by side
+- [ ] Vehicles in the court (S225, S226, S227), gun pits and tents (S228, S185)
+- [ ] Round 1 · layout: the quadrangle against French caserne plans on the card
+- [ ] Round 2 · style match: fixed `--shot-cam` views from the gate and from above beside the card's references
 - [ ] Round 3 · the last stand: the base as its defenders left it
-- [ ] Review: the photo match sheets
+- [ ] Review: the style match sheets
 
-### [ ] S065 · Mission: hold the Batalhão
+### [ ] S065 · Mission: hold the barracks
 > needs: S064, S054, S063, S023, S024, S229, S244 | size: L | test: `tests/test_mission_batalhao.gd` | see: `--mission=batalhao --bot`
-- [ ] Inside: armoury with ammo crates and gun racks behind a locked cage, barracks rows, mess hall, command room with the radio
-- [ ] Objectives: get in through the gate, call the helicopter on the radio, open the armoury, hold the parade ground
+- [ ] Inside: armoury with ammo crates and gun racks behind a locked cage, barrack rooms, mess hall, command room with the radio
+- [ ] Objectives: get in through the gate, call the helicopter on the radio, open the armoury, hold the cour d'honneur
 - [ ] Mounted guns in the pits and on the tower
 - [ ] Waves pour over the walls and through the gate; soldier zombies in the mix
-- [ ] The helicopter lands in the middle of the parade ground
+- [ ] The helicopter lands in the middle of the court
 - [ ] Bot scenario survives on easy
 
-### [ ] S230 · Mirante: the lookout tower
+### [ ] S230 · Lookout: the telegraph tower
 > needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_tower`
-- [ ] Card: no photo yet: put photos of the tower on the summit in `references/elements/` first and build nothing from memory (S066 waits on this too)
-- [ ] Round 1 · form: height, plan, the deck, the way up inside
-- [ ] Round 2 · structure: as in the photos
-- [ ] Round 3 · surface: as in the photos, weathered by the summit's wind
-- [ ] Round 4 · night and wind: its lights, the antennas' lights, cloud wisps through the deck
-- [ ] Review: beside the photos
+- The hill keeps Morro da Boa Vista's place and height (`CityHeights`); on top stands the old stone tower that carried a Chappe telegraph around 1800, now a lookout (`--mission=mirante`), with a windmill beside it.
+- [ ] Card: engravings and photos of Chappe telegraph towers and the windmills of the hills round Paris (put them in `references/elements/` first and build nothing from memory; S066 waits on this too)
+- [ ] Round 1 · form: the tower's height and plan, the deck on top, the stair inside; the windmill's tower and sails
+- [ ] Round 2 · structure: the stone courses, the telegraph's mast with its beam and arms still on the roof, the deck's railing, the stair, the windmill's cap, sails and tail pole, a mast with antennas added later
+- [ ] Round 3 · surface: weathered by the summit's wind: lichen, rust, carved initials, torn sail cloth
+- [ ] Round 4 · night and wind: its lights, the antennas' lights, the sails creaking round, cloud wisps through the deck
+- [ ] Review: beside the references
 
-### [ ] S231 · Mirante: summit furniture
+### [ ] S231 · Lookout: summit furniture
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_summit`
-- [ ] Card: coin binoculars, the summit's railings, a kiosk, antenna masts with red lights (photos first)
+- [ ] Card: coin binoculars, a panorama table naming what you see, the summit's railings, a guinguette with its terrace, antenna masts with red lights (photos first)
 - [ ] Round 1 · form: sizes
-- [ ] Round 2 · structure: the binoculars' head and coin box, railing posts, the masts' lattice and guy wires
+- [ ] Round 2 · structure: the binoculars' head and coin box, the panorama table's engraved plate, railing posts, the guinguette's arbour, tables and lamps, the masts' lattice and guy wires
 - [ ] Round 3 · surface: weathering
 - [ ] Review: the summit at eye height
 
-### [ ] S232 · Mirante: the entrance portal
+### [ ] S232 · Lookout: the park gate
 > needs: S141, S177 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_gate`
-- [ ] Card: `mirante_entrance.jpg`: two square board-formed concrete pillars, the lintel with MORRO DA BOA VISTA in green letters and the smaller line under it, the white butterfly canopy over the lanes, the guard booth with its terracotta top and shield, the red and white barrier, the yellow-kerbed island, the PARE barricade, cones, the green info totem
-- [ ] Round 1 · form: the pillars' and the canopy's sizes against the car in the photo, the canopy's two wings
-- [ ] Round 2 · structure: the canopy's thin edges and joints, the booth's window and door, the barrier's arm and post, kerbs, the totem
-- [ ] Round 3 · surface: board marks and stains on the concrete, the lettering's paint, the canopy's dirty underside
-- [ ] Round 4 · photo match: the viewpoint of `mirante_entrance.jpg` rebuilt, side by side
-- [ ] Review: the photo match and the rack at 1 m
+- [ ] Card: photos of the gates of French hill parks and estates: stone piers with urns and the hill's invented name carved on them, an iron grille, a small gatekeeper's lodge (pavillon de garde), the car park's edge, a map board; `mirante_entrance.jpg` gives only the scale (a two-lane road through it)
+- [ ] Round 1 · form: the piers' and the lodge's sizes against a car, the road through
+- [ ] Round 2 · structure: the piers' caps, urns and lettering, the grille's bars and gilded tips, the lodge's windows, door and roof, a barrier added later, kerbs, the map board
+- [ ] Round 3 · surface: moss on the stone, the lettering's worn paint, rust on the grille
+- [ ] Round 4 · style match: a fixed `--shot-cam` view up the road through the gate beside the card's references
+- [ ] Review: the style match and the rack at 1 m
 
-### [ ] S233 · Mirante: the hill road
+### [ ] S233 · Lookout: the hill road
 > needs: S141, S167 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_road`
-- [ ] Card: `mirante_street.jpg`: grey rectangular concrete pavers for the cars, a red brick walking lane in herringbone, a white line between them, kerbs, the grass verge, gutters
-- [ ] Round 1 · form: lane widths, the line, kerb heights; modules that follow the road's curve and grade
-- [ ] Round 2 · structure: the pavers' bonds and joints, gutters, guard rails on the outside of bends, the retaining wall uphill
-- [ ] Round 3 · surface: moss in the joints, leaves, wet patches under the canopy
-- [ ] Review: the viewpoint of `mirante_street.jpg` rebuilt
+- [ ] Card: photos of old French roads up a wooded hill: a narrow road of setts, a gravel verge, stone gutters, a low stone parapet on the outside of bends, a mossy retaining wall uphill
+- [ ] Round 1 · form: lane widths, verges; modules that follow the road's curve and grade
+- [ ] Round 2 · structure: the setts' edges and asphalt patches, gutters, parapets on the outside of bends, the retaining wall, milestones (bornes kilométriques)
+- [ ] Round 3 · surface: moss, leaves, wet patches under the canopy
+- [ ] Review: a bend and the hairpin at eye height
 
-### [ ] S234 · Mirante: the trail
+### [ ] S234 · Lookout: the trail
 > needs: S141, S178 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=trail`
-- [ ] Card: photos of the Trilha Rústica (put them in `references/elements/` first): dirt steps held by logs, roots, rocks, a rope rail
+- [ ] Card: photos of French forest trails (put them in `references/elements/` first): dirt steps held by logs, roots, sandstone rocks, a wooden handrail, a painted waymark on a trunk
 - [ ] Round 1 · form: the steps' heights, the path's width
-- [ ] Round 2 · structure: logs and stakes, roots across the path, rocks, a fallen tree
+- [ ] Round 2 · structure: logs and stakes, roots across the path, rocks, a fallen tree, waymarks
 - [ ] Round 3 · surface: mud, leaf litter, moss
 - [ ] Review: walking it at eye height
 
-### [ ] S066 · Mirante, the summit
+### [ ] S066 · Lookout, the summit
 > needs: S053, S047, S230, S231 | size: L | rounds: 2 | test: `tests/test_poi_mirante.gd` | see: `--mission=mirante --shot-at=2`
-- [ ] The lookout tower (S230) and the summit's clearing with its furniture (S231): car park, railings, coin binoculars, a kiosk, antenna masts with red lights
-- [ ] The view: the whole city backdrop below, lit windows, fires, the river as a pale line
-- [ ] Wind up here: stronger sway, louder, cloud wisps passing through the deck at night
+- [ ] The telegraph tower and the windmill (S230) and the summit's clearing with its furniture (S231): car park, railings, coin binoculars, the guinguette, antenna masts with red lights
+- [ ] The view: the whole town backdrop below, the church tower and the campanile, lit windows, fires, the river as a pale line
+- [ ] Wind up here: stronger sway, louder, the windmill's sails turning, cloud wisps passing through the deck at night
 - [ ] Player start on the deck
-- [ ] Round 1 · layout: the summit against its photos and `joinville_topography.png`
-- [ ] Round 2 · the view: the city from the deck at night reads as Joinville
-- [ ] Review: the deck's view and the photo match
+- [ ] Round 1 · layout: the summit against the card's references and `joinville_topography.png` (its height and shape only)
+- [ ] Round 2 · the view: the town from the deck at night reads as old Paris under siege
+- [ ] Review: the deck's view and the summit at eye height
 
-### [ ] S067 · Mirante, the road down
+### [ ] S067 · Lookout, the road down
 > needs: S066, S041, S167, S178, S232, S233, S234 | size: L | rounds: 3 | test: `tests/test_poi_mirante_road.gd` | see: `--mission=mirante --shot-cam` on the hairpin
-- [ ] The hill road (S233) along the traced road, the hairpin and the grade from `CityHeights`; everything placed with `map.ground_y`
-- [ ] Forest walls both sides (S178), canopy closing overhead; concrete poles with their cables following the road (S167)
-- [ ] The gate at the foot (S232)
+- [ ] The hill road (S233) along the road of the plan, the hairpin and the grade from `CityHeights`; everything placed with `map.ground_y`
+- [ ] Forest walls both sides (S178), canopy closing overhead; wooden poles with their wires following the road (S167)
+- [ ] The park gate at the foot (S232)
 - [ ] Side trail (S234) as a risky shortcut: no lamps
 - [ ] A few lamps only, long dark stretches for flashlights
 - [ ] Round 1 · layout: the road's line, width and grade against the topography
-- [ ] Round 2 · photo match: `mirante_street.jpg` and `mirante_entrance.jpg` rebuilt, side by side
+- [ ] Round 2 · style match: fixed `--shot-cam` views of a bend and of the gate beside the card's references
 - [ ] Round 3 · night: the dark stretches, the few lamps, fog between the trunks
-- [ ] Review: the photo match sheets and the hairpin at night
+- [ ] Review: the style match sheets and the hairpin at night
 
-### [ ] S068 · Mission: down from the Mirante
+### [ ] S068 · Mission: down from the lookout
 > needs: S067, S052, S022 | size: M | test: `tests/test_mission_mirante.gd` | see: `--mission=mirante --bot`
 - [ ] Descend the tower: tight stairs, leapers
 - [ ] The road: leapers drop out of the trees, runners come up the road in packs, fog between the trunks
 - [ ] Checkpoint at the hairpin
 - [ ] Choice: the lit road or the dark trail
-- [ ] Extraction at the gate at the foot, a truck instead of the helicopter
+- [ ] Extraction at the park gate at the foot, a truck instead of the helicopter
 - [ ] Bot scenario finishes it on easy
 
 ---
@@ -1923,7 +1943,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] Firefighter: helmet and thick coat, immune to fire
 - [ ] Helmets are parts: a hit knocks them off with a clang and they roll away
 - [ ] Bullets on armour spark and ricochet instead of bleeding
-- [ ] Weighted by place: soldiers at the Batalhão, cops at checkpoints
+- [ ] Weighted by place: soldiers at the barracks, cops at checkpoints
 
 ### [ ] S081 · Death and ragdolls
 > needs: S071 | size: M | test: `tests/test_ragdoll.gd` | see: `--host --demo --bot --shot-at=2,4`
@@ -2224,7 +2244,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 > needs: S050 | size: M | test: `tests/test_post.gd` | see: `tools\shots.ps1`
 - [ ] Tonemap and exposure per time of day; eyes adapt when leaving a dark building into daylight
 - [ ] Glow on emissive things: muzzle flashes, lamps, fire, signs
-- [ ] Colour grade per mission: cold blue-green hospital, sodium orange streets, grey-green forest, bleached dusk at the Batalhão
+- [ ] Colour grade per mission: cold blue-green hospital, sodium orange streets, grey-green forest, bleached dusk at the barracks
 - [ ] Film grain and a soft vignette, both with settings
 - [ ] Ambient occlusion and screen-space reflections on HIGH only
 - [ ] Sharpening after upscale on LOW
@@ -2262,7 +2282,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 ### [ ] S115 · Ambient life
 > needs: S048 | size: M | test: `tests/test_ambient_life.gd`
 - [ ] Crows on wires and corpses that take off when a player comes near or a shot is fired
-- [ ] Vultures circling over the Batalhão, bats round the lamps on the hill road
+- [ ] Crows circling over the barracks, bats round the lamps on the hill road
 - [ ] Rats running along walls into holes, cockroaches scattering from light indoors
 - [ ] Flies as a small buzzing cloud over old corpses
 - [ ] Moths round lamps, fireflies in the forest
@@ -2288,7 +2308,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 > needs: S024, S109 | size: S | test: `tests/test_searchlight.gd`
 - [ ] Helicopter searchlight: a hard white cone through fog and rain, a moving pool on the ground that hunts for the players, then locks on the landing zone
 - [ ] Zombies in the pool are lit sharply with long shadows (one of the two shadow slots while it is on)
-- [ ] The Batalhão tower's searchlight on a slow sweep
+- [ ] The barracks tower's searchlight on a slow sweep
 - [ ] Lens flare when looking into it
 
 ### [ ] S118 · Graphics tiers
@@ -2378,7 +2398,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 - [ ] `user://profile.cfg`: missions done per difficulty, records, total kills, unlocked items
 - [ ] Finishing missions unlocks the next ones and starting loadout options (a better sidearm, a melee weapon, an attachment)
 - [ ] Each player's own unlocks apply to themself; the host's unlock the missions
-- [ ] Challenges: finish the hospital with melee only, the Mirante without the flashlight, and the like
+- [ ] Challenges: finish the hospital with melee only, the lookout without the flashlight, and the like
 - [ ] A profile screen in the menu
 
 ### [ ] S128 · Daily modifiers

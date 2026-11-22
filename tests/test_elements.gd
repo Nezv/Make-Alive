@@ -148,3 +148,54 @@ func test_the_rack_shows_it_from_every_review_view() -> void:
 			rack.look(i)
 			assert_true(rack.camera.is_position_in_frustum(mid), "%s: view %s sees it" % [elem, PropRack.VIEWS[i]])
 		rack.free()
+
+
+## The detail kit (S141): every helper of tools/models/shapes.py, surfaces.py, lettering.py and
+## wear.py has a sample on the kit's board, named in kit.json with where it stands, and one of the
+## board's own review views looks at it.
+const KIT_SAMPLES := [
+	# shapes
+	"chamfer_box", "bevel_box", "lathe", "sweep_pipe", "cable", "handrail", "extrude", "panel_inset",
+	"panel_raised", "array_linear", "array_radial", "window_frame", "door_frame", "vent", "louvre_vent",
+	# surfaces
+	"brick_stretcher", "brick_flemish", "brick_english", "brick_foraine", "concrete_block", "ashlar",
+	"setts", "setts_fan", "pavers", "roof_flat_tiles", "roof_canal_tiles", "ridge_caps", "corrugated",
+	"ribbed", "grille", "mesh", "louvres", "board_formed",
+	# lettering
+	"font_block", "font_stencil", "numbers", "street_plate", "road_word",
+	# wear
+	"chips", "rust_runs", "water_stains", "soot", "moss", "dirt_foot", "posters", "graffiti",
+	# damage
+	"dents", "broken_glass", "pocks", "burnt_materials", "cut",
+]
+
+
+func test_the_kit_shows_every_helper() -> void:
+	var model := PropModel.load_model("kit")
+	assert_true(model != null, "the kit is built")
+	if model == null:
+		return
+	var samples: Dictionary = model.info.get("samples", {})
+	var size := model.size()
+	var lo: Array = model.info.min
+	var rack := PropRack.new()
+	add_child(rack)
+	rack.setup("kit", {})
+	var views: Array = model.info.get("views", [])
+	assert_gt(views.size(), 3, "the kit has close-up views")
+	for s: String in KIT_SAMPLES:
+		assert_true(samples.has(s), "the kit shows %s" % s)
+		if not samples.has(s):
+			continue
+		var a: Array = samples[s]
+		var p := Vector3(a[0], a[1], a[2])
+		for axis in 3:
+			assert_true(p[axis] >= float(lo[axis]) - 0.01 and p[axis] <= float(lo[axis]) + size[axis] + 0.01, "%s lies on the kit" % s)
+		var seen := false
+		for i in views.size():
+			rack.look_view(i)
+			if rack.camera.is_position_in_frustum(p):
+				seen = true
+				break
+		assert_true(seen, "a close-up of the kit sees %s" % s)
+	rack.free()

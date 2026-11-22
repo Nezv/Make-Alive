@@ -48,11 +48,14 @@ def sheet(name, shots_dir, out_path):
     rows.append([(os.path.join(shots_dir, f"state_{s}.png"), s) for s in states])
     ref_dir = os.path.join(ROOT, "references", "elements", name)
     refs = sorted(os.path.join(ref_dir, f) for f in os.listdir(ref_dir)) if os.path.isdir(ref_dir) else []
-    ref_cols = 2
+    refs = [r for r in refs if r.lower().endswith((".jpg", ".jpeg", ".png"))]
+    small = len(refs) > 8  # many references (the kit's board): half-size tiles, four across
+    rt = (TILE[0] // 2, TILE[1] // 2) if small else TILE
+    ref_cols = 4 if small else 2
     ref_rows = (len(refs) + ref_cols - 1) // ref_cols
     cols = max(len(r) for r in rows)
-    h_rows = max(len(rows), ref_rows)
-    out = Image.new("RGB", ((cols + ref_cols) * TILE[0] + 12, h_rows * TILE[1] + 24), (10, 10, 12))
+    height = max(len(rows) * TILE[1], ref_rows * rt[1])
+    out = Image.new("RGB", (cols * TILE[0] + ref_cols * rt[0] + 12, height + 24), (10, 10, 12))
     d = ImageDraw.Draw(out)
     d.text((6, 6), f"{name}: the game's rack (left), the card's references (right)", fill=(230, 230, 230))
     for r, row in enumerate(rows):
@@ -60,10 +63,35 @@ def sheet(name, shots_dir, out_path):
             out.paste(_tile(path, label), (c * TILE[0], 24 + r * TILE[1]))
     for i, path in enumerate(refs):
         r, c = divmod(i, ref_cols)
-        out.paste(_tile(path, os.path.basename(path)), ((cols + c) * TILE[0] + 12, 24 + r * TILE[1]))
+        out.paste(_tile(path, os.path.basename(path)[:-4], rt), (cols * TILE[0] + 12 + c * rt[0], 24 + r * rt[1]))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     out.save(out_path, quality=82)
     return out_path
+
+
+def view_sheets(name, shots_dir, out_path):
+    """An element with close-ups of its own (the kit's board): one sheet per state, every
+    close-up in it, big enough to judge the paint. Written beside the main sheet as
+    <name>_r<N>_<state>.jpg; returns their paths."""
+    names = sorted({f[5:-4].rsplit("_", 1)[0] for f in os.listdir(shots_dir) if f.startswith("view_")})
+    if not names:
+        return []
+    states = sorted({f[:-4].rsplit("_", 1)[1] for f in os.listdir(shots_dir) if f.startswith("view_")},
+                    key=lambda s: ["clean", "abandoned", "damaged", "burnt"].index(s) if s in ("clean", "abandoned", "damaged", "burnt") else 9)
+    size = (640, 360)
+    cols = 3
+    out_paths = []
+    for st in states:
+        rows = (len(names) + cols - 1) // cols
+        im = Image.new("RGB", (cols * size[0], rows * size[1] + 24), (10, 10, 12))
+        ImageDraw.Draw(im).text((6, 6), f"{name}: close-ups, {st}", fill=(230, 230, 230))
+        for i, v in enumerate(names):
+            r, c = divmod(i, cols)
+            im.paste(_tile(os.path.join(shots_dir, f"view_{v}_{st}.png"), v, size), (c * size[0], 24 + r * size[1]))
+        p = out_path[:-4] + f"_{st}.jpg"
+        im.save(p, quality=85)
+        out_paths.append(p)
+    return out_paths
 
 
 def main():
@@ -75,6 +103,8 @@ def main():
             shoot(name, tmp)
             path = sheet(name, tmp, os.path.join(REVIEWS, f"{name}_r{rnd}.jpg"))
             print("wrote", path)
+            for p in view_sheets(name, tmp, path):
+                print("wrote", p)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
