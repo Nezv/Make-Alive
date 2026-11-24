@@ -28,6 +28,7 @@ extends RefCounted
 ##                                                   (Weapons.AMMO); a missing calibre uses its own default
 ##   respawn         true                            how the dead come back: true at once · false never (out for the
 ##                                                   mission) · "checkpoint" at the next checkpoint · seconds (a timer)
+##   sky             "night"                         the time of day when no mission or host says (TimeOfDay)
 ##   objectives      [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]  in order;
 ##                                                   kind: reach, hold, survive, interact, extract
 ##                     reach: `who` "any" (default) or "all" players still in the fight
@@ -63,6 +64,7 @@ var respawn := true         ## the dead come back at once
 var respawn_after := -1.0   ## ...or after this many seconds (-1: no timer)
 var respawn_checkpoint := false ## ...or when the next checkpoint is reached
 var starting_ammo := {}     ## Weapons.Ammo -> rounds in reserve at the start
+var sky := "night"          ## TimeOfDay preset, unless the mission or the host says otherwise
 var errors: Array = []
 
 
@@ -71,6 +73,7 @@ func _init(dict: Dictionary = {}) -> void:
 	name = dict.get("name", "")
 	bounds = PackedVector2Array(dict.get("bounds", []))
 	blocked_exits = dict.get("blocked_exits", [])
+	sky = TimeOfDay.resolve(dict.get("sky", "night"))
 	_read_respawn(dict.get("respawn", true))
 	_read_spawns(dict)
 	_read_closets(dict)

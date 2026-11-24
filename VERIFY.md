@@ -121,6 +121,23 @@ back here or into chat.
 - [ ] **pois** · The five missions' start and place (placeholders until P06) — you start in a street, the place is in view, nothing floats or sinks into the hill.
   - see: references/shots/*_street.png, references/shots/*_landmark.png
   - make: tools\shots.ps1 _street
+- [ ] **sky_presets** · Sky and time of day (S050) — clear, overcast, dusk, night and storm each read at a glance and sit beside their reference photo; clouds look like clouds (no blocks, streaks or ripples); stars are points; no line or seam where the town's geometry ends at 1200 m and the painted backdrop goes on; the hill and the smoke columns stand on the horizon from the roofs.
+  - see: references/shots/sky_marche_*.png, references/shots/sky_roofs_*.png, references/shots/sky_hill_*.png, references/elements/reviews/sky_rfinal.jpg
+  - ref: references/elements/sky/*.jpg
+  - make: python tools/sky_review.py final --missions
+  - src: scripts/fx/sky_shader.gd, scripts/fx/sky_dome.gd, scripts/time_of_day.gd
+- [ ] **sky_town_below** · The town seen from the Mirante (S050) — by day roofs and streets readable into the haze; at night streets as lines of lamps, the far town glowing up to the horizon; the western ridge only to the west.
+  - see: references/shots/sky_hill_*.png
+  - ref: references/elements/sky/overcast_montmartre.jpg, references/elements/sky/night_paris.jpg
+  - make: python tools/sky_review.py final --view=hill
+  - src: scripts/fx/sky_shader.gd
+- [ ] **sky_storm** · A lightning strike (S050) — one part of the deck lit from inside, not the whole sky white; the town brightens for a moment. Also play `tools\godot.ps1 -- --host --time=storm` for a minute: strikes every few seconds, the clouds race.
+  - see: references/shots/sky_*_storm.png
+  - ref: references/elements/sky/storm_night.jpg
+  - make: python tools/sky_review.py final
+- [ ] **sky_missions** · Each mission's own sky from its start (S050) — terminal dusk, hospital night, prefeitura storm, batalhão overcast, mirante night; nothing in the sky looks wrong behind the placeholder buildings.
+  - see: references/shots/sky_start_*.png, references/elements/reviews/sky_rfinal_missions.jpg
+  - make: python tools/sky_review.py final --missions
 - [ ] **corridor** · The corridor's map data drawn (S002) — zones, closets out of sight, routes reaching the play area.
   - see: references/shots/corridor_zones.png
   - make: tools\shots.ps1 corridor_zones

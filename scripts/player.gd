@@ -76,7 +76,7 @@ func _ready() -> void:
 	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.fov = base_fov()
 	camera.near = 0.05
-	camera.far = 300
+	camera.far = Config.VIEW_FAR # the fog and the sky's backdrop hide where it ends
 	add_child(camera)
 	camera.make_current()
 	view = Viewmodel.new()

@@ -23,6 +23,9 @@ var brain: Bot             ## what plays for the local player when `bot` is on (
 var map_name := "corridor" ## set before start_host; clients get it in `welcome`
 var mission := ""          ## a city POI id ("mirante"...) or "" for free play; clients get it in `welcome`
 var difficulty := "normal" ## Difficulty.LEVELS; set before start_host, clients get it in `welcome`
+var sky_choice := ""       ## the host's `--time=` (a TimeOfDay name); "" = the mission's or the map's own
+var sky := "night"         ## the TimeOfDay preset this match plays; clients get it in `welcome`
+var sky_dome: SkyDome      ## the sky, its light and fog, the far backdrop
 var limited_ammo := false  ## set before start_host: reloads take from a reserve even on a test map (--limited-ammo, tests)
 var map: GameMap
 var world: Node3D
@@ -148,42 +151,13 @@ func _build_world() -> void:
 	if door != null:
 		door.smashed.connect(_on_door_smashed)
 
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("0b0d10")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("7f8fa6")
-	env.ambient_light_energy = 0.35
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	# The background stays black, but shiny things (guns, wet blood) reflect a dim night sky.
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("141c2b")
-	sky_mat.sky_horizon_color = Color("5a6680")
-	sky_mat.ground_horizon_color = Color("3a4252")
-	sky_mat.ground_bottom_color = Color("0b0d10")
-	var sky := Sky.new()
-	sky.sky_material = sky_mat
-	sky.radiance_size = Sky.RADIANCE_SIZE_64
-	env.sky = sky
-	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	env.fog_enabled = true
-	env.fog_light_color = Color("0b0d10")
-	env.fog_density = 0.035
-	if map.outdoor: # see the night sky, and far enough to make out the building
-		env.background_mode = Environment.BG_SKY
-		env.ambient_light_energy = 0.6
-		env.fog_light_color = Color("151b28")
-		env.fog_density = 0.011
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-
-	var moon := DirectionalLight3D.new()
-	moon.light_color = Color("aabbdd")
-	moon.light_energy = 0.9 if map.outdoor else 0.5
-	moon.shadow_enabled = false # lamps cast the shadows; a sun shadow would redraw the horde 4 more times
-	moon.rotation = Vector3(deg_to_rad(-60), deg_to_rad(35), 0)
-	add_child(moon)
+	if is_host:
+		sky = TimeOfDay.resolve(sky_choice if sky_choice != "" else
+			(Missions.INFO[mission].sky if Missions.INFO.has(mission) else map.data.sky))
+	sky_dome = SkyDome.new()
+	sky_dome.name = "Sky"
+	add_child(sky_dome)
+	sky_dome.setup(map, sky)
 
 	local_player = LocalPlayer.new()
 	local_player.name = "LocalPlayer"
@@ -232,7 +206,7 @@ func request_join(player_name_: String, version := 0) -> void:
 
 ## What a joining player must know about this match beyond the map: sent in `welcome`.
 func welcome_rules() -> Dictionary:
-	var r := { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION }
+	var r := { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION, "sky": sky }
 	if heli != null:
 		r.heli = heli_state()
 	return r
@@ -393,6 +367,7 @@ func welcome(map_name_: String, mission_: String, interactable_states: Dictionar
 	mission = mission_
 	limited_ammo = not match_rules.get("infinite_ammo", true)
 	difficulty = match_rules.get("difficulty", "normal")
+	sky = TimeOfDay.resolve(match_rules.get("sky", "night"))
 	if match_rules.has("mission"):
 		mission_state(match_rules.mission)
 	_build_world()
@@ -1818,6 +1793,8 @@ func _process(delta: float) -> void:
 	Sfx.step_spots(Sfx.pool().ears(), delta)
 	step_pings(delta)
 	step_heli(delta)
+	var cam := get_viewport().get_camera_3d()
+	sky_dome.step(delta, cam.global_position if cam else Vector3.INF)
 	if local_player.status.dead:
 		_update_spectating(delta)
 	hud.set_spectate(spectate_text())

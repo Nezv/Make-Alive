@@ -51,7 +51,7 @@ Legend: [x] exists, [ ] not built.
 
 - Not all of it: keep each map reduced to the POI surroundings.
 - Streets, sidewalks, cars (wrecks as cover), lamp posts, bus stops, trash, barricades.
-- Day / dusk / night variants, fog for cheap draw distance.
+- Day / dusk / night variants, fog for cheap draw distance. (S050: five sky presets, one per mission, depth fog and a painted backdrop past the far plane.)
 - Interiors only for the mission buildings; other buildings are solid blocks with doors that do not open.
 - Zombie spawn points hidden behind corners, never in sight.
 

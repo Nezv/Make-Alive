@@ -786,19 +786,20 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · decay: the abandoned square (litter, a fallen lantern, a car crashed into the fountain's basin) without losing the place
 - [ ] Review: the style match sheet
 
-### [ ] S050 · Sky and time of day
-> needs: S004 | size: L | rounds: 3 | test: `tests/test_sky.gd` | see: `--time=day|dusk|night --shot-at=2`
-- [ ] Sky shader in code: gradient, sun or moon disc, stars that twinkle, two drifting cloud layers lit from below by the town at night
-- [ ] Presets per mission in map data: overcast day, orange dusk with long shadows, moonlit night, storm
-- [ ] One directional light per preset, shadows only by day and dusk
-- [ ] Distance fog tinted by the preset, hides the draw distance limit
-- [ ] Far backdrop: the roofscape bristling with chimneys, the church tower and the campanile, and the dark wooded hill with the old telegraph tower and its windmill on top, visible from every mission
-- [ ] Columns of smoke on the horizon, a distant fire glow under the clouds
-- [ ] `--time=` flag, sent in `welcome`
-- [ ] Round 1 · day: the clear and overcast presets (sky colour, clouds, the light on the plaster) against the card's references
-- [ ] Round 2 · dusk and night: the town's glow under the clouds, the dark hill, the moon and stars
-- [ ] Round 3 · storm and backdrop: the storm preset, the roofscape and the hill seen from each mission's start
-- [ ] Review: every preset from the same three viewpoints in one sheet
+### [x] S050 · Sky and time of day
+> needs: S004 | size: L | rounds: 3 | test: `tests/test_sky.gd` | see: `python tools/sky_review.py N [--missions]`, `--time=clear|overcast|dusk|night|storm`
+- [x] Sky shader in code: gradient, sun or moon disc, stars that twinkle, two drifting cloud layers lit from below by the town at night
+- [x] Presets per mission in map data: overcast day, orange dusk with long shadows, moonlit night, storm
+- [x] One directional light per preset, shadows only by day and dusk
+- [x] Distance fog tinted by the preset, hides the draw distance limit
+- [x] Far backdrop: the roofscape bristling with chimneys, the church tower and the campanile, and the dark wooded hill with the old telegraph tower and its windmill on top, visible from every mission
+- [x] Columns of smoke on the horizon, a distant fire glow under the clouds
+- [x] `--time=` flag, sent in `welcome`
+- [x] Round 1 · day: the clear and overcast presets (sky colour, clouds, the light on the plaster) against the card's references
+- [x] Round 2 · dusk and night: the town's glow under the clouds, the dark hill, the moon and stars
+- [x] Round 3 · storm and backdrop: the storm preset, the roofscape and the hill seen from each mission's start
+- [x] Review: every preset from the same three viewpoints in one sheet
+- Done: `TimeOfDay` (five presets as data: clear, overcast, dusk, night, storm; `Missions.INFO[..].sky`, `MapData.sky`, the host's `--time=`, sent in `welcome`), `SkyDome` (environment, sun or moon, depth fog to `fog_max` at the far plane, lightning) and one sky shader (`SkyShader`) that also paints the backdrop past the far plane (`Config.VIEW_FAR` 1200 m): the hill and the roofscape from a horizon profile worked out from the map's heights for where the camera stands, the town from above out of `CityPicture` with its lamps at night, the fires' smoke columns, and the church, campanile, telegraph tower and mill as silhouettes until S188, S214 and S230 build them. No draw call; measured 8.2 ms with 60 zombies in the city, the same as a plain sky. Card and rounds: `references/elements/sky.md`, sheets `sky_r1..r4`, `sky_rfinal`. Left: plaster reads light (the town's vertex colours are linear; the exposure makes up for it at night), the mission starts hide the backdrop behind their placeholder buildings, no drawn lightning bolt.
 
 ### [ ] S051 · Mission areas
 > needs: S002, S043, S048 | size: L | test: `tests/test_mission_areas.gd` | see: `--mission=<each>`

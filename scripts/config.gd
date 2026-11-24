@@ -379,7 +379,7 @@ const BUDGET := {
 	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # shapes: the whole of joinville.png is built until the performance pass decides what stays in detail
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
-const PROTOCOL_VERSION := 5   # bump when anything on the wire changes: a client of another build is refused with a message
+const PROTOCOL_VERSION := 6   # bump when anything on the wire changes: a client of another build is refused with a message
 const PACKET_OVERHEAD := 64    # what the RPC itself and the player block's framing take of a snapshot packet
 const INTEREST_NEAR_SHARE := 0.7 # over budget: this share of the packet is the zombies nearest the client, every tick
 const INTEREST_FAR_TICKS := 6  # ...and the rest of them are sent in turn, each at least this often
@@ -431,3 +431,21 @@ const LAYER_ZOMBIE := 4    # zombie movement capsules
 const LAYER_HITBOX := 8    # per-body-part areas that bullets hit
 const LAYER_INTERACT := 16 # things you can right-click
 const LAYER_DEBRIS := 32   # gibs and ragdolls
+
+# --- Sky and time of day (S050: TimeOfDay, SkyDome, SkyShader) ---
+const VIEW_FAR := 1200.0           # metres: the player's far plane; the sky's backdrop goes on past it
+const SKY_FOG_HIDES := 0.4         # at least this much of the far plane is hidden by fog in every preset (the backdrop does the rest)
+const SKY_UPDATE := 0.12           # seconds between the sky shader's updates (clouds, stars, where the camera is)
+const SKY_SEED := 1800             # the sky's own dice (lightning, the fires' places)
+const SKY_SHADOW_DISTANCE := 60.0  # metres of sun shadows, by day and at dusk
+const SKY_CLOUD_SPEED := 0.012     # cloud drift in the shader's units per second at wind 1
+const SKY_FLASH_TIME := 0.35       # seconds a lightning strike flickers
+const SKY_FLASH_LIGHT := 1.2       # extra light energy at a strike's brightest
+const SKY_PROFILE_SIZE := 512      # azimuths in the backdrop's horizon profile
+const SKY_PROFILE_MOVE := 40.0     # metres the camera moves before the profile is worked out again
+const SKY_PROFILE_SLICE := 32      # azimuths worked out per frame meanwhile
+const SKY_PROFILE_REACH := 6000.0  # metres the profile looks out to
+const SKY_PROFILE_STEP := 12.0     # metres between its samples near the far plane (wider further out)
+const SKY_CANOPY := 14.0           # metres of forest crown over the hill's ground
+const SKY_ROOF_HEIGHT := 16.0      # metres: the far roofscape's ridge line
+const SKY_SMOKE_COLUMNS := 3       # fires burning somewhere in town (the shader holds 4 at most)
