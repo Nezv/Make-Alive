@@ -47,7 +47,7 @@ Plain outfit models are 2700-2900 triangles. A bite adds the pit (≈ 250-350 tr
 | variant | triangles (max) | draws | texture memory |
 |---|---|---|---|
 | plain outfit | 2900 | 1 | 1 albedo + 1 emission |
-| any bite of it | plain + 1800 (< 5000) | 1 | shared with the plain model (same texture objects) |
+| any bite of it | plain + 2800 (< 6500) | 1 | shared with the plain model (same texture objects) |
 
 Disk: one small .glb per variant (≈ 0.3-0.4 MB), 180 of them.
 
