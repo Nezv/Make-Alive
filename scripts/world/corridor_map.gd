@@ -132,6 +132,7 @@ static func build() -> Dictionary:
 		light.shadow_enabled = i == 2 or i == 3 # the two around the corner cast shadows
 		light.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID # 2 passes instead of 6
 		root.add_child(light)
+		root.add_child(SoundSpot.make("tube_buzz", p + Vector3(0, 0.25, 0), Config.TUBE_BUZZ_DB))
 	root.add_child(lamp_mesh.instance(MeshKit.emissive(Color("ffd9a0"), 3.0), false))
 
 	return { "root": root }

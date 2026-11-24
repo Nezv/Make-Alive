@@ -334,6 +334,8 @@ func _impact(code: int, pos: Vector3, n: Vector3) -> void:
 	var chip: Color = IMPACT_CHIP[surface]
 	if puff:
 		stats.impacts += 1
+		if surface == Surface.Kind.GLASS:
+			Sfx.play("glass_crack", pos, 0.1)
 	match surface:
 		Surface.Kind.WATER: # a column and rings, no hole
 			if puff:

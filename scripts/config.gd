@@ -396,6 +396,13 @@ const SFX_UI_VOICES := 6        # sounds with no position: menus, your own gun
 const SFX_UNIT_SIZE := 6.0      # metres at which a sound is still at full volume
 const SFX_MAX_DISTANCE := 120.0 # beyond this a sound is silent
 const SFX_FAR_CUTOFF_HZ := 4000.0 # far sounds lose what is above this...
+const SOUND_SPOTS_MAX := 64       # hums, alarms and ticks placed in a map; more stay silent
+const SOUND_SPOTS_AUDIBLE := 6    # of those, only the nearest this many play at once
+const SOUND_SPOT_REACH := 30.0    # metres a placed hum is heard from (a spot can say its own)
+const WORLD_SOUND_JITTER := 0.05  # pitch spread of a world sound the host sends
+const DOOR_SOUND_DB := -2.0       # a door opening, closing, being bashed
+const PICKUP_SOUND_DB := -6.0     # ammo, a medkit, keys going into your kit
+const TUBE_BUZZ_DB := -16.0       # a lamp's hum, quiet: you hear it standing under it
 const SFX_FAR_CUTOFF_DB := -18.0  # ...by up to this much
 
 # --- Physics layers (bit values) ---

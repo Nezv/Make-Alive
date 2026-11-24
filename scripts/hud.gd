@@ -29,6 +29,7 @@ var ammo: AmmoPanel
 var vitals: VitalsBar
 var compass: Compass
 var objective_text: ObjectiveText
+var _chimed_for := "" ## the objective the chime last rang for
 var markers: WorldMarkers
 var hitmarker: HitMarker
 var arcs: DamageArcs
@@ -393,10 +394,12 @@ func _build_end() -> void:
 	retry_button.text = "Retry"
 	retry_button.visible = false
 	retry_button.pressed.connect(func(): retry_pressed.emit())
+	WorldSounds.wire_button(retry_button)
 	buttons.add_child(retry_button)
 	end_button = Button.new()
 	end_button.text = "Back to the menu"
 	end_button.pressed.connect(func(): leave_pressed.emit())
+	WorldSounds.wire_button(end_button, true)
 	buttons.add_child(end_button)
 	end_panel.visible = false
 	add_child(end_panel)
@@ -482,10 +485,12 @@ func _build_pause() -> void:
 	var resume := Button.new()
 	resume.text = "Resume"
 	resume.pressed.connect(func(): Input.mouse_mode = Input.MOUSE_MODE_CAPTURED)
+	WorldSounds.wire_button(resume, true)
 	v.add_child(resume)
 	var leave := Button.new()
 	leave.text = "Leave game"
 	leave.pressed.connect(func(): leave_pressed.emit())
+	WorldSounds.wire_button(leave, true)
 	v.add_child(leave)
 	var help := Label.new()
 	help.text = "WASD move · Shift sprint · Ctrl crouch · Space jump (sprint into low cover to vault it)\nLeft click shoot · Right click aim, or use / pick up what you look at\nR reload · V shove · 1-9 or mouse wheel change gun · Q last gun · Esc menu\nH heal · G throw · hold Tab for the item wheel"
@@ -529,6 +534,10 @@ func set_weapon(gun_name: String, rounds: int, reloading: bool, reserve := -1) -
 func set_objective(view: Dictionary, zombies := 0) -> void:
 	var status: int = view.get("status", MissionRules.Status.IDLE)
 	var text: String = view.get("text", "")
+	if text != _chimed_for:
+		_chimed_for = text
+		if text != "":
+			Sfx.play_ui("objective_chime", -8.0) # a new objective
 	var left: float = view.get("left", -1.0)
 	objective_label.modulate = Color.WHITE
 	if status == MissionRules.Status.FAILED:

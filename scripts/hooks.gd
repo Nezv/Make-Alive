@@ -138,17 +138,27 @@ func on_right_click(player_id: int, target: Interactable) -> void:
 
 func on_right_click_door(player_id: int, door: Door) -> void:
 	fired.emit(&"on_right_click_door", [player_id, door])
+	var was_open := door.is_open
 	door.toggle()
+	if door.is_open != was_open:
+		game.play_sound("door_open" if door.is_open else "door_close", _door_at(door), Config.WORLD_SOUND_JITTER, Config.DOOR_SOUND_DB)
+
+
+## Where a door's sounds come from: the middle of its panel.
+func _door_at(door: Door) -> Vector3:
+	return door.global_position + Vector3(0, Door.HEIGHT * 0.45, 0)
 
 
 func on_right_click_lootbox(player_id: int, box: Lootbox) -> void:
 	fired.emit(&"on_right_click_lootbox", [player_id, box])
 	var wanted := StringName(box.loot)
 	if not box.opened and Inventory.valid(wanted) and game.inventory_room(player_id, wanted) <= 0:
-		game.notice_to(player_id, "Can't carry any more %s" % Inventory.item_name(wanted)) # it stays shut for later
+		game.refuse_to(player_id, "Can't carry any more %s" % Inventory.item_name(wanted)) # it stays shut for later
+		game.play_sound("latch", box.global_position + Vector3(0, 0.5, 0))
 		return
 	var item := box.try_open()
 	if item != "":
+		game.play_sound("lootbox_open", box.global_position + Vector3(0, 0.5, 0))
 		on_loot_received(player_id, item)
 
 
@@ -196,18 +206,30 @@ func on_right_click_ammo_box(player_id: int, box: AmmoBox) -> void:
 ## The military crate: a couple of cartons of whatever the gun in the player's hands is fed with.
 func on_right_click_ammo_crate(player_id: int, crate: AmmoCrate) -> void:
 	fired.emit(&"on_right_click_ammo_crate", [player_id, crate])
-	if crate.locked or crate.uses <= 0 or not game.players.has(player_id):
+	if crate.locked:
+		game.play_sound("locked_rattle", crate.global_position + Vector3(0, 0.5, 0))
+		return
+	if crate.uses <= 0 or not game.players.has(player_id):
 		return
 	var type := Weapons.ammo_of(game.players[player_id].weapon)
 	var carton: int = Weapons.AMMO[type].box
 	var got := game.give_ammo(player_id, type, carton * Config.AMMO_CRATE_BOXES)
 	if got > 0 and crate.use(): # a full player wastes no use
+		game.play_sound("crate_open", crate.global_position + Vector3(0, 0.5, 0))
 		on_ammo_picked_up(player_id, type, got)
 
 
 ## `rounds` of a calibre (Weapons.Ammo) went into a player's reserve from a box, a crate or a drop.
 func on_ammo_picked_up(player_id: int, ammo_type: int, rounds: int) -> void:
 	fired.emit(&"on_ammo_picked_up", [player_id, ammo_type, rounds])
+	_pickup_sound(player_id, "ammo_clink")
+
+
+## A pickup's sound at the player who took it.
+func _pickup_sound(player_id: int, sound: String) -> void:
+	if game.players.has(player_id):
+		var pos: Vector3 = game.players[player_id].pos
+		game.play_sound(sound, pos + Vector3(0, 1.0, 0), Config.WORLD_SOUND_JITTER, Config.PICKUP_SOUND_DB)
 
 
 ## What a lootbox held, by Inventory id: it goes in the player's pack.
@@ -222,10 +244,12 @@ func on_loot_received(player_id: int, item: String) -> void:
 ## `count` of an item went into a player's inventory (found, looted, handed out).
 func on_item_picked_up(player_id: int, item: StringName, count: int) -> void:
 	fired.emit(&"on_item_picked_up", [player_id, item, count])
+	_pickup_sound(player_id, "medkit_zip" if item in [&"medkit", &"bandage"] else "rummage")
 
 
 func on_key_picked_up(player_id: int, key: StringName) -> void:
 	fired.emit(&"on_key_picked_up", [player_id, key])
+	_pickup_sound(player_id, "key_jingle")
 
 
 ## A player used an item (it is on, and the host already took it out of their inventory): this is what it does.
@@ -321,6 +345,13 @@ func on_horde_incoming(wave: int, count: int) -> void:
 ## Zombies smashed a door down.
 func on_door_broken(door: Door) -> void:
 	fired.emit(&"on_door_broken", [door])
+	game.play_sound("door_break", _door_at(door), Config.WORLD_SOUND_JITTER, Config.DOOR_SOUND_DB)
+
+
+## A zombie's blow landed on a closed door that held (for now).
+func on_door_bashed(door: Door, zombie: Zombie) -> void:
+	fired.emit(&"on_door_bashed", [door, zombie])
+	game.play_sound("door_splinter", _door_at(door), 0.12, Config.DOOR_SOUND_DB)
 	game.feed.rpc("The door has been smashed!")
 
 

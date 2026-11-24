@@ -1980,15 +1980,21 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Zombie feet: shuffle, runner slaps, horde rumble
 - [ ] Gore sounds: limb tear, bone crack, squelch, splash of a blood burst, a head burst pop
 
-### [ ] S084 · World sounds
+### [x] S084 · World sounds
 > needs: S005 | size: M | test: `tests/test_world_sounds.gd`
-- [ ] Doors: handle, creak open, slam, locked rattle, splinter and break
-- [ ] Barricade: hammer knocks, plank crack, plank snap
-- [ ] Lootbox: latch, lid creak, rummage; pickups: ammo clink, medkit zip, key jingle
-- [ ] Glass: crack, shatter, shards falling, crunch underfoot
-- [ ] Vehicles: car alarm, hazard tick, a horn stuck on, engine ticking as it cools
-- [ ] UI: hover tick, click, back, error, objective chime, wave horn
-- [ ] Generators, buzzing tube lights, a swinging sign creaking
+- `scripts/world_sounds.gd` (`WorldSounds`) makes them all; the host plays one on every peer with `Game.play_sound`; loops are `SoundSpot`s, the nearest `Config.SOUND_SPOTS_AUDIBLE` heard. `tools\sounds.ps1` writes them as WAVs and draws their spectrogram sheet.
+- [x] Doors: handle, creak open, slam, locked rattle, splinter and break
+  - Opening, closing, a zombie's blow and the break are played (`hooks.gd`). Doors have no locks yet: the rattle is a locked ammo crate's for now.
+- [x] Barricade: hammer knocks, plank crack, plank snap
+  - Made and registered; nothing barricades yet, so nothing plays them (the step that makes planks do something calls them).
+- [x] Lootbox: latch, lid creak, rummage; pickups: ammo clink, medkit zip, key jingle
+- [x] Glass: crack, shatter, shards falling, crunch underfoot
+  - A bullet into glass cracks (`Fx._impact`). Shatter and shards wait for breakable glass (S113), the crunch for footsteps by surface (S083).
+- [x] Vehicles: car alarm, hazard tick, a horn stuck on, engine ticking as it cools
+  - Placed by the set pieces (`Scenery.sound`): the alarm and the horn come and go on their own cycles.
+- [x] UI: hover tick, click, back, error, objective chime, wave horn
+- [x] Generators, buzzing tube lights, a swinging sign creaking
+  - Generators at the camps and the checkpoint, tubes at the corridor's lamps and the booth. No swinging sign exists yet: the creak waits for the shop signs (S160).
 
 ### [ ] S085 · Ambience
 > needs: S005 | size: M | test: `tests/test_ambience.gd`

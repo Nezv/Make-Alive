@@ -410,6 +410,7 @@ func mission_state(state: Dictionary) -> void:
 	mission_view = state.duplicate() # counted down here; never the sender's own copy
 	if state.get("kind", "") == "survive" and int(state.get("wave", 0)) > before:
 		Sfx.play_ui("siren", -4.0) # a new wave is on its way
+		Sfx.play_ui("wave_horn", -6.0)
 
 
 ## Host: tell everyone where the mission stands. Called by MissionRules whenever something changes.
@@ -1129,7 +1130,7 @@ func loot_backpack(id: int, pack: Backpack) -> int:
 	var had_keys := inv.keys()
 	var moved := pack.loot(inv, id)
 	if moved == 0:
-		notice_to(id, "Can't carry any more")
+		refuse_to(id, "Can't carry any more")
 		return 0
 	_sync_inventory(id, "+%d  from the backpack" % moved)
 	for item: StringName in Inventory.ITEMS:
@@ -1144,6 +1145,34 @@ func loot_backpack(id: int, pack: Backpack) -> int:
 ## Say something short to one player (the host included).
 func notice_to(id: int, text: String) -> void:
 	_send_to(id, &"notice", [text])
+
+
+## Tell one player no (a full pack): the line and the interface's error buzz.
+func refuse_to(id: int, text: String) -> void:
+	notice_to(id, text)
+	ui_sound_to(id, "ui_error")
+
+
+## Host: a sound in the world that every peer hears where it happened (a door, a pickup, a latch).
+## Only the name and the place travel; each peer plays its own copy.
+func play_sound(sound: String, pos: Vector3, jitter := Config.WORLD_SOUND_JITTER, volume_db := 0.0) -> void:
+	world_sound.rpc(sound, pos, jitter, volume_db)
+	world_sound(sound, pos, jitter, volume_db)
+
+
+@rpc("authority", "call_remote", "reliable", 2)
+func world_sound(sound: String, pos: Vector3, jitter: float, volume_db: float) -> void:
+	Sfx.play(sound, pos, jitter, volume_db)
+
+
+## Host: an interface sound in one player's head (a refusal).
+func ui_sound_to(id: int, sound: String) -> void:
+	_send_to(id, &"ui_sound", [sound])
+
+
+@rpc("authority", "call_remote", "reliable")
+func ui_sound(sound: String) -> void:
+	Sfx.play_ui(sound, -6.0)
 
 
 func _on_local_use_cancelled() -> void:
@@ -1370,8 +1399,9 @@ func zombie_attack_lands(z: Zombie, target_id: int) -> void:
 		damage_player(target_id, roundi(z.attack_damage() * mult("damage")), z)
 
 
-func zombie_bashes_door(_z: Zombie, d: Door) -> void:
-	d.take_hit(Config.DOOR_BASH_DAMAGE)
+func zombie_bashes_door(z: Zombie, d: Door) -> void:
+	if not d.take_hit(Config.DOOR_BASH_DAMAGE) and not d.broken:
+		hooks.on_door_bashed(d, z)
 
 
 func zombie_leap_lands(z: Zombie) -> void:
@@ -1785,6 +1815,7 @@ func _process(delta: float) -> void:
 	update_drips(delta)
 	update_reach()
 	Sfx.step_muffle(delta)
+	Sfx.step_spots(Sfx.pool().ears(), delta)
 	step_pings(delta)
 	step_heli(delta)
 	if local_player.status.dead:

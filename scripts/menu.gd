@@ -112,6 +112,7 @@ func _ready() -> void:
 		var east: bool = poi.at.x > 1600.0 # far east, by the panel: name on the left of the pin
 		var pin := PoiPin.new(id, Missions.INFO[id].title, KINDS[Missions.INFO[id].kind], east)
 		pin.pressed.connect(select.bind(id))
+		WorldSounds.wire_button(pin)
 		map_area.add_child(pin)
 		pins[id] = pin
 	map_area.resized.connect(_relayout)
@@ -285,6 +286,7 @@ func _build_panel() -> void:
 		if selected != "":
 			_save_name()
 			mission_pressed.emit(selected))
+	WorldSounds.wire_button(start_button)
 	v.add_child(start_button)
 	var note := Label.new()
 	note.text = "Objectives aren't built yet: a mission starts you at its POI on the city map."
@@ -297,6 +299,7 @@ func _build_panel() -> void:
 	free_play_button = Button.new()
 	free_play_button.text = "Training corridor (free play)"
 	free_play_button.pressed.connect(func(): _save_name(); host_pressed.emit())
+	WorldSounds.wire_button(free_play_button)
 	v.add_child(free_play_button)
 
 	var row := HBoxContainer.new()
@@ -308,6 +311,7 @@ func _build_panel() -> void:
 	var join := Button.new()
 	join.text = "Join"
 	join.pressed.connect(func(): _join(ip_edit.text))
+	WorldSounds.wire_button(join)
 	row.add_child(join)
 	v.add_child(row)
 	var lan_title := Label.new()
@@ -328,12 +332,15 @@ func _build_panel() -> void:
 	var quit := Button.new()
 	quit.text = "Quit"
 	quit.pressed.connect(func(): get_tree().quit())
+	WorldSounds.wire_button(quit, true)
 	v.add_child(quit)
 
 
 func open(message := "") -> void:
 	visible = true
 	status.text = message
+	if message != "":
+		Sfx.play_ui("ui_error", -6.0) # back here because something went wrong (refused, lost the host)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Net.start_listening()
 
@@ -377,6 +384,7 @@ func _process(delta: float) -> void:
 		var b := Button.new()
 		b.text = "%s's game · %d players · %s" % [g.name, g.players, ip]
 		b.pressed.connect(func(): _join(ip))
+		WorldSounds.wire_button(b)
 		lan_list.add_child(b)
 
 

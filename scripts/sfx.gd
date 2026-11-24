@@ -20,9 +20,10 @@ static var stats := { "played": 0, "stolen": 0, "dropped": 0 }
 static var last: Array[String] = [] ## the names of the last sounds asked for (tests)
 static var _muffle_left := 0.0
 static var _muffle_total := 1.0
-static var _defs := {}    ## name -> { bus, build }
+static var _defs := {}    ## name -> { bus, build, loop }
 static var _streams := {} ## name -> AudioStreamWAV
 static var _pool: Pool
+static var _spots: Array = [] ## the SoundSpots in the world (capped by Config.SOUND_SPOTS_MAX)
 
 
 ## Make the audio buses (in code: there is no bus layout file). Safe to call more than once.
@@ -37,8 +38,9 @@ static func ensure_buses() -> void:
 
 # --- Named sounds -----------------------------------------------------------------
 
-static func register(sound: String, bus: String, build: Callable) -> void:
-	_defs[sound] = { "bus": bus, "build": build }
+## `loop`: the stream plays round and round (a SoundSpot's hum); its samples must join their own start.
+static func register(sound: String, bus: String, build: Callable, loop := false) -> void:
+	_defs[sound] = { "bus": bus, "build": build, "loop": loop }
 	_streams.erase(sound)
 
 
@@ -70,6 +72,8 @@ static func _builtin() -> void:
 		GunVoice.register_all()
 	if not _defs.has("sever_wet"):
 		register("sever_wet", "Zombies", _sever_wet)
+	if not _defs.has(WorldSounds.ONE_SHOTS.keys()[0]):
+		WorldSounds.register_all()
 	if not _defs.has("low_ammo_click"):
 		register("low_ammo_click", "Guns", _low_ammo_click)
 		for what in ["mag_release", "mag_out", "mag_in", "mag_slap", "bolt_rack", "shell_in", "pump_back", "pump_fwd",
@@ -84,7 +88,12 @@ static func stream(sound: String) -> AudioStreamWAV:
 		if not _defs.has(sound):
 			return null
 		var samples: PackedFloat32Array = (_defs[sound].build as Callable).call()
-		_streams[sound] = to_stream(samples)
+		var s := to_stream(samples)
+		if _defs[sound].get("loop", false):
+			s.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			s.loop_begin = 0
+			s.loop_end = samples.size()
+		_streams[sound] = s
 	return _streams[sound]
 
 
@@ -154,9 +163,45 @@ static func pool() -> Pool:
 static func reset() -> void:
 	if _pool != null and is_instance_valid(_pool):
 		_pool.free()
+	_spots = _spots.filter(func(s: Node) -> bool: return is_instance_valid(s))
 	_pool = null
 	_streams.clear()
 	stats = { "played": 0, "stolen": 0, "dropped": 0 }
+
+
+# --- Sounds that stay in one place ----------------------------------------------------
+
+## A SoundSpot came into the world: it is heard from now on (false: the cap is reached, it stays silent).
+static func add_spot(spot: Node) -> bool:
+	if _spots.size() >= Config.SOUND_SPOTS_MAX:
+		return false
+	_spots.append(spot)
+	return true
+
+
+static func remove_spot(spot: Node) -> void:
+	_spots.erase(spot)
+
+
+static func spot_count() -> int:
+	return _spots.size()
+
+
+## Every frame: the spots' clocks run, and only the nearest few sounding ones within their range
+## play (Config.SOUND_SPOTS_AUDIBLE); the rest are stopped, so a street of hums costs a few voices.
+static func step_spots(ears: Vector3, delta := 0.0) -> void:
+	var near := []
+	for s: SoundSpot in _spots:
+		s.clock += delta
+		var d := ears.distance_to(s.global_position)
+		if d <= s.reach and s.sounding():
+			near.append([d, s])
+	near.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	var keep := {}
+	for i in mini(near.size(), Config.SOUND_SPOTS_AUDIBLE):
+		keep[near[i][1]] = true
+	for s: SoundSpot in _spots:
+		s.set_heard(keep.has(s))
 
 
 # --- Sounds -----------------------------------------------------------------------
@@ -417,6 +462,24 @@ static func band_pass(buf: PackedFloat32Array, low_hz: float, high_hz: float) ->
 
 
 ## Feed the sound back into itself after `delay` seconds: metallic ring (short) or echo (long).
+## A two-pole resonance at `hz`, `width_hz` wide: an impulse through it rings like a struck body.
+static func resonate(buf: PackedFloat32Array, hz: float, width_hz: float) -> PackedFloat32Array:
+	var r := exp(-PI * width_hz / RATE)
+	var a1 := -2.0 * r * cos(TAU * hz / RATE)
+	var a2 := r * r
+	var g := 1.0 - r
+	var out := PackedFloat32Array()
+	out.resize(buf.size())
+	var y1 := 0.0
+	var y2 := 0.0
+	for i in buf.size():
+		var y := g * buf[i] - a1 * y1 - a2 * y2
+		out[i] = y
+		y2 = y1
+		y1 = y
+	return out
+
+
 static func comb(buf: PackedFloat32Array, delay: float, feedback: float) -> PackedFloat32Array:
 	var out := buf.duplicate()
 	var d := maxi(int(delay * RATE), 1)

@@ -81,7 +81,7 @@ Legend: [x] exists, [ ] not built.
 - [ ] Reload: mag out, mag in, bolt, pump shell.
 - [ ] Footsteps by surface, sprint breathing, low-hp heartbeat.
 - [ ] Zombie groans, runner screeches, leaper snarl, per-type death, limb tear, squelch.
-- [ ] Doors: open, close, break. Lootbox open, pickup.
+- [x] Doors: open, close, break. Lootbox open, pickup. (S084: `WorldSounds`, with glass, vehicles, the interface and hums)
 - [ ] Horde warning siren, helicopter approach, extraction countdown beeps.
 - [ ] Ambient: wind, distant gunfire, city hum.
 - [ ] Positional audio for teammates and zombies.
