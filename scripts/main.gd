@@ -39,6 +39,8 @@ extends Node
 ##   --zombie-rack=1        stand one zombie of every outfit in front of you: =1 first half, =2 second half (add --back for their backs)
 ##   --survivor-rack        other players as you see them: aiming, reloading on the run, shoving, throwing, healing, down
 ##   --body-rack            the generic model bodies (male, female) and their skeleton, still (also --back, --rack-anim)
+##   --bite-rack=1          one outfit (--outfit=nurse, --male) plain and with every bite: =1 plain and bites 0-4, =2 bites 5-9
+##   --bite=N               with --outfit-rack: every model wears bite N (0-9, see Characters.BITES)
 ##   --outfit-rack=1        the outfit models, each as a man and a woman: =1 civilian, worker, nurse; =2 doctor, cop, soldier; =3 the rest (also --back, --rack-anim)
 ##   --rack-anim=walk       the rack zombies hold that animation's pose (idle, walk, run, attack, windup, leap, stagger, crawl)
 ##   --rack-sever=arm       the rack zombies have lost that part (arm: the right one, leg: the left one, head), to look at stumps
@@ -111,7 +113,7 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.map_name = map_name
 	game.mission = mission
 	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") \
-			or _args.has("body-rack") or _args.has("outfit-rack") or _args.has("survivor-rack") or not GameMap.NAMES.has(game.map_name):
+			or _args.has("body-rack") or _args.has("outfit-rack") or _args.has("bite-rack") or _args.has("survivor-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
 	game.difficulty = _args.get("difficulty", "normal")
@@ -181,6 +183,8 @@ func _host(map_name := "city", mission := "") -> void:
 		_survivor_rack()
 	if _args.has("outfit-rack"):
 		_outfit_rack(int(_args["outfit-rack"]))
+	if _args.has("bite-rack"):
+		_bite_rack(int(_args["bite-rack"]), String(_args.get("outfit", "nurse")), not _args.has("male"))
 	var ips := ", ".join(Net.local_ips())
 	print("[host] hosting on port %d. Friends join: %s" % [Config.PORT, ips])
 	game.hud.push_feed("Hosting. Friends join with IP: %s" % ips)
@@ -440,13 +444,24 @@ func _body_rack() -> void:
 	_rack(row, row.size())
 
 
+## One outfit on one body (--outfit=nurse, --male for the man) plain and with every bite, half of
+## them at a time (group 1: plain and bites 0-4, group 2: bites 5-9), labelled with the bite's name.
+func _bite_rack(group: int, outfit_name: String, female: bool) -> void:
+	var row := []
+	var first := -1 if group == 1 else 5
+	for bite in range(first, first + 6 if group == 1 else first + 5):
+		var model := CharacterModel.outfit(outfit_name, female, bite)
+		row.append([Humanoid.create_model(model, {"zombie": true}), "plain" if bite < 0 else Characters.BITES[bite].name])
+	_rack(row, row.size(), 0.8)
+
+
 ## Three outfits of tools/models/outfits.py (group 1, 2 or 3), each worn by the male and the
 ## female body, side by side.
 func _outfit_rack(group: int) -> void:
 	var row := []
 	for o in range((group - 1) * 3, mini(group * 3, Characters.FEMALE_SHARE.size())):
 		for female: bool in [false, true]:
-			var model := CharacterModel.outfit(Characters.OUTFIT_NAMES[o], female)
+			var model := CharacterModel.outfit(Characters.OUTFIT_NAMES[o], female, int(_args.get("bite", -1)))
 			var label := "%s %s" % [Characters.OUTFIT_NAMES[o], "f" if female else "m"]
 			row.append([Humanoid.create_model(model, {"zombie": true}), label])
 	_rack(row, row.size(), 0.8)

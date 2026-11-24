@@ -44,6 +44,7 @@ const BODY_F := "res://assets/models/zombie_body_f"
 const SKELETON := "res://assets/models/zombie_skeleton"
 
 static var _cache := {}
+static var _textures := {}   ## texture path -> its mipmapped texture, shared by every model that wears it
 
 var mesh: ArrayMesh
 var skin: Skin
@@ -60,12 +61,15 @@ static func skeleton() -> CharacterModel:
 
 
 ## A dressed zombie (tools/models/outfits.py): `outfit_name` as in Characters.OUTFIT_NAMES.
-static func outfit(outfit_name: String, female := false) -> CharacterModel:
-	return load_model(outfit_path(outfit_name, female))
+## `bite` (-1: none) is one of Characters.BITES: the same outfit with a hole torn in it
+## (tools/models/bites.py), wearing the outfit's own textures.
+static func outfit(outfit_name: String, female := false, bite := -1) -> CharacterModel:
+	return load_model(outfit_path(outfit_name, female, bite))
 
 
-static func outfit_path(outfit_name: String, female := false) -> String:
-	return "res://assets/models/zombie_%s_%s" % [outfit_name, "f" if female else "m"]
+static func outfit_path(outfit_name: String, female := false, bite := -1) -> String:
+	var path := "res://assets/models/zombie_%s_%s" % [outfit_name, "f" if female else "m"]
+	return path if bite < 0 else "%s_b%d" % [path, bite]
 
 
 static func load_model(base: String) -> CharacterModel:
@@ -127,12 +131,17 @@ func _load(base: String) -> void:
 		bind_joint.append(j)
 	root.free()
 	material = StandardMaterial3D.new()
-	material.albedo_texture = _mipmapped(load(base + "_albedo.png"))
+	# A bite variant (..._b3) has no textures of its own: it wears its outfit's.
+	var skin_base := base
+	var cut := base.rfind("_b")
+	if cut > 0 and base.substr(cut + 2).is_valid_int():
+		skin_base = base.substr(0, cut)
+	material.albedo_texture = _shared_texture(skin_base + "_albedo.png")
 	material.roughness = 0.85
 	material.emission_enabled = true
 	material.emission = Color.WHITE
 	material.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY # the map says where it glows
-	material.emission_texture = _mipmapped(load(base + "_emission.png"))
+	material.emission_texture = _shared_texture(skin_base + "_emission.png")
 	material.emission_energy_multiplier = 2.5
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var seg_of := _segments_of_vertices()
@@ -140,6 +149,12 @@ func _load(base: String) -> void:
 		# Clothes fold over at a hard bend: a face seen from behind still shows cloth, not a hole.
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_cut_parts(bind_joint, rest, seg_of)
+
+
+static func _shared_texture(path: String) -> Texture2D:
+	if not _textures.has(path):
+		_textures[path] = _mipmapped(load(path))
+	return _textures[path]
 
 
 ## The PNGs import as plain 2D textures (import settings are not kept in git); a 3D surface seen

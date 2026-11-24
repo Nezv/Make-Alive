@@ -40,6 +40,22 @@ const BLACK := Color("15151a")
 const STRIPE := Color("c8e03a")  # reflective tape
 const GOLD := Color("c9a227")
 
+## The ten bites (tools/models/bites.py BITES: the numbers are the same): a point on the way in and
+## the direction a ray travels to meet the bite's centre. A model with bite N is
+## zombie_<outfit>_<m|f>_b<N>; it wears the outfit's textures.
+const BITES := [
+	{"name": "abdomen_l", "at": Vector3(-0.085, 1.07, 0), "to": Vector3(0, 0, 1)},
+	{"name": "abdomen_r", "at": Vector3(0.09, 1.04, 0), "to": Vector3(-0.2, 0, 0.98)},
+	{"name": "ribs_r", "at": Vector3(0.14, 1.25, 0), "to": Vector3(-0.45, 0, 0.89)},
+	{"name": "chest", "at": Vector3(-0.05, 1.38, 0), "to": Vector3(0, 0.1, 1)},
+	{"name": "shoulder_l", "at": Vector3(-0.31, 1.46, 0), "to": Vector3(0.45, -0.55, 0.35)},
+	{"name": "upper_arm_r", "at": Vector3(0.3, 1.34, 0), "to": Vector3(-0.3, 0, 0.95)},
+	{"name": "forearm_l", "at": Vector3(-0.3, 1.02, 0), "to": Vector3(0.35, 0, 0.94)},
+	{"name": "thigh_r", "at": Vector3(0.12, 0.72, 0), "to": Vector3(-0.35, 0, 0.94)},
+	{"name": "calf_l", "at": Vector3(-0.12, 0.34, 0), "to": Vector3(0, 0, -1)},
+	{"name": "neck", "at": Vector3(0, 1.57, 0), "to": Vector3(0.8, -0.1, 0.6)},
+]
+
 
 static func _pick(arr: Array, n: int) -> Color:
 	return arr[absi(n) % arr.size()]
@@ -76,12 +92,22 @@ static func has_model(outfit: int) -> bool:
 	return outfit >= 0 and outfit < FEMALE_SHARE.size()
 
 
-## Every model a crowd may wear (Game loads them before the first spawn).
+## Which bite (an index into BITES) zombie `id` wearing `outfit` carries, -1 for none: about
+## `Config.BITE_SHARE` of a crowd, picked from the id so every peer sees the same wound.
+static func bite_for(id: int, outfit: int) -> int:
+	if not has_model(outfit) or _r(id, 57) >= Config.BITE_SHARE:
+		return -1
+	return int(_r(id, 58) * BITES.size()) % BITES.size()
+
+
+## Every model a crowd may wear, each outfit on both bodies, plain and with each bite (Game loads
+## them before the first spawn).
 static func model_paths() -> Array[String]:
 	var out: Array[String] = []
 	for o in FEMALE_SHARE.size():
 		for female in [false, true]:
-			out.append(CharacterModel.outfit_path(OUTFIT_NAMES[o], female))
+			for bite in range(-1, BITES.size()):
+				out.append(CharacterModel.outfit_path(OUTFIT_NAMES[o], female, bite))
 	return out
 
 
@@ -91,7 +117,7 @@ static func zombie(id: int, type: int, outfit := -1) -> Humanoid:
 	if outfit < 0:
 		outfit = outfit_for(id, type)
 	if has_model(outfit):
-		var model := CharacterModel.outfit(OUTFIT_NAMES[outfit], is_female(id, outfit))
+		var model := CharacterModel.outfit(OUTFIT_NAMES[outfit], is_female(id, outfit), bite_for(id, outfit))
 		return Humanoid.create_model(model, zombie_style(id, type, outfit))
 	return Humanoid.create(zombie_style(id, type, outfit))
 

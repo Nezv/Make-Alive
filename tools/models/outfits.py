@@ -6,6 +6,9 @@ Plain colours for now: one per garment part; prints, badges and other details co
                                                              (+ _albedo.png, _emission.png), previews
     tools\\blender.ps1 tools\\models\\outfits.py cop --f     -> only those (any outfit names, --m / --f)
     tools\\blender.ps1 tools\\models\\outfits.py --quick     -> shapes only, flat colours, previews
+    tools\\blender.ps1 tools\\models\\outfits.py nurse --f --bitten -> also the ten bite variants (zombie_<outfit>_<m|f>_b<N>.glb, --only-bite=N one,
+                                                             sharing the outfit's textures; --bite-shots renders them)
+    python tools/models/outfits.py --bites nurse --f       -> every bite flat-shaded, no Blender (references/shots/bites_*.png)
     python tools/models/outfits.py --sketch [names]        -> flat-shaded pictures without Blender,
                                                              standing and bent in the game's poses
                                                              (references/shots/sketch_outfit_*.png)
@@ -239,7 +242,7 @@ VIEWS = [
 ]
 
 
-def build(name, sex, quick):
+def build(name, sex, quick, bitten=False, shots=False):
     import pipeline as pl
     parts, p = dress(name, sex)
     mesh, piece_of = combined(parts)
@@ -268,6 +271,10 @@ def build(name, sex, quick):
     print(f"built {model}: {len(T)} triangles{' (quick)' if quick else ''}")
     prefix = "model_" + model
     pl.render_views(obj, SHOTS, prefix, VIEWS)
+    if bitten and not quick:
+        import bites
+        only = [int(a.split("=")[1]) for a in sys.argv if a.startswith("--only-bite=")] or None
+        bites.build_all(name, sex, obj, maps, albedo, alb, em, shots=shots, only=only)
     return [os.path.join(SHOTS, f"{prefix}_{v[0]}.png") for v in VIEWS]
 
 
@@ -277,7 +284,7 @@ def main(names, sexes):
     shots = []
     for name in names:
         for sex in sexes:
-            shots += build(name, sex, quick)
+            shots += build(name, sex, quick, "--bitten" in sys.argv, "--bite-shots" in sys.argv)
     pl.contact_sheet(shots, os.path.join(SHOTS, "model_outfits.png"), len(VIEWS) * len(sexes))
     print("previews:", os.path.join(SHOTS, "model_outfits.png"))
 
@@ -358,6 +365,10 @@ if __name__ == "__main__":
     sexes = [s for s in ("m", "f") if "--" + s in argv] or ["m", "f"]
     if "--sketch" in argv:
         sketch(names, sexes, os.path.join(SHOTS, "sketch_outfit_{}.png"))
+    elif "--bites" in argv:
+        import bites
+        for name in names:
+            bites.sketch(name, sexes, os.path.join(SHOTS, "bites_{}_{}.png"))
     elif "--folds" in argv:
         for name in names:
             for sex in sexes:

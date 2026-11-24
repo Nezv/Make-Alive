@@ -1759,14 +1759,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - Agent: Opus 5.5 at effort max. Geometry-heavy work with many look-and-fix rounds; it needs the whole pipeline (body, skeleton, clothes, rig, piece cuts) in its head at once. Plan first, then build one bite end to end before the other nine.
 - [ ] Optimized variant producer in `tools/models/`: from one outfit and body, many variants that share what they can
   - [ ] Clothes swaps per variant (sleeve length, open or closed, hat or none, colour sets)
-  - [ ] Variants picked from the zombie id, the same on every peer; the wire unchanged
-  - [ ] Budget: triangles and texture memory per variant kept close to the plain model, loading stays before the first spawn
-- [ ] Ten bites, each a named region torn out of flesh and clothes together, e.g.
-  - [ ] Left or right side of the abdomen, left or right lower ribs, upper chest, shoulder, upper arm, forearm, thigh, calf, neck and jaw
-  - [ ] The hole cuts the body and every garment over it, with a torn ragged edge (not a clean cut) and blood-dark rims
-  - [ ] Only that region's bones show under it (a few ribs, the radius and ulna, a length of femur, a piece of spine), never the whole skeleton model
-  - [ ] Inside the hole: wound flesh, the bone section, depth, so no see-through; the piece it belongs to stays closed for gibs
-- [ ] Bites survive the existing rules: helpers bend them, they come off with their piece, stumps still close
+  - [x] Variants picked from the zombie id, the same on every peer; the wire unchanged
+  - [x] Budget: triangles and texture memory per variant kept close to the plain model, loading stays before the first spawn
+- [x] Ten bites, each a named region torn out of flesh and clothes together, e.g.
+  - [x] Left or right side of the abdomen, left or right lower ribs, upper chest, shoulder, upper arm, forearm, thigh, calf, neck and jaw
+  - [x] The hole cuts the body and every garment over it, with a torn ragged edge (not a clean cut) and blood-dark rims
+  - [x] Only that region's bones show under it (a few ribs, the radius and ulna, a length of femur, a piece of spine), never the whole skeleton model
+  - [x] Inside the hole: wound flesh, the bone section, depth, so no see-through; the piece it belongs to stays closed for gibs
+- [x] Bites survive the existing rules: helpers bend them, they come off with their piece, stumps still close
 - [ ] Contact sheet of every bone, clothes and body variant of the female nurse in one isometric picture, shown in chat when done
 
 ### [ ] S139 · Outfit details: uniforms
