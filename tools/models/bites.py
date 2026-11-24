@@ -76,11 +76,23 @@ BITES = [
     dict(name="neck", at=(0.0, 1.57, 0.0), to=(0.8, -0.1, 0.6), r=(0.05, 0.055, 0.04), depth=0.046, seed=101,
          bones=[dict(kind="column", at=(0.0, 0.0), n=3, size=0.024, gap=0.034, drop=0.85, seg="head")]),
 ]
-# Every hole is this much wider across the surface than first drawn (the depth is unchanged): at 3 m the
-# first ones could hardly be seen.
-SIZE = 1.35
+# Every hole is this much wider across the surface than first drawn, a little deeper, and its bones are
+# thicker, longer and nearer the surface: at 3 m the first ones could hardly be seen, and the bones must show.
+SIZE = 1.75
+DEEPER = 1.2
+BONE_GROW = 1.7
+BONE_LONG = 1.3
+BONE_NEAR = 0.8
 for _b in BITES:
     _b["r"] = (_b["r"][0] * SIZE, _b["r"][1] * SIZE, _b["r"][2])
+    _b["depth"] *= DEEPER
+    for _k in _b["bones"]:
+        for _f in ("w", "t", "radius", "size", "gap"):
+            if _f in _k:
+                _k[_f] *= BONE_GROW
+        if "len" in _k:
+            _k["len"] *= BONE_LONG
+        _k["drop"] *= BONE_NEAR
 NAMES = [b["name"] for b in BITES]
 
 # What a face of a variant is for the painter and the sketch: its own colour (RGB 0..1).
@@ -487,7 +499,7 @@ def make_crater(soup, seg, loop, normal, depth, rng, like):
     ids = soup.tris_of(seg)
     A, Bq, C = soup.tri_pts(ids)
     t, _ = ray_first(A, Bq, C, mid, -normal, 0.004)
-    room = depth if t is None else min(depth, 0.58 * t)
+    room = depth if t is None else min(depth, 0.65 * t)
     # a pit that is already deeper than it is wide only needs the room
     rings = []
     for alpha, drop, tag_mix in ((0.30, 0.52, ("rim", "flesh")), (0.72, 1.0, ("flesh", "deep"))):

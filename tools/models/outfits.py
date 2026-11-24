@@ -58,7 +58,7 @@ OUTFITS = {
                      hat="e8c21a", hat2="d0aa10")),
     "nurse": dict(
         top=dict(sleeves="short", neck="crew", hem=0.94),
-        pants=dict(length="long"), shoes="shoe", hat="nurse",
+        pants=dict(length="long"), shoes="shoe", hat="nurse", blood_every=2,
         colours=dict(shirt="4fa3a0", pants="3f8f8c", shoe="e8e8e0", sole="b8b8b0", hat="e8e8e0")),
     "doctor": dict(
         top=dict(sleeves="long", neck="collar", hem=0.84, ease=0.024, hem_flare=0.01,
@@ -219,7 +219,7 @@ def paint(maps, p, name):
     soak = np.where(piece == B.FOREARM, np.clip((1.0 - y) / 0.2, 0, 1) * 1.05, soak)
     soak = np.where(piece == B.SHIN, np.clip((0.07 - y) / 0.07, 0, 1) * 0.7, soak)
     paintable = ~np.isin(tag, [TAG["eye"], TAG["teeth"], TAG["mouth"]])
-    col[paintable] = B.blood(P[paintable], N[paintable], col[paintable], B._splats(p), B._drips(p), soak[paintable], seed=5)
+    col[paintable] = B.blood(P[paintable], N[paintable], col[paintable], B._splats(p)[::OUTFITS[name].get("blood_every", 1)], B._drips(p)[::OUTFITS[name].get("blood_every", 1)], soak[paintable], seed=5)
     col *= (0.66 + 0.34 * ao)[:, None]
     eye = tag == TAG["eye"]
     col[eye] = B.PALETTE["eye"]
