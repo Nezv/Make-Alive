@@ -7,7 +7,9 @@ extends Node
 ##   --mission=mirante      a city mission (terminal, hospital, prefeitura, batalhao, mirante): with --host start it,
 ##                          without it just pick it on the menu map (for screenshots of the menu)
 ##   --balance=C:/x.md      print the balance sheet (guns against zombie types), save it there and exit
-##   --city-plan=C:/dir     save city_plan.png and city_on_reference.png (what part of Joinville the city map covers) and exit
+##   --city-plan=C:/dir     save city_plan.png, city_core.png and city_on_reference.png (the street plan over Joinville) and exit
+##   --review-light         an overcast day instead of the night, to judge forms and colours (shots)
+##   --city-zoom=x,y,w      with --city-plan: also city_zoom.png, a close plan of w pixels of joinville.png from (x, y)
 ##   --join=192.168.1.7     join immediately
 ##   --name=Bob             player name
 ##   --bot                  local player wanders and shoots by itself
@@ -165,6 +167,8 @@ func _host(map_name := "city", mission := "") -> void:
 		game.director_overlay = true
 	if _args.has("zones"):
 		game.add_child(game.map.data.debug_node())
+	if _args.has("review-light"):
+		_review_light()
 	if _args.has("cam") or _args.has("shot-cam"):
 		_debug_camera(_args.get("cam", _args.get("shot-cam", "")))
 	if _args.has("poi-cam") and game.map is CityMap:
@@ -514,14 +518,19 @@ func _balance(path: String) -> void:
 	get_tree().quit()
 
 
-## Draw which part of Joinville the city map covers, then quit. Works headless.
+## Draw the city's plan and the streets over Joinville, then quit. Works headless.
 func _city_plan(dir: String) -> void:
 	var t := Time.get_ticks_msec()
-	var city := CityMap.new()
-	print("[city] built in %d ms: %.2f km2, %d x %d cells of %.0f m, %d buildings" % [
+	var city := CityMap.new(false)
+	print("[city] laid out in %d ms: %.2f km2, %d x %d cells of %.0f m, %d buildings" % [
 		Time.get_ticks_msec() - t, city.area_km2(), city.gw, city.gh, city.cell, city.building_count])
+	t = Time.get_ticks_msec()
 	city.plan_image().save_png(dir.path_join("city_plan.png"))
+	print("[city] plan drawn in %d ms" % (Time.get_ticks_msec() - t))
 	city.plan_image(8, city.core_rect()).save_png(dir.path_join("city_core.png"))
+	if _args.has("city-zoom"): # x,y,w in joinville.png pixels: a close plan of that square
+		var z: PackedFloat64Array = (_args["city-zoom"] as String).split_floats(",")
+		city.plan_image(16, Rect2(CityData.to_plan(Vector2(z[0], z[1])), Vector2(z[2], z[2]) * CityData.M_PER_PX)).save_png(dir.path_join("city_zoom.png"))
 	var over := city.reference_overlay()
 	if over != null:
 		over.save_png(dir.path_join("city_on_reference.png"))
@@ -537,11 +546,29 @@ func _debug_camera(spec: String) -> void:
 		return
 	var cam := Camera3D.new()
 	cam.fov = 70
-	cam.far = maxf(400.0, v[1] * 6.0) # high overview cameras need to see the ground
+	cam.far = maxf(1500.0, v[1] * 6.0) # the town's skyline reaches far; high overviews need to see the ground
 	game.add_child(cam)
 	cam.global_transform = Transform3D(Basis.from_euler(Vector3(deg_to_rad(v[4]), deg_to_rad(v[3]), 0)), Vector3(v[0], v[1], v[2]))
 	cam.make_current()
 	game.local_player.hide_view = true
+
+
+## An overcast day instead of the night, to judge forms and colours (until S050's sky and time of day).
+func _review_light() -> void:
+	for we: WorldEnvironment in game.find_children("*", "WorldEnvironment", false, false):
+		var env := we.environment
+		env.ambient_light_energy = 0.55
+		env.fog_density = 0.0008
+		env.fog_light_color = Color("aab4c0")
+		var sky := env.sky.sky_material as ProceduralSkyMaterial
+		if sky:
+			sky.sky_top_color = Color("8fa3bb")
+			sky.sky_horizon_color = Color("c9d0d8")
+			sky.ground_horizon_color = Color("9a9890")
+	for light: DirectionalLight3D in game.find_children("*", "DirectionalLight3D", false, false):
+		light.light_color = Color("fff3e0")
+		light.light_energy = 1.25
+		light.rotation = Vector3(deg_to_rad(-38), deg_to_rad(-50), 0)
 
 
 func _screenshot() -> void:

@@ -10,6 +10,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - **Elements:** a step that makes something people look at (a building part, a family of props, a vehicle, a plant, the hands, a gun) is an element step: it makes that one thing, or one small family that shares one design, and nothing else, and it iterates in rounds (see "Detail and iteration" below). A step that places finished elements (a street, a square, a POI) is an assembly step and models nothing new.
 - **Prove:** the step's `test` passes in the whole suite, and the `see` command's screenshots were read and look right. A step with `rounds` also has every round written on its element's card, and its last review sheet shown in chat.
 - **Close:** tick each feature done, tick the step when all are, commit. If the session runs out, tick what is done and leave the step open. Update `CLAUDE.md` ("Where things are", "Not built yet") and `TODO.md` when a step changes them.
+- **Leave it to be verified:** a step that makes anything to look at or listen to (a model, an element, an effect, a sound, a pose, a screen) adds its checks to `VERIFY.md` (what a person should judge, the pictures and sounds, the references beside them, how to remake them; see the format at its top), adds the shots to `tools\shots.ps1` or the sounds to `tools/sound_sheet.gd` when they are not there, remakes them, runs `python tools/verify_page.py` and says in chat which checks are new on `references/verify.html`. Only a person ticks a check; an agent never does.
 - **Size:** S = under half a session, M = one session, L = one full session, stop at any ticked feature.
 
 ## Format (the mind map script reads this)
@@ -21,7 +22,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ## Rules every step obeys
 
-- **A French town on Joinville's plan:** Joinville is the plan, not the look. `references/joinville.png`, the OpenStreetMap tiles `references/1.png` to `9.png` and `joinville_topography.png` give the bones: the river's line, the hill and its height, where the five places stand, the main roads between them, how dense each part is. The streets are simplified from them (S040), never traced one to one, and everything people see is dressed as a French town in the style of Paris around 1800, before Haussmann: narrow crooked streets of setts between tall plastered houses with shutters, mansards and chimney stacks, timber-framed houses in the old core, quays along the river, boulevards on the line of the old walls, a few post-war blocks at the edge. Life is today's (cars, buses, a hospital tower, an army), set in that old fabric. Every name, sign and word on a wall is French. The Joinville photos (`terminal1.png`, `hospital*.png`, `prefeitura*.jpg`, `batalhao*.jpg`, `mirante_*.jpg`, `praça_da_bandeira.jpg`) give only arrangement and scale; no building, sign or name is copied from them, and every name is invented. Only the five POIs have interiors. Every other building is a solid block with a believable facade and doors that do not open.
+- **A French town on Joinville's plan:** Joinville is the plan, not the look. `references/joinville.png`, the OpenStreetMap tiles `references/1.png` to `9.png` and `joinville_topography.png` give the bones: the river's line, the hill and its height, where the five places stand, the streets, how dense each part is. The streets are Joinville's own, traced off the map (S040: the main ones where its bus routes run), and everything people see is dressed as a French town in the style of Paris around 1800, before Haussmann: narrow crooked streets of setts between tall plastered houses with shutters, mansards and chimney stacks, timber-framed houses in the old core, quays along the river, a few post-war blocks at the edge. Life is today's (cars, buses, a hospital tower, an army), set in that old fabric. Every name, sign and word on a wall is French. The Joinville photos (`terminal1.png`, `hospital*.png`, `prefeitura*.jpg`, `batalhao*.jpg`, `mirante_*.jpg`, `praça_da_bandeira.jpg`) give only arrangement and scale; no building, sign or name is copied from them, and every name is invented. Only the five POIs have interiors. Every other building is a solid block with a believable facade and doors that do not open.
 - **Budget:** 144 fps on a laptop. Two shadow-casting lamps. Every effect has a cap in `Config` and a pool. Watch "draws".
 - **Network:** new effects travel as *what happened* (kind, position, direction, one argument), never as particles or physics. Zombie snapshots stay 13 bytes each unless the step says otherwise and the packet test still passes.
 - **Looks are deterministic:** seeded from ids or the map's own RNG, never `randf`, so every peer sees the same city.
@@ -643,32 +644,29 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
   - The tiles are at four times joinville.png's zoom (their scale bars); `--register` finds each tile's place by cross-correlating its buildings with joinville.png's (match 0.64 to 0.77) and the control points are kept in `TILES`. 1301 footprints (convex, simplified), streets as 1-pixel cells per class, areas as polygons; the overlay is generated, not committed. The nine tiles cover the centre in an uneven patchwork: what their bounding box leaves uncovered is `CityOsm.GAPS`
 
 ### [x] S040 · Street network 2
-> needs: S039 | size: L | test: `tests/test_city_map.gd` | see: `--city-plan`
-- The plan, not a copy: Joinville's tiles give the bones (the river's line, the hill, where the five places stand, the main through-roads); the street grid is bent into a French town as Paris was around 1800, before Haussmann: a dense old core of narrow crooked streets, a few squares, quays along the river, boulevards on the line of the old walls, and every name invented and French.
-- [x] `CityData.STREETS` redrawn from the tiles as a skeleton, not traced one to one
-  - [x] Keep: the through-roads that link the five places, the quays, the road up the hill and its hairpin
-  - [x] Bend: break Joinville's long straight grid into streets that wander, narrow and widen, meet at odd angles; dead-end impasses and covered passages through blocks
-  - [x] Add: the old core round a place du marché, a tree-lined boulevard ring where the wall stood, a faubourg street running out of town from one of the old gates
-- [x] Invented French street names, kept in a table in `CityData`: rue du Marché, rue des Tanneurs, rue de la Harpe-Rouge, quai des Bateliers, place de l'Église, impasse des Carmes, boulevard du Rempart, faubourg Saint-Rémy and the like; never a real street of a real town on purpose
-- [x] Per street: carriageway width, one-way direction, pavement width each side (none in the narrowest lanes), surface kind (setts or asphalt)
-- [x] Junctions as real shapes: chamfered corners (pans coupés), T and skewed cross, a small rond-point where the boulevard meets the quay
+> needs: S039 | size: L | test: `tests/test_street_net.gd`, `tests/test_city_map.gd` | see: `--city-plan`
+- Joinville's own streets, not an invented plan: the street grid is Joinville's, dressed as a French town (setts, pavements, pans coupés, invented French names). The map is the whole of `joinville.png` (and the hill road's hairpin above it), not a part cut out round the POIs; what is kept in detail and what only as a far LOD is decided after a performance pass.
+- [x] `CityData.STREETS` traced off `joinville.png` by `tools/trace_streets.py` into `CityStreets`: the main streets (`principale`) where the bus routes of `joinville_main_streets.png` run, every other street a `rue`; the hill road by hand off the topography
+- [x] Invented French street names for every street (`CityData.name_of`); never a real street of a real town on purpose
+- [x] Per street: carriageway width, one-way direction, pavement width each side, surface kind (setts or asphalt)
+- [x] Junctions as real shapes: chamfered corners (pans coupés), T and skewed cross
 - [x] Streets as meshes following the polyline with mitred joints, not grid cells; the 4 m grid stays for navigation only
 - [x] Only what lies inside a mission area is built in detail (S051)
 - [x] `--city-plan` and the menu's map redrawn from the new plan
-- Done as data and a graph: 48 streets of 11 kinds in `CityData.STREETS`, `StreetNet` for junctions and strips, meshes in `CityMap._street_surfaces`. Buildings still stand on the 4 m grid's BLOCK cells, set back a metre or two from the pavements' edge in places, until S043 builds the îlots along the street lines. The detail area is a parameter of `CityMap` that nothing sets yet (S051 will). The mall has no trees yet (S047 plants them).
+- Done: 328 traced streets (76 main) and the hill road, `StreetNet` for junctions and strips, meshes in `CityMap._street_surfaces`. A first version invented an old core, a boulevard ring with a rond-point and faubourgs, inside a map cut to the hull of the POIs; both were dropped for Joinville's streets and the whole picture. Buildings still stand on the 4 m grid's BLOCK cells until S043 builds the îlots along the street lines. The detail area is a parameter of `CityMap` that nothing sets yet (S051 will).
 
 ### [ ] S041 · Road surface
 > needs: S040, S155 | size: L | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over the rue du Marché, `--street-rack`
 - [ ] Surfaces as vertex colour and one shared material, no textures
   - [ ] Pavés: square sandstone and granite setts in rows on the old streets, the squares and the quays, slightly domed each, the joints dark; drawn in vertex colour with height noise
   - [ ] The old lanes dished to a gutter (ruisseau) down the middle, as before pavements
-  - [ ] Asphalt on the boulevards and the newer roads: dark, patched, a lighter worn track per lane
+  - [ ] Asphalt on the main streets: dark, patched, a lighter worn track per lane
 - [ ] Markings as thin overlay meshes in one draw per street, French style
   - [ ] White dashed centre and lane lines on the asphalt, none on the setts
   - [ ] Zebra crossings (passages piétons) as white bars, on the setts too
   - [ ] BUS lettering and lanes near the bus station, painted arrows, give-way triangles, yellow zigzags at the bus stops, parking bays and PAYANT lettering
 - [ ] The road details of S155 placed: manholes, gutters and kerb drains, raised crossings, cracks and potholes seeded per street, setts missing in patches
-- [ ] Camber: the boulevards crowned, the old lanes falling to the middle
+- [ ] Camber: the main streets crowned, the old lanes falling to the middle
 - [ ] `--street-rack`: a 30 m strip of every surface and marking side by side
 - [ ] Round 1 · form: the strips' crowns and dishes, kerb lines and the markings' widths against the card's French references
 - [ ] Round 2 · structure: the setts' rows and joints, sunk and lifted ones, asphalt patches over setts, faded and cracked paint
@@ -683,41 +681,42 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
   - [ ] Stone flags on the squares and in front of the public buildings
   - [ ] No pavement in the narrowest lanes: setts wall to wall, stone bollards (bornes chasse-roues) guarding the house corners and the carriage gates
 - [ ] Dropped kerbs at the portes cochères and crossings, studded tactile strips at corners
-- [ ] Tree pits with cast-iron grilles on the boulevards; the walls, railings and gates of S156 where buildings stand back
+- [ ] Tree pits with cast-iron grilles on the main streets; the walls, railings and gates of S156 where buildings stand back
 - [ ] Sidewalks are nav cells: zombies use them, hordes spill onto the road
 - [ ] Round 1 · form: kerb heights and pavement widths per street, the flags' sizes against the photos
 - [ ] Round 2 · structure: joints, cracked and patched asphalt, broken kerb stones, the bornes' worn tops
 - [ ] Round 3 · surface: grime, gum, stains, moss and weeds in the joints, darker where wet
 - [ ] Review: the street rack and the corner shot beside the references
 
-### [ ] S043 · Block massing
-> needs: S039, S040 | size: L | rounds: 2 | test: `tests/test_city_blocks.gd` | see: `--host --shot-cam` skyline
+### [x] S043 · Block massing
+> needs: S039, S040 | size: L | rounds: 2 | test: `tests/test_city_blocks.gd` | see: `tools\shots.ps1 city_`, `--city-plan`
 - The traced footprints say how dense each part of town is and where the big buildings sit; the blocks are Paris's before Haussmann, not Joinville's lots.
-- [ ] Îlots: each block between the new streets is closed by a row of narrow houses along its edge with courtyards and passages inside, seeded widths per house (two to four windows); footprints from `CityOsm` inside it set its density and where a big hall, court or garden breaks the row
-- [ ] Height from a class picked by street, place and seed
-  - [ ] Old core: four to six floors on narrow fronts, steep roofs with dormers, leaning a little
-  - [ ] Faubourg and boulevard houses: four or five floors, stone ground floor, plastered above, mansard roofs
-  - [ ] Hôtels particuliers: a stone house between a front court behind a gate and a garden behind
-  - [ ] A few post-war blocks at the edge of town, where the hospital tower and the bus station stand; no skyline of towers
-  - [ ] Ateliers: long low halls with glass roofs by the river
-- [ ] Roofs are part of the mass: pitched and mansard roofs with ridges and hips, the tall party-wall chimney stacks left to the kits
-- [ ] Collision is the block, one mesh per city block, test counts draws
-- [ ] Blocks outside every mission area: low-detail silhouettes only
-- [ ] Round 1 · skyline: from the place du marché, the bridge and the hill: a sea of grey slate and red tile roofs bristling with chimney pots, the church tower and the town hall's campanile above it
-- [ ] Round 2 · roofscape: the îlots and courtyards from the helicopter's height against old Paris views and plans on the card (the Turgot plan's bird's-eye view)
-- [ ] Review: the three views side by side with the references
+- [x] Îlots: each block between the new streets is closed by a row of narrow houses along its edge with courtyards and passages inside, seeded widths per house (two to four windows); footprints from `CityOsm` inside it set its density and where a big hall, court or garden breaks the row
+- [x] Height from a class picked by street, place and seed
+  - [x] Old core: four to six floors on narrow fronts, steep roofs with dormers, leaning a little
+  - [x] Houses on the main streets: four or five floors, stone ground floor, plastered above, mansard roofs
+  - [x] Hôtels particuliers: a stone house between a front court behind a gate and a garden behind
+  - [x] A few post-war blocks at the edge of town, where the hospital tower and the bus station stand; no skyline of towers
+  - [x] Ateliers: long low halls with glass roofs by the river
+- [x] Roofs are part of the mass: pitched and mansard roofs with ridges and hips, the tall party-wall chimney stacks left to the kits
+- [x] Collision is the block, one mesh per city block, test counts draws
+- [x] Blocks outside every mission area: low-detail silhouettes only
+- [x] Round 1 · skyline: from the place du marché, the bridge and the hill: a sea of grey slate and red tile roofs bristling with chimney pots, the church tower and the town hall's campanile above it
+- [x] Round 2 · roofscape: the îlots and courtyards from the helicopter's height against old Paris views and plans on the card (the Turgot plan's bird's-eye view)
+- [x] Review: the three views side by side with the references
+- Done: `CityBlocks` (`scripts/world/city_blocks.gd`): îlots from the 4 m grid's BLOCK runs, outlines straightened onto the building lines; rows of houses in whole window bays, corner houses, wings across a court, back buildings from `CityOsm` and a seeded court fill, hôtels behind a gate, garden walls; classes core / main (mansards over stone) / rue / faubourg / post-war (hospital, bus station, a few at the edge) / ateliers (saw-tooth, by the river). About 34 000 houses, one mesh, one collision shape per îlot. Card and both rounds: `references/elements/city_blocks.md`. Left to the kits: chimney stacks and dormers (S159); no passages through the rows yet (the street plan has no covered passages); the church tower and campanile are S188 and S214. Joinville's blocks are big (180 îlots), so the courts are deep; the far LOD waits for S051's mission areas (silhouettes already work outside a detail area).
 
 ### [ ] S044 · Facades
 > needs: S043, S157, S158, S159, S160, S161, S162, S163, S164 | size: L | rounds: 2 | test: `tests/test_facades.gd` | see: `--host --shot-cam` street level, day and night
 - Assembly: the blocks of S043 dressed from the facade kits; nothing modelled here.
 - [ ] Facade grammar per block class: which kit, how many floors, where the shops, carriage gates and signs go, seeded per building
-  - [ ] Timber-framed houses (S161) in the old core; plastered stone houses (S162) on the main streets and boulevards with wooden shopfronts (S158) under French windows (S157); the few post-war blocks (S163) at the edge; ateliers (S164) by the river
+  - [ ] Timber-framed houses (S161) in the old core; plastered stone houses (S162) on the main streets with wooden shopfronts (S158) under French windows (S157); the few post-war blocks (S163) at the edge; ateliers (S164) by the river
   - [ ] Roofs, dormers and balconies (S159), painted and hanging signs (S160) by the shop kinds of the street
 - [ ] The town's mix: plaster fronts in creams, ochres and greys, a stone hôtel behind its gate, a leaning timber house, a later infill where one burnt
 - [ ] Night: a seeded few windows lit warm or TV-blue behind the shutters, some flickering, most dark
 - [ ] Decay by street: shutters closed or hanging, broken windows, soot above burnt ones, quarantine tape across doors (the kits' states)
 - [ ] House numbers on blue enamel plates by the doors
-- [ ] Round 1 · composition: three street views (old core, boulevard, the river ateliers) for variety; no two neighbours alike
+- [ ] Round 1 · composition: three street views (old core, a main street, the river ateliers) for variety; no two neighbours alike
 - [ ] Round 2 · night and decay: the same views at night and in the abandoned state
 - [ ] Review: the three views, day and night
 
@@ -739,24 +738,24 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 ### [ ] S046 · Street furniture placement
 > needs: S041, S042, S166, S167, S168, S169, S170, S171, S172, S173 | size: M | rounds: 2 | test: `tests/test_street_furniture.gd` | see: `--furniture-rack`, `--host --shot-cam` on a street corner
 - Assembly: places the finished street furniture; nothing modelled here.
-- [ ] Rules along streets, seeded, merged per block: réverbères hung on ropes over the old streets and lanterns on wall brackets, cast-iron candelabra on the boulevards and quays, the ropes and wires of S167, traffic lights at the bigger junctions, street names carved in the corner stones and on blue plates, bus stops where the lines run, a colonne Morris and a kiosk now and then, benches, bins, bornes and railings by the squares and shops
+- [ ] Rules along streets, seeded, merged per block: réverbères hung on ropes over the old streets and lanterns on wall brackets, cast-iron candelabra on the main streets and quays, the ropes and wires of S167, traffic lights at the bigger junctions, street names carved in the corner stones and on blue plates, bus stops where the lines run, a colonne Morris and a kiosk now and then, benches, bins, bornes and railings by the squares and shops
 - [ ] Lamps follow the two-shadow rule: emission and a cheap light, shadows only from the manager (S108)
 - [ ] States by street: a few lamps flicker or hang dead, a réverbère down in the street on its rope, a sign bent
 - [ ] Small props are cover; thin poles do not block bullets
 - [ ] `--furniture-rack`: every piece of S166 to S173 in a row
-- [ ] Round 1 · placement: an old lane, the quay and a boulevard against the card's references
+- [ ] Round 1 · placement: an old lane, the quay and a main street against the card's references
 - [ ] Round 2 · density and light: enough clutter to read as a lived-in town, the lamps' pools at night
 - [ ] Review: the corner shot by day and night
 
 ### [ ] S047 · Vegetation placement and wind
-> needs: S042, S174, S175, S176, S177, S178 | size: M | rounds: 2 | test: `tests/test_vegetation.gd` | see: `--tree-rack`, `--host --shot-cam` on the boulevard
+> needs: S042, S174, S175, S176, S177, S178 | size: M | rounds: 2 | test: `tests/test_vegetation.gd` | see: `--tree-rack`, `--host --shot-cam` on a main street
 - Assembly and the shared systems: places the finished plants of S174 to S178.
-- [ ] Planting rules: double rows of plane trees and elms on the boulevard and the quays, the old chestnuts on the squares, limes trained flat in the courts, box parterres in the formal gardens, window boxes and climbing ivy on the old houses, the forest wall where the hill rises
+- [ ] Planting rules: rows of plane trees and elms on the main streets and the quays, the old chestnuts on the squares, limes trained flat in the courts, box parterres in the formal gardens, window boxes and climbing ivy on the old houses, the forest wall where the hill rises
 - [ ] Wind: vertex sway in a shader, stronger at the tips, gusts that travel across a street
 - [ ] Grass tufts on lawns and verges as one MultiMesh, pressed down where zombies ran
 - [ ] Leaves fall and skitter along the gutter in gusts
 - [ ] `--tree-rack`: every species and size in a row
-- [ ] Round 1 · placement: the boulevard, the quay, a square, the edge of the hill
+- [ ] Round 1 · placement: a main street, the quay, a square, the edge of the hill
 - [ ] Round 2 · motion: wind strength by place, gusts, nothing swimming
 - [ ] Review: the four views beside the card's references
 
@@ -779,7 +778,6 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 > needs: S044, S047, S166, S173, S187, S188, S189, S190 | size: M | rounds: 3 | test: `tests/test_landmarks.gd` | see: `--host --shot-cam` on the place du marché
 - Assembly of the finished landmarks, exterior only. They stand where the plan of S040 puts them (the place du marché where Praça da Bandeira is, the church near it), not on traced footprints.
 - [ ] The place du marché: setts, the fountain (S187) in the middle, old chestnuts, lanterns (S166), benches and bins (S173), the empty market stalls, tall plastered houses with shops closing it
-- [ ] The boulevard: a wide gravel walk under double rows of plane trees between two carriageways, benches and lamps along it
 - [ ] The church (S188) on its parvis off the market
 - [ ] The old cemetery (S189) on the slope behind the church
 - [ ] The jardin public at the foot of the hill (S190), seen only on the lookout mission
@@ -921,7 +919,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S166 · Street lamps
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=lamps_street`
-- [ ] Card: the réverbère of about 1800 (a lantern with a reflector hung on a rope across the street), the lantern on an iron wall bracket (potence), the cast-iron candelabrum of the boulevards and quays, the modern mast on the outer roads
+- [ ] Card: the réverbère of about 1800 (a lantern with a reflector hung on a rope across the street), the lantern on an iron wall bracket (potence), the cast-iron candelabrum of the main streets and quays, the modern mast on the outer roads
 - [ ] Round 1 · form: the lanterns' shapes, the brackets' curves, the candelabrum's height, base and arms
 - [ ] Round 2 · structure: the réverbère's glass, reflector and hook, the bracket's scrolls, the candelabrum's base with its access door and fluted column, the lantern's panes and crown
 - [ ] Round 3 · surface: dark green or black paint with chips, stickers on the posts, rust at the foot, insects in the glass
@@ -995,7 +993,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S174 · Plane tree
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=plane_tree`
-- [ ] Card: photos of French boulevard and quay plane trees: the mottled bark, the high broad crown, the pollarded ones in the squares
+- [ ] Card: photos of French avenue and quay plane trees: the mottled bark, the high broad crown, the pollarded ones in the squares
 - [ ] Round 1 · form: heights from 12 to 25 m, the trunk's lean and fork, the crown's spread; a pollarded variant with knuckled branch ends
 - [ ] Round 2 · structure: branching, leaf clusters, the hanging seed balls
 - [ ] Round 3 · surface: the bark's patches of grey, olive and cream, the leaves' light and dark sides, autumn colour by preset
@@ -1140,7 +1138,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - The game's text still names Joinville and its real places; the town becomes an invented French one in the style of Paris around 1800, on the same plan.
 - [ ] An invented French town name, its street names (S040) and its coat of arms (one shape, used by S155, S186, S218), in `CityData`
 - [ ] `Missions` titles and briefs in French names: the gare routière, the Hôtel-Dieu, the hôtel de ville, the caserne, the telegraph tower on the hill; mission ids (`terminal`, `hospital`, `prefeitura`, `batalhao`, `mirante`) stay as they are
-- [ ] The menu's map: the invented names on the pins, the old core, the boulevards and the quays drawn
+- [ ] The menu's map: the invented names on the pins, the old core, the main streets and the quays drawn
 - [ ] `CLAUDE.md` and `TODO.md` follow: the city is described as the town, the Joinville references as its plan
 
 ---
@@ -1240,13 +1238,13 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S197 · Bus station: roof slab and fascia
 > needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_roof`
-- The town's gare routière is a 1970s concrete canopy dropped into the old fabric by the boulevard; `terminal1.png` gives only the idea (a long slab on steel columns over platform islands) and the scale.
+- The town's gare routière is a 1970s concrete canopy dropped into the old fabric by the main street; `terminal1.png` gives only the idea (a long slab on steel columns over platform islands) and the scale.
 - [ ] Card: photos of French bus stations of the 1960s and 70s: a long concrete canopy, its edge band, the soffit; measured against 12 m buses under it
-- [ ] Round 1 · form: the two slab halves and the gap of the skylight between them, the soffit, the fascia band along the boulevard
+- [ ] Round 1 · form: the two slab halves and the gap of the skylight between them, the soffit, the fascia band along the main street
 - [ ] Round 2 · structure: drip edges, expansion joints every bay, gutters and downpipes at the columns, recessed light cans in the soffit, the fascia's panels and fixings
 - [ ] Round 3 · surface: raw concrete with board marks, black water stains running from every joint, algae on the shaded edge, grime, rust weeping from the brackets
 - [ ] Round 4 · night: the soffit's lights (half dead), their pools on the wet setts (with S200), the stains still readable under them
-- [ ] Review: the rack sheet and a view from the boulevard beside the references, with the old houses behind
+- [ ] Review: the rack sheet and a view from the main street beside the references, with the old houses behind
 
 ### [ ] S198 · Bus station: steel columns and trusses
 > needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_columns`
@@ -1306,10 +1304,10 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] The slab (S197) on its columns (S198) with the skylight (S199), over the platforms and bays (S200), the ticket office, kiosks and toilets (S201) and the boards (S202)
 - [ ] City buses (S203): some in the bays, one jack-knifed across the exit, one with its doors open and lights on
 - [ ] Lighting: cold tube lights under the slab, half dead, puddles catching them
-- [ ] The old houses of the boulevard round it, the place du marché (S049) a street away and joined to it
+- [ ] The old houses of the main street round it, the place du marché (S049) a street away and joined to it
 - [ ] Player start on the platforms, first weapon spots, first ammo
 - [ ] Round 1 · layout: bays and islands laid out like the French references on the card, sized for the buses
-- [ ] Round 2 · style match: fixed `--shot-cam` views from the platforms and the boulevard beside the card's references
+- [ ] Round 2 · style match: fixed `--shot-cam` views from the platforms and the main street beside the card's references
 - [ ] Round 3 · light and rain: the night and the rain (with S108 and S110 when they exist)
 - [ ] Review: the style match sheets
 

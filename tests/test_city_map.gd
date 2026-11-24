@@ -1,6 +1,6 @@
 extends TestCase
-## The city map: the part of central Joinville that holds the five mission POIs and everything
-## between them, traced from references/joinville.png.
+## The city map: all of references/joinville.png (and above it, the hill road's hairpin), the five
+## mission POIs in it.
 
 const POIS := ["hospital", "terminal", "prefeitura", "batalhao", "mirante"]
 
@@ -45,7 +45,6 @@ func test_all_five_pois_are_inside_with_room_around_them() -> void:
 		assert_true(CityData.POIS.has(id), "%s is a POI" % id)
 		var p := m.poi_pos(id)
 		assert_true(m.contains(p), "%s is inside the map" % id)
-		assert_gt(m.distance_to_edge(p), Config.CITY_MARGIN * 0.9, "%s has city around it" % id)
 
 
 func test_everything_between_the_pois_is_in() -> void:
@@ -57,13 +56,14 @@ func test_everything_between_the_pois_is_in() -> void:
 				assert_true(m.contains(p), "between %s and %s" % [a, b])
 
 
-func test_the_rest_of_the_city_is_left_out() -> void:
+func test_the_whole_picture_is_the_map() -> void:
 	var m := _map()
+	for corner: Vector3 in [_px(2, 2), _px(1918, 2), _px(2, 1018), _px(1918, 1018)]:
+		assert_true(m.contains(corner), "the picture's corner %s is in" % corner)
 	for far: Vector3 in [_px(100, 100), _px(300, 600), _px(450, 300), _px(1700, 800), _px(1200, 950), _px(900, 60)]:
-		assert_false(m.contains(far), "%s is outside" % far)
-		assert_true(m.nav.is_blocked(far), "and nobody can walk there")
-	assert_lt(m.area_km2(), 4.0, "only the part around the POIs")
-	assert_gt(m.area_km2(), 1.5)
+		assert_true(m.contains(far), "%s is in: the town is not cut down to the POIs" % far)
+	assert_false(m.contains(_px(-10, 500)), "nothing beyond the picture")
+	assert_near(m.area_km2(), CityData.FRAME.get_area() * CityData.M_PER_PX * CityData.M_PER_PX / 1.0e6, 0.01)
 
 
 func test_every_poi_can_be_walked_to_from_the_start() -> void:
@@ -85,11 +85,11 @@ func test_player_spawn_points_are_all_clear() -> void:
 func test_streets_are_open_and_blocks_are_built_up() -> void:
 	var m := _map()
 	assert_gt(m.building_count, 400, "city blocks are filled with buildings")
-	# rue de la Gare, rue Saint-Martin, the boulevard, the faubourg, a ruelle
-	for street: Vector3 in [_px(965, 526), _px(896, 450), _px(774, 440), _px(722, 674), _px(1020, 460)]:
+	# main streets and side streets across the picture
+	for street: Vector3 in [_px(233, 125.7), _px(371.65, 818.95), _px(569, 210.5), _px(254.6, 788.15)]:
 		assert_eq(m.type_at(street), CityMap.STREET, "street at %s" % street)
 		assert_false(m.nav.is_blocked(street))
-	var block := _px(806, 447) # between the boulevard and the rue des Carmes
+	var block := _px(850, 318) # a block of the centre, far from every street
 	assert_eq(m.type_at(block), CityMap.BLOCK)
 	assert_true(m.nav.is_blocked(block), "buildings are solid")
 

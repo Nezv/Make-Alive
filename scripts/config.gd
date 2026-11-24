@@ -333,7 +333,6 @@ const STRAGGLER_CHECK := 1.0    # seconds between checks for stragglers
 const WEAPON_SPOTS_ACTIVE := 8 # how many of a map's weapon spots hold a gun each match
 const SPAWN_MIN_DIST := 18.0  # zombies never appear closer to a player than this (open maps)
 const DIRECT_CHECK_RANGE := 14.0 # open maps: beyond this a zombie just follows its path
-const CITY_MARGIN := 180.0    # metres of city kept around the outermost POIs
 const CITY_CELL := 4.0        # metres per cell of the city's layout / navigation grid
 const CITY_FLOOR_H := 3.2
 const CITY_WALL_H := 4.0      # the wall where the map ends
@@ -341,6 +340,26 @@ const CITY_SPAWN_NEAR := 30.0 # city zombies appear between these distances from
 const CITY_SPAWN_FAR := 70.0
 const CITY_SPAWN_TRIES := 40
 const CITY_HILL_FADE := 100.0  # metres over which Morro da Boa Vista rises from the flat city at the forest's edge
+
+# --- City blocks (S043, scripts/world/city_blocks.gd; the classes' numbers are CityBlocks.CLASSES) ---
+const CITY_BLOCK_SIMPLIFY := 3.0   # metres an îlot's outline may stray from the 4 m grid's staircase
+const CITY_BAY := Vector2(2.3, 2.8) # metres: a window bay, the unit a house's width is counted in
+const CITY_STOREY := Vector2(2.9, 3.4) # metres per floor, seeded per house (the cornice line steps)
+const CITY_CORE_RADIUS := 400.0    # metres round the place du Marché and the place de l'Église: the old core
+const CITY_FAUBOURG := 1150.0      # metres from the place du Marché beyond which is the edge of town
+const CITY_POSTWAR_NEAR := Vector2(200.0, 120.0) # metres round the hospital and round the bus station that were rebuilt after the war
+const CITY_MARCHE_KEEP := 150.0    # metres round the place du Marché kept old: tall plastered houses close it, not slabs
+const CITY_POSTWAR_EDGE := 0.1     # share of the îlots at the edge of town that are post-war blocks
+const CITY_ATELIER_RIVER := 70.0   # metres from the river within which a row may be ateliers
+const CITY_ATELIER_SHARE := 0.7    # ...and the share of those rows that are
+const CITY_HOTEL_SHARE := 0.08     # chance a long row in the centre has an hôtel particulier behind a gate
+const CITY_HOTEL_ROW := 34.0       # metres of row an hôtel needs, and twice its depth inside the block
+const CITY_STRAIGHT_DEG := 25.0    # an outline turning less than this at a point runs straight on
+const CITY_ILOT_SMALL := 150.0     # m²: an îlot smaller than this is one building
+const CITY_BACK_MIN := 60.0        # m²: a traced footprint smaller than this is a shed, not built
+const CITY_HALL_AREA := 1200.0     # m²: a traced footprint larger than this is a hall
+const CITY_LIT_SHARE := 0.1        # houses with a window still lit
+const CITY_BLOCK_TRIANGLES := 1500000 # the whole town's walls and roofs
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
 
@@ -357,7 +376,7 @@ const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than 
 # --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
 const BUDGET := {
 	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 11 }, # +1: the checkpoint's lamp
-	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 },
+	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # shapes: the whole of joinville.png is built until the performance pass decides what stays in detail
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
 const PROTOCOL_VERSION := 5   # bump when anything on the wire changes: a client of another build is refused with a message
@@ -396,6 +415,7 @@ const SFX_UI_VOICES := 6        # sounds with no position: menus, your own gun
 const SFX_UNIT_SIZE := 6.0      # metres at which a sound is still at full volume
 const SFX_MAX_DISTANCE := 120.0 # beyond this a sound is silent
 const SFX_FAR_CUTOFF_HZ := 4000.0 # far sounds lose what is above this...
+const SFX_FAR_CUTOFF_DB := -18.0  # ...by up to this much
 const SOUND_SPOTS_MAX := 64       # hums, alarms and ticks placed in a map; more stay silent
 const SOUND_SPOTS_AUDIBLE := 6    # of those, only the nearest this many play at once
 const SOUND_SPOT_REACH := 30.0    # metres a placed hum is heard from (a spot can say its own)
@@ -403,7 +423,6 @@ const WORLD_SOUND_JITTER := 0.05  # pitch spread of a world sound the host sends
 const DOOR_SOUND_DB := -2.0       # a door opening, closing, being bashed
 const PICKUP_SOUND_DB := -6.0     # ammo, a medkit, keys going into your kit
 const TUBE_BUZZ_DB := -16.0       # a lamp's hum, quiet: you hear it standing under it
-const SFX_FAR_CUTOFF_DB := -18.0  # ...by up to this much
 
 # --- Physics layers (bit values) ---
 const LAYER_WORLD := 1     # floors, walls, closed doors

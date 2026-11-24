@@ -9,25 +9,25 @@ extends RefCounted
 ## carriageway (ROAD) and for the building line (WALK, the pavements' outer edge), each pair of
 ## neighbouring arms meets at a corner cut by a chamfer: KERB_CUT at the kerb, PAN_COUPE at the
 ## houses (the pans coupés of French street corners). A T, a skewed cross and a bend all come out of
-## the same rule. A node listed in CityData.ROUNDABOUTS is a ring road round an island instead.
+## the same rule.
 ## Links are strips with mitred joints, trimmed where the junction shape takes over.
 
 const WALK := 0     ## pavement, out to the building line
 const ROAD := 1     ## carriageway, kerb to kerb
-const MALL := 2     ## a boulevard's gravel walk down the middle
-const ISLAND := 3   ## the middle of a rond-point
 const SNAP := 9.0   ## metres: an end this close to a street joins it
 const STEP := 4.0   ## metres between a strip's cross-sections (they follow the ground on the hill)
 const KERB_CUT := 2.5
 const PAN_COUPE := 4.0
 const MAX_TRIM := 40.0
-const MALL_GAP := 5.0   ## metres the mall stops short of a junction's carriageway
 const BUCKET := 16.0
+const SEG_CELL := 32.0  ## metres: the squares segments are sorted into for joining
+const WELD := 1.5       ## metres: points of the plan closer than this are one
+const ARM_LOOK := 3.0   ## metres: an arm's direction is taken this far along it
 
 var streets: Array = []   ## CityData entries
 var specs: Array = []     ## CityData.spec of each
 var lines: Array = []     ## per street: { pts: PackedVector2Array, f: PackedFloat32Array } after joining
-var nodes: Array = []     ## { at: Vector2, arms: Array, round: float }
+var nodes: Array = []     ## { at: Vector2, arms: Array }
 var links: Array = []     ## { street: int, pts, f, a: node, b: node }
 var pieces: Array = []    ## { layer, surface: String, street: int (-1 a junction), node: int, tris: PackedVector2Array, box: Rect2 }
 
@@ -36,7 +36,7 @@ var _corners: Array = []  ## per node: [{ sharp, inside }]
 var _buckets := {}
 
 
-func _init(street_data: Array, roundabouts: Array = []) -> void:
+func _init(street_data: Array) -> void:
 	for s: Dictionary in street_data:
 		streets.append(s)
 		specs.append(CityData.spec(s))
@@ -48,8 +48,10 @@ func _init(street_data: Array, roundabouts: Array = []) -> void:
 			f.append(float(narrow[i]) if i < narrow.size() else 1.0)
 		lines.append({ "pts": pts, "f": f })
 	_join_ends()
+	_weld()
 	_split_crossings()
-	_make_nodes(roundabouts)
+	_weld()
+	_make_nodes()
 	_make_links()
 	for k in nodes.size():
 		_junction(k)
@@ -63,62 +65,163 @@ static func _key(p: Vector2) -> Vector2i:
 	return Vector2i(roundi(p.x * 20.0), roundi(p.y * 20.0))
 
 
+## Every segment of every street by the SEG_CELL squares it touches: [street, segment, ...] (flat).
+func _segment_grid() -> Dictionary:
+	var grid := {}
+	for s in lines.size():
+		var pts: PackedVector2Array = lines[s].pts
+		for i in pts.size() - 1:
+			var box := Rect2(pts[i], Vector2.ZERO).expand(pts[i + 1]).grow(SNAP)
+			for x in range(floori(box.position.x / SEG_CELL), floori(box.end.x / SEG_CELL) + 1):
+				for y in range(floori(box.position.y / SEG_CELL), floori(box.end.y / SEG_CELL) + 1):
+					var key := Vector2i(x, y)
+					if not grid.has(key):
+						grid[key] = []
+					(grid[key] as Array).append_array([s, i])
+	return grid
+
+
 ## Ends that stop on (or just short of) another street are moved onto it, and a point is added there.
+## Points of the street within SNAP of where its end now lies go: a traced end that ran past the
+## other street would otherwise double back at the junction.
 func _join_ends() -> void:
-	var adds := []  # [street, segment, point]
+	var grid := _segment_grid()
+	var moves := []  # [street, end, other street, point]
 	for s in lines.size():
 		for e in [0, -1]:
 			var pts: PackedVector2Array = lines[s].pts
 			var p := pts[e]
 			var best := SNAP
 			var hit := Vector2.INF
-			var on := [-1, -1]
-			for o in lines.size():
+			var on := -1
+			var near: Array = grid.get(Vector2i(floori(p.x / SEG_CELL), floori(p.y / SEG_CELL)), [])
+			for n in range(0, near.size(), 2):
+				var o: int = near[n]
+				var i: int = near[n + 1]
 				if o == s:
 					continue
 				var q: PackedVector2Array = lines[o].pts
-				for i in q.size() - 1:
-					var c := Geometry2D.get_closest_point_to_segment(p, q[i], q[i + 1])
-					var d := c.distance_to(p)
-					if d < best - 0.01:
-						best = d
-						# prefer a point the other street already has
-						if c.distance_to(q[i]) < 1.5:
-							c = q[i]
-						elif c.distance_to(q[i + 1]) < 1.5:
-							c = q[i + 1]
-						hit = c
-						on = [o, i]
-			if hit == Vector2.INF:
-				continue
-			pts[e] = hit
-			lines[s].pts = pts
-			adds.append([on[0], on[1], hit])
+				var c := Geometry2D.get_closest_point_to_segment(p, q[i], q[i + 1])
+				var d := c.distance_to(p)
+				if d < best - 0.01:
+					best = d
+					# prefer a point the other street already has
+					if c.distance_to(q[i]) < 1.5:
+						c = q[i]
+					elif c.distance_to(q[i + 1]) < 1.5:
+						c = q[i + 1]
+					hit = c
+					on = o
+			if hit != Vector2.INF:
+				moves.append([s, e, on, hit])
+	for m: Array in moves:
+		var s: int = m[0]
+		var hit: Vector2 = m[3]
+		var pts: PackedVector2Array = lines[s].pts
+		var f: PackedFloat32Array = lines[s].f
+		if m[1] == 0:
+			pts[0] = hit
+			while pts.size() > 2 and pts[1].distance_to(hit) < SNAP:
+				pts.remove_at(1)
+				f.remove_at(1)
+		else:
+			pts[-1] = hit
+			while pts.size() > 2 and pts[-2].distance_to(hit) < SNAP:
+				pts.remove_at(pts.size() - 2)
+				f.remove_at(f.size() - 2)
+		lines[s].pts = pts
+		lines[s].f = f
+	var adds := []  # [street, segment, point]: the segment found again, as points may have gone
+	for m: Array in moves:
+		var o: int = m[2]
+		var hit: Vector2 = m[3]
+		var q: PackedVector2Array = lines[o].pts
+		var seg := 0
+		var best := INF
+		for i in q.size() - 1:
+			var d := Geometry2D.get_closest_point_to_segment(hit, q[i], q[i + 1]).distance_to(hit)
+			if d < best:
+				best = d
+				seg = i
+		adds.append([o, seg, hit])
 	_insert(adds)
+
+
+## Points of different streets closer than WELD are one point (a traced junction is a little blurred),
+## and a street never keeps two points that close in a row.
+func _weld() -> void:
+	var seen := {}  # cell -> [points]
+	for s in lines.size():
+		var pts: PackedVector2Array = lines[s].pts
+		var f: PackedFloat32Array = lines[s].f
+		var out := PackedVector2Array()
+		var of := PackedFloat32Array()
+		for i in pts.size():
+			var p := pts[i]
+			var c := Vector2i(floori(p.x / WELD), floori(p.y / WELD))
+			var found := false
+			for dx in [-1, 0, 1]:
+				for dy in [-1, 0, 1]:
+					for q: Vector2 in seen.get(c + Vector2i(dx, dy), []):
+						if not found and q.distance_to(p) < WELD:
+							p = q
+							found = true
+			if not found:
+				if not seen.has(c):
+					seen[c] = []
+				(seen[c] as Array).append(p)
+			var last := i == pts.size() - 1
+			if not out.is_empty() and out[-1].distance_to(p) < WELD:
+				if last and out.size() > 1: # the end wins over the point before it
+					out[-1] = p
+				continue
+			out.append(p)
+			of.append(f[i])
+		if out.size() < 2: # a street shorter than WELD: keep its ends
+			out = PackedVector2Array([pts[0], pts[-1]])
+			of = PackedFloat32Array([f[0], f[-1]])
+		lines[s].pts = out
+		lines[s].f = of
 
 
 ## Streets that cross share the crossing point.
 func _split_crossings() -> void:
+	var grid := _segment_grid()
 	var adds := []
-	for s in lines.size():
-		var a: PackedVector2Array = lines[s].pts
-		for o in range(s + 1, lines.size()):
-			var b: PackedVector2Array = lines[o].pts
-			for i in a.size() - 1:
-				var ra := Rect2(a[i], Vector2.ZERO).expand(a[i + 1]).grow(0.5)
-				for j in b.size() - 1:
-					if not ra.intersects(Rect2(b[j], Vector2.ZERO).expand(b[j + 1]).grow(0.5)):
-						continue
-					var x: Variant = Geometry2D.segment_intersects_segment(a[i], a[i + 1], b[j], b[j + 1])
-					if x == null:
-						continue
-					var p: Vector2 = x
-					# snap to a point either street already has
-					for v: Vector2 in [a[i], a[i + 1], b[j], b[j + 1]]:
-						if v.distance_to(p) < 1.0:
-							p = v
-					adds.append([s, i, p])
-					adds.append([o, j, p])
+	var done := {}
+	for key: Vector2i in grid:
+		var list: Array = grid[key]
+		for m in range(0, list.size(), 2):
+			for n in range(m + 2, list.size(), 2):
+				var s: int = list[m]
+				var o: int = list[n]
+				if s == o:
+					continue
+				var i: int = list[m + 1]
+				var j: int = list[n + 1]
+				if s > o:
+					var t := s
+					s = o
+					o = t
+					t = i
+					i = j
+					j = t
+				var pair := Vector4i(s, i, o, j)
+				if done.has(pair):
+					continue
+				done[pair] = true
+				var a: PackedVector2Array = lines[s].pts
+				var b: PackedVector2Array = lines[o].pts
+				var x: Variant = Geometry2D.segment_intersects_segment(a[i], a[i + 1], b[j], b[j + 1])
+				if x == null:
+					continue
+				var p: Vector2 = x
+				# snap to a point either street already has
+				for v: Vector2 in [a[i], a[i + 1], b[j], b[j + 1]]:
+					if v.distance_to(p) < 1.0:
+						p = v
+				adds.append([s, i, p])
+				adds.append([o, j, p])
 	_insert(adds)
 
 
@@ -156,7 +259,7 @@ func _insert(adds: Array) -> void:
 		lines[s].f = of
 
 
-func _make_nodes(roundabouts: Array) -> void:
+func _make_nodes() -> void:
 	var count := {}
 	for s in lines.size():
 		var pts: PackedVector2Array = lines[s].pts
@@ -169,11 +272,7 @@ func _make_nodes(roundabouts: Array) -> void:
 			var k := _key(pts[i])
 			if count[k] >= 2 and not _key_node.has(k):
 				_key_node[k] = nodes.size()
-				nodes.append({ "at": pts[i], "arms": [], "round": 0.0 })
-	for rp: Dictionary in roundabouts:
-		var k := node_near(CityData.to_plan(rp.at), 3.0)
-		if k >= 0:
-			nodes[k].round = float(rp.r)
+				nodes.append({ "at": pts[i], "arms": [] })
 
 
 func _make_links() -> void:
@@ -204,7 +303,13 @@ func _arm(node: int, link: int, at_start: bool) -> void:
 	var pts: PackedVector2Array = l.pts
 	var f: PackedFloat32Array = l.f
 	var sp: Dictionary = specs[l.street]
-	var dir := (pts[1] - pts[0]).normalized() if at_start else (pts[-2] - pts[-1]).normalized()
+	var o := pts[0] if at_start else pts[-1]
+	var dir := Vector2.ZERO
+	for k in range(1, pts.size()):
+		var q := pts[k] if at_start else pts[pts.size() - 1 - k]
+		dir = (q - o).normalized()
+		if q.distance_to(o) >= ARM_LOOK:
+			break
 	var fe := f[0] if at_start else f[-1]
 	var road: float = sp.road * fe * 0.5
 	var walk: Array = sp.walk
@@ -212,7 +317,7 @@ func _arm(node: int, link: int, at_start: bool) -> void:
 	var w_right: float = walk[1] if at_start else walk[0]
 	var w_left: float = walk[0] if at_start else walk[1]
 	(nodes[node].arms as Array).append({ "link": link, "start": at_start, "street": l.street, "dir": dir,
-		"road": road, "right": [road + w_right, road], "left": [road + w_left, road], "mall": float(sp.mall) * 0.5,
+		"road": road, "right": [road + w_right, road], "left": [road + w_left, road],
 		"trim": [0.0, 0.0] })
 
 
@@ -228,9 +333,6 @@ func _junction(k: int) -> void:
 	var node: Dictionary = nodes[k]
 	var arms: Array = node.arms
 	_corners.append([])
-	if node.round > 0.0:
-		_roundabout(k)
-		return
 	if arms.size() < 2:
 		return
 	var o: Vector2 = node.at
@@ -295,6 +397,17 @@ func _junction(k: int) -> void:
 				poly.append(sec.pa)
 				poly.append(sec.pb)
 		_add_poly(level, _surface_at(k, level), -1, k, poly)
+		# Each arm's own band from the node out to its trim: however skewed the junction, its
+		# polygon and the strips leave no hole along any street.
+		for arm: Dictionary in arms:
+			var l: Dictionary = links[arm.link]
+			var length := _length(l.pts)
+			var tr: float = arm.trim[level]
+			if tr <= 0.0:
+				continue
+			var t0 := 0.0 if arm.start else maxf(0.0, length - tr)
+			var t1 := maxf(0.0, length - tr) if arm.start else 0.0
+			_add(level, _surface_at(k, level), -1, k, _band(l, level, t0, t1))
 
 
 func _surface_at(k: int, level: int) -> String:
@@ -307,42 +420,6 @@ func _surface_at(k: int, level: int) -> String:
 			best = arm.road
 			out = specs[arm.street].surface
 	return out
-
-
-func _roundabout(k: int) -> void:
-	var node: Dictionary = nodes[k]
-	var o: Vector2 = node.at
-	var r: float = node.round
-	var walk := 0.0
-	for arm: Dictionary in node.arms:
-		walk = maxf(walk, maxf(arm.right[WALK], arm.left[WALK]) - float(arm.road))
-		var h := maxf(float(arm.right[ROAD]), float(arm.left[ROAD]))
-		var hw := maxf(float(arm.right[WALK]), float(arm.left[WALK]))
-		arm.trim[ROAD] = sqrt(maxf(r * r - h * h, 0.0))
-		arm.trim[WALK] = sqrt(maxf((r + walk) * (r + walk) - hw * hw, 0.0))
-	for arm: Dictionary in node.arms: # the pavement ring is as wide as the widest pavement
-		var hw := maxf(float(arm.right[WALK]), float(arm.left[WALK]))
-		arm.trim[WALK] = sqrt(maxf((r + walk) * (r + walk) - hw * hw, 0.0))
-	_add_poly(WALK, "flags", -1, k, _circle(o, r + walk, 32))
-	_add(ROAD, _surface_at(k, ROAD), -1, k, _ring(o, r, r - CityData.RING_ROAD, 32))
-	_add_poly(ISLAND, "grass", -1, k, _circle(o, r - CityData.RING_ROAD, 32))
-
-
-static func _circle(o: Vector2, r: float, n: int) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for i in n:
-		out.append(o + Vector2.from_angle(i * TAU / n) * r)
-	return out
-
-
-## An annulus as triangles (as a polygon it would need a hole).
-func _ring(o: Vector2, r_out: float, r_in: float, n: int) -> PackedVector2Array:
-	var tris := PackedVector2Array()
-	for i in n:
-		var a := Vector2.from_angle(i * TAU / n)
-		var b := Vector2.from_angle((i + 1) * TAU / n)
-		tris.append_array([o + a * r_out, o + b * r_out, o + b * r_in, o + a * r_out, o + b * r_in, o + a * r_in])
-	return tris
 
 
 func _add_poly(layer: int, surface: String, street: int, node: int, poly: PackedVector2Array) -> void:
@@ -423,69 +500,58 @@ static func _at(pts: PackedVector2Array, f: PackedFloat32Array, dist: PackedFloa
 	return [pts[i].lerp(pts[i + 1], u), lerpf(f[i], f[i + 1], u)]
 
 
-## Whether a street crosses the boulevard at this end of link `link`: arms leave the node on both
-## sides of it (a street meeting it from one side only leaves the mall whole), or it ends there.
-func _crossed(node: int, link: int, start: bool) -> bool:
-	var arms: Array = nodes[node].arms
-	if nodes[node].round > 0.0 or arms.size() < 2:
-		return true
-	var d := Vector2.ZERO
-	for arm: Dictionary in arms:
-		if arm.link == link and arm.start == start:
-			d = arm.dir
-	var sides := 0
-	for arm: Dictionary in arms:
-		if float(arm.mall) > 0.0:
-			continue
-		sides |= 1 if d.cross(arm.dir) > 0.0 else 2
-	return sides == 3
+static func _length(pts: PackedVector2Array) -> float:
+	var out := 0.0
+	for i in pts.size() - 1:
+		out += pts[i].distance_to(pts[i + 1])
+	return out
 
 
 func _strips(i: int) -> void:
 	var l: Dictionary = links[i]
 	var sp: Dictionary = specs[l.street]
-	for level in [WALK, ROAD, MALL]:
-		if level == MALL and float(sp.mall) <= 0.0:
-			continue
+	for level in [WALK, ROAD]:
 		if level == WALK and float(sp.walk[0]) <= 0.0 and float(sp.walk[1]) <= 0.0:
 			continue
-		var lv: int = ROAD if level == MALL else level
-		var t0 := _trim_of(l.a, i, true, lv)
-		var t1 := _trim_of(l.b, i, false, lv)
-		if level == MALL:
-			t0 = t0 + MALL_GAP if _crossed(l.a, i, true) else 0.0
-			t1 = t1 + MALL_GAP if _crossed(l.b, i, false) else 0.0
-		var cut := _cut(l.pts, l.f, t0, t1)
-		if cut.is_empty():
-			continue
-		var pts: PackedVector2Array = cut[0]
-		var f: PackedFloat32Array = cut[1]
-		var tris := PackedVector2Array()
-		var lefts := PackedVector2Array()
-		var rights := PackedVector2Array()
-		for k in pts.size():
-			var d_prev := (pts[k] - pts[k - 1]).normalized() if k > 0 else (pts[1] - pts[0]).normalized()
-			var d_next := (pts[k + 1] - pts[k]).normalized() if k < pts.size() - 1 else d_prev
-			var n_prev := d_prev.orthogonal()
-			var n := (n_prev + d_next.orthogonal()).normalized()
-			if n == Vector2.ZERO:
-				n = n_prev
-			var miter := 1.0 / maxf(n.dot(n_prev), 0.35)
-			var road: float = sp.road * f[k] * 0.5
-			var hl := road
-			var hr := road
-			if level == WALK:
-				hl += float(sp.walk[0])
-				hr += float(sp.walk[1])
-			elif level == MALL:
-				hl = float(sp.mall) * 0.5
-				hr = hl
-			lefts.append(pts[k] + n * hl * miter)
-			rights.append(pts[k] - n * hr * miter)
-		for k in pts.size() - 1:
-			tris.append_array([lefts[k], rights[k], rights[k + 1], lefts[k], rights[k + 1], lefts[k + 1]])
-		var surface: String = "flags" if level == WALK else ("gravel" if level == MALL else sp.surface)
-		_add(level, surface, l.street, -1, tris)
+		var t0 := _trim_of(l.a, i, true, level)
+		var t1 := _trim_of(l.b, i, false, level)
+		var surface: String = "flags" if level == WALK else sp.surface
+		_add(level, surface, l.street, -1, _band(l, level, t0, t1))
+
+
+## A link's surface at one level as triangles, from t0 metres after its start to t1 before its end:
+## cross-sections every STEP metres, mitred at its bends.
+func _band(l: Dictionary, level: int, t0: float, t1: float) -> PackedVector2Array:
+	var sp: Dictionary = specs[l.street]
+	var tris := PackedVector2Array()
+	if level == WALK and float(sp.walk[0]) <= 0.0 and float(sp.walk[1]) <= 0.0:
+		return tris
+	var cut := _cut(l.pts, l.f, t0, t1)
+	if cut.is_empty():
+		return tris
+	var pts: PackedVector2Array = cut[0]
+	var f: PackedFloat32Array = cut[1]
+	var lefts := PackedVector2Array()
+	var rights := PackedVector2Array()
+	for k in pts.size():
+		var d_prev := (pts[k] - pts[k - 1]).normalized() if k > 0 else (pts[1] - pts[0]).normalized()
+		var d_next := (pts[k + 1] - pts[k]).normalized() if k < pts.size() - 1 else d_prev
+		var n_prev := d_prev.orthogonal()
+		var n := (n_prev + d_next.orthogonal()).normalized()
+		if n == Vector2.ZERO:
+			n = n_prev
+		var miter := 1.0 / maxf(n.dot(n_prev), 0.35)
+		var road: float = sp.road * f[k] * 0.5
+		var hl := road
+		var hr := road
+		if level == WALK:
+			hl += float(sp.walk[0])
+			hr += float(sp.walk[1])
+		lefts.append(pts[k] + n * hl * miter)
+		rights.append(pts[k] - n * hr * miter)
+	for k in pts.size() - 1:
+		tris.append_array([lefts[k], rights[k], rights[k + 1], lefts[k], rights[k + 1], lefts[k + 1]])
+	return tris
 
 
 # --- Questions ---------------------------------------------------------------------------------
@@ -603,35 +669,3 @@ func triangles(area := PackedVector2Array()) -> int:
 		n += (piece.tris as PackedVector2Array).size() / 3
 	return n
 
-
-## The old town's outline: the boulevards from end to end, then back along the quay between their ends.
-func ring_polygon() -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for s in streets.size():
-		if streets[s].kind != "boulevard":
-			continue
-		for p: Vector2 in lines[s].pts:
-			if out.is_empty() or out[-1].distance_to(p) > 0.1:
-				out.append(p)
-	if out.size() < 2:
-		return out
-	for s in streets.size():
-		if streets[s].kind != "quai":
-			continue
-		var q: PackedVector2Array = lines[s].pts
-		var ia := -1
-		var ib := -1
-		for i in q.size():
-			if q[i].distance_to(out[0]) < 1.0:
-				ia = i
-			if q[i].distance_to(out[-1]) < 1.0:
-				ib = i
-		if ia < 0 or ib < 0:
-			continue
-		var step := -1 if ib > ia else 1
-		var i := ib + step
-		while i != ia:
-			out.append(q[i])
-			i += step
-		return out
-	return out

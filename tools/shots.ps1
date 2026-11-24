@@ -1,4 +1,4 @@
-# Takes the standard set of screenshots into references\shots\ (not in git) and writes a contact
+﻿# Takes the standard set of screenshots into references\shots\ (not in git) and writes a contact
 # sheet, references\shots\index.html. Run it after a visual change and read the pictures.
 #   tools\shots.ps1            -> every shot
 #   tools\shots.ps1 rack       -> only shots whose name contains "rack"
@@ -42,7 +42,26 @@ $shots = [ordered]@{
     'view_sprint'       = $corridor + '--weapon=4', '--pose=sprint'
     'view_reload'       = $corridor + '--weapon=4', '--pose=reload'
     'demo_zombies'      = @('--host', '--demo')
+    'prop_rack_kit'     = @('--prop-rack=kit')
+    'bite_rack_1'       = $corridor + '--bite-rack=1', '--outfit=nurse'
+    'bite_rack_2'       = $corridor + '--bite-rack=2', '--outfit=nurse'
+    'survivor_rack'     = $corridor + '--survivor-rack'
+    'view_heal'         = $corridor + '--weapon=1', '--pose=heal'
+    'view_downed'       = $corridor + '--weapon=1', '--pose=downed'
+    'view_inspect'      = $corridor + '--weapon=4', '--pose=inspect'
+    'view_shove'        = $corridor + '--weapon=4', '--pose=shove'
+    'item_wheel'        = $corridor + '--wheel'
+    'heli_landing'      = $corridor + '--heli=1'
+    'feed_death'        = $corridor + '--feed'
 }
+# The town's mass (S043, references/elements/city_blocks.md): the skyline from the place du Marché,
+# the bridge and the hill, a street in the old core, the roofscape from the helicopter's height.
+$city = @('--host', '--no-hordes', '--review-light')
+$shots['city_marche'] = $city + '--shot-cam=150,1.7,40,40,6'
+$shots['city_core_street'] = $city + '--shot-cam=-150,1.7,160,80,4'
+$shots['city_bridge'] = $city + '--shot-cam=262,7,-150,180,2'
+$shots['city_hill'] = $city + '--shot-cam=560,140,-240,100,-14'
+$shots['city_roofs'] = $city + '--shot-cam=60,140,180,30,-48'
 foreach ($m in 'terminal', 'hospital', 'prefeitura', 'batalhao', 'mirante') {
     $shots["${m}_street"] = @('--host', "--mission=$m", '--no-hordes')
     $shots["${m}_landmark"] = @('--host', "--mission=$m", '--no-hordes', '--poi-cam')
