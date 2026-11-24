@@ -93,7 +93,7 @@ func test_variants_share_their_outfits_textures_and_stay_low_poly() -> void:
 			assert_true(m.material.albedo_texture == plain.material.albedo_texture, n + ": one albedo in memory")
 			assert_true(m.material.emission_texture == plain.material.emission_texture, n + ": one emission map")
 			assert_eq(m.skin.get_bind_count(), plain.skin.get_bind_count(), n + ": the same joints")
-			assert_lt(_total(m), _total(plain) + 1400, n + ": close to the plain model in triangles")
+			assert_lt(_total(m), _total(plain) + 1800, n + ": close to the plain model in triangles")
 			assert_lt(_total(m), 5000, n + " is still low poly")
 
 

@@ -56,7 +56,7 @@ BITES = [
     dict(name="ribs_r", at=(0.14, 1.25, 0.0), to=(-0.45, 0.0, 0.89), r=(0.075, 0.09, 0.05), depth=0.05, seed=37,
          bones=[dict(kind="line", along="u", off=o, at=0.0, len=0.2, drop=0.55, w=0.012, t=0.008, seg="torso")
                 for o in (-0.044, 0.004, 0.052)]),
-    dict(name="chest", at=(-0.05, 1.38, 0.0), to=(0.0, 0.1, 1.0), r=(0.075, 0.07, 0.05), depth=0.045, seed=41,
+    dict(name="chest", at=(-0.05, 1.38, 0.0), to=(0.0, 0.1, 1.0), r=(0.075, 0.07, 0.05), depth=0.056, seed=41,
          bones=[dict(kind="line", along="u", off=0.047, at=0.0, len=0.18, drop=0.6, w=0.014, t=0.009, seg="torso"),
                 dict(kind="line", along="u", off=-0.012, at=0.0, len=0.18, drop=0.55, w=0.012, t=0.008, seg="torso"),
                 dict(kind="line", along="v", off=0.025, at=0.0, len=0.15, drop=0.72, w=0.016, t=0.007, seg="torso")]),
@@ -65,7 +65,7 @@ BITES = [
                 dict(kind="knob", at=(0.0, -0.01), drop=0.78, radius=0.024, seg="torso")]),
     dict(name="upper_arm_r", at=(0.30, 1.34, 0.0), to=(-0.3, 0.0, 0.95), r=(0.05, 0.075, 0.04), depth=0.036, seed=67,
          bones=[dict(kind="line", along="v", off=0.0, at=0.0, len=0.17, drop=0.78, w=0.013, t=0.013, seg=None)]),
-    dict(name="forearm_l", at=(-0.30, 1.02, 0.0), to=(0.35, 0.0, 0.94), r=(0.045, 0.07, 0.04), depth=0.042, seed=79,
+    dict(name="forearm_l", at=(-0.30, 1.02, 0.0), to=(0.35, 0.0, 0.94), r=(0.045, 0.07, 0.04), depth=0.05, seed=79,
          bones=[dict(kind="line", along="v", off=-0.011, at=0.0, len=0.17, drop=0.8, w=0.0085, t=0.0085, seg="forearm_l"),
                 dict(kind="line", along="v", off=0.011, at=0.012, len=0.13, drop=0.8, w=0.0075, t=0.0075, seg="forearm_l")]),
     dict(name="thigh_r", at=(0.12, 0.72, 0.0), to=(-0.35, 0.0, 0.94), r=(0.07, 0.085, 0.05), depth=0.05, seed=83,
@@ -73,9 +73,14 @@ BITES = [
     dict(name="calf_l", at=(-0.12, 0.34, 0.0), to=(0.0, 0.0, -1.0), r=(0.05, 0.075, 0.04), depth=0.046, seed=97,
          bones=[dict(kind="line", along="v", off=-0.004, at=0.0, len=0.18, drop=0.8, w=0.013, t=0.013, seg="shin_l"),
                 dict(kind="line", along="v", off=0.022, at=0.012, len=0.14, drop=0.8, w=0.0075, t=0.0075, seg="shin_l")]),
-    dict(name="neck", at=(0.0, 1.57, 0.0), to=(0.8, -0.1, 0.6), r=(0.05, 0.055, 0.04), depth=0.032, seed=101,
+    dict(name="neck", at=(0.0, 1.57, 0.0), to=(0.8, -0.1, 0.6), r=(0.05, 0.055, 0.04), depth=0.046, seed=101,
          bones=[dict(kind="column", at=(0.0, 0.0), n=3, size=0.024, gap=0.034, drop=0.85, seg="head")]),
 ]
+# Every hole is this much wider across the surface than first drawn (the depth is unchanged): at 3 m the
+# first ones could hardly be seen.
+SIZE = 1.35
+for _b in BITES:
+    _b["r"] = (_b["r"][0] * SIZE, _b["r"][1] * SIZE, _b["r"][2])
 NAMES = [b["name"] for b in BITES]
 
 # What a face of a variant is for the painter and the sketch: its own colour (RGB 0..1).
@@ -482,7 +487,7 @@ def make_crater(soup, seg, loop, normal, depth, rng, like):
     ids = soup.tris_of(seg)
     A, Bq, C = soup.tri_pts(ids)
     t, _ = ray_first(A, Bq, C, mid, -normal, 0.004)
-    room = depth if t is None else min(depth, 0.5 * t)
+    room = depth if t is None else min(depth, 0.58 * t)
     # a pit that is already deeper than it is wide only needs the room
     rings = []
     for alpha, drop, tag_mix in ((0.30, 0.52, ("rim", "flesh")), (0.72, 1.0, ("flesh", "deep"))):
