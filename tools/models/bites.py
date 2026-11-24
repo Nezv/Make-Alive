@@ -76,23 +76,15 @@ BITES = [
     dict(name="neck", at=(0.0, 1.57, 0.0), to=(0.8, -0.1, 0.6), r=(0.05, 0.055, 0.04), depth=0.046, seed=101,
          bones=[dict(kind="column", at=(0.0, 0.0), n=3, size=0.024, gap=0.034, drop=0.85, seg="head")]),
 ]
-# Every hole is this much wider across the surface than first drawn, a little deeper, and its bones are
-# thicker, longer and nearer the surface: at 3 m the first ones could hardly be seen, and the bones must show.
+# Every hole is this much wider across the surface than first drawn and a little deeper: at 3 m the
+# first ones could hardly be seen. What shows in it is the real skeleton (tools/models/skeleton.py),
+# not shapes made up for the hole: see `skeleton_for`.
 SIZE = 1.75
 DEEPER = 1.2
-BONE_GROW = 1.7
-BONE_LONG = 1.3
-BONE_NEAR = 0.8
 for _b in BITES:
     _b["r"] = (_b["r"][0] * SIZE, _b["r"][1] * SIZE, _b["r"][2])
     _b["depth"] *= DEEPER
-    for _k in _b["bones"]:
-        for _f in ("w", "t", "radius", "size", "gap"):
-            if _f in _k:
-                _k[_f] *= BONE_GROW
-        if "len" in _k:
-            _k["len"] *= BONE_LONG
-        _k["drop"] *= BONE_NEAR
+    _b["bones"] = []
 NAMES = [b["name"] for b in BITES]
 
 # What a face of a variant is for the painter and the sketch: its own colour (RGB 0..1).
@@ -502,15 +494,15 @@ def make_crater(soup, seg, loop, normal, depth, rng, like):
     room = depth if t is None else min(depth, 0.65 * t)
     # a pit that is already deeper than it is wide only needs the room
     rings = []
-    for alpha, drop, tag_mix in ((0.30, 0.52, ("rim", "flesh")), (0.72, 1.0, ("flesh", "deep"))):
+    for alpha, drop, tag_mix in ((0.07, 0.5, ("rim", "flesh")), (0.14, 1.0, ("flesh", "deep"))):
         ring = []
         for k, i in enumerate(rim):
             p = P[i]
             toward = mid - p
             j = rng.normal(0.0, 1.0, 3)
             j -= normal * (j @ normal)
-            wob = 1.0 + 0.45 * float(rng.normal())
-            pos = p + toward * alpha + (-normal) * room * drop * np.clip(wob, 0.55, 1.4) + j * 0.0045
+            wob = 1.0 + 0.12 * float(rng.normal())
+            pos = p + toward * alpha + (-normal) * room * drop * np.clip(wob, 0.85, 1.2) + j * 0.0045
             ring.append(soup.add_vertex(pos, soup.vd[i]))
         rings.append(ring)
     centre = soup.add_vertex(mid - normal * room * 1.15, soup.vd[rim[0]])
@@ -560,55 +552,121 @@ def _surface_drop(A, Bq, C, origin, down, depth):
     return origin + down * (t + depth)
 
 
-def place_bones(soup, seg, spec, frame, centre, normal, room, surface):
-    """The spec's bones for one piece's crater as closed meshes; `surface` = the piece's triangles
-    before the bite (to drop points onto)."""
-    u, v, w = frame
+SKELETON_BEHIND = 0.06     # the pit's floor lies this far behind the nearest bone
+SKELETON_MARGIN = 0.012     # the bones stay this far inside the clothes' own surface
+SEG_OF = {(B.HEAD, 0): "head", (B.TORSO, 0): "torso", (B.PELVIS, 0): "torso",
+          (B.UPPER_ARM, 1): "upper_arm_r", (B.UPPER_ARM, -1): "upper_arm_l",
+          (B.FOREARM, 1): "forearm_r", (B.FOREARM, -1): "forearm_l",
+          (B.THIGH, 1): "thigh_r", (B.THIGH, -1): "thigh_l",
+          (B.SHIN, 1): "shin_r", (B.SHIN, -1): "shin_l"}
+
+
+class Bone:
+    """A closed piece of the skeleton: points, polygon faces (what `add_mesh` reads)."""
+    def __init__(self, verts, faces, tags):
+        self.verts, self.faces, self.tags = verts, faces, tags
+
+
+def skeleton_parts():
+    """The whole skeleton as closed components, by the rigid piece they ride: {seg: [Bone]}."""
+    import skeleton as S
+    out = {}
+    for key, mesh in S.bones(B.MALE).items():
+        seg = SEG_OF[key]
+        parent = list(range(len(mesh.verts)))
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+        for f in mesh.faces:
+            for i in f[1:]:
+                parent[find(i)] = find(f[0])
+        groups = {}
+        for fi, f in enumerate(mesh.faces):
+            groups.setdefault(find(f[0]), []).append(fi)
+        for fis in groups.values():
+            used = sorted({v for fi in fis for v in mesh.faces[fi]})
+            remap = {o: n for n, o in enumerate(used)}
+            out.setdefault(seg, []).append(Bone(
+                [tuple(mesh.verts[o]) for o in used],
+                [tuple(remap[v] for v in mesh.faces[fi]) for fi in fis],
+                [mesh.tags[fi] for fi in fis]))
+    return out
+
+
+def _inside(pts, A, Bq, C, margin=0.0):
+    """Which of `pts` are inside the surface (A, B, C) with `margin` to spare: a ray each way across
+    (+x, -x, +z, -z) meets the surface at least `margin` away. (Not a parity count: a rigid piece is
+    cloth, skin and caps in layers, and an edge-on hit would fool it.)"""
+    res = np.ones(len(pts), dtype=bool)
+    for k, o in enumerate(pts):
+        for d in ((1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 0.0, -1.0)):
+            t, _ = ray_first(A, Bq, C, o, np.array(d), 1e-5)
+            if t is None or t < margin:
+                res[k] = False
+                break
+    return res
+
+
+def _shrunk(verts, axis, s):
+    """Across (x, z) the points are pulled towards the bones' own axis by `s` and the axis is moved to
+    where the piece's cloth is centred; the length (y) is kept. axis = (ax, az, tx, tz)."""
+    v = np.array(verts, dtype=np.float64)
+    v[:, 0] = axis[2] + (v[:, 0] - axis[0]) * s
+    v[:, 2] = axis[3] + (v[:, 2] - axis[1]) * s
+    return v
+
+
+def fit_skeleton(parts, seg, surface):
+    """How the skeleton of one piece is fitted into it: centred in the cloth (the trunk keeps its own
+    axis: the spine lies at the back) and shrunk across, the length kept, until every point of it is
+    inside the cloth with SKELETON_MARGIN to spare. Returns (axis, scale), axis as for `_shrunk`."""
     A, Bq, C = surface
-    made = []
-    for b in spec["bones"]:
-        if b.get("seg") not in (None, seg):
-            continue
-        drop = room * b["drop"]
+    allv = np.vstack([np.array(b.verts) for b in parts])
+    ax, az = float(allv[:, 0].mean()), float(allv[:, 2].mean())
+    # a bone runs on past its piece into the next one at a joint: only the middle of the piece counts
+    cloth = np.vstack([A, Bq, C])
+    ys = cloth[:, 1]
+    mid = allv[(allv[:, 1] > ys.min() + 0.05) & (allv[:, 1] < ys.max() - 0.05)]
+    pick = mid[:: max(1, len(mid) // 90)] if len(mid) else allv[:1]
+    pick = pick[:: max(1, len(pick) // 40)]
+    # the trunk keeps its own axis (the spine lies at the back); a limb or the head is moved about
+    # until the most room is left round it
+    shifts = [(0.0, 0.0)] if seg == "torso" else [(dx, dz) for dx in (-0.03, -0.015, 0.0, 0.015, 0.03)
+                                                  for dz in (-0.03, -0.015, 0.0, 0.015, 0.03)]
+    cloth_c = (ax, az)
+    if seg != "torso":
+        band = cloth[(ys > ys.min() + 0.05) & (ys < ys.max() - 0.05)]
+        if len(band):
+            cloth_c = (float(band[:, 0].mean()), float(band[:, 2].mean()))
+    for s in (1.0, 0.88, 0.76, 0.64, 0.52, 0.45):
+        for dx, dz in sorted(shifts, key=lambda q: abs(q[0]) + abs(q[1])):
+            axis = (ax, az, (cloth_c[0] if seg != "torso" else ax) + dx, (cloth_c[1] if seg != "torso" else az) + dz)
+            if _inside(_shrunk(pick, axis, s), A, Bq, C, SKELETON_MARGIN).all():
+                return axis, float(s)
+    return (ax, az, cloth_c[0], cloth_c[1]), 0.45
 
-        def at(a, bb):
-            o = centre + u * a + v * bb + w * 0.15
-            return _surface_drop(A, Bq, C, o, -w, drop)
 
-        if b["kind"] == "line":
-            along = u if b["along"] == "u" else v
-            other = v if b["along"] == "u" else u
-            n = 8
-            pts = []
-            for s in np.linspace(-0.5, 0.5, n):
-                a_off = b["at"] + s * b["len"]
-                p = (at(a_off, b["off"]) if b["along"] == "u" else at(b["off"], a_off))
-                if p is None:
-                    break
-                pts.append(p)
-            if len(pts) < n:
-                continue
-            up = other if b["along"] == "u" else u
-            m = strip(pts, b["w"], b["t"], up=up, tag="bone",
-                      taper=lambda i, n=n: 0.72 if i in (0, n - 1) else (0.9 if i in (1, n - 2) else 1.0))
-        elif b["kind"] == "knob":
-            p = at(*b["at"])
-            if p is None:
-                continue
-            m = knob(p, b["radius"], axis=v, sides=6)
-        elif b["kind"] == "column":
-            m = Mesh()
-            for k in range(b["n"]):
-                off = (k - (b["n"] - 1) / 2) * b["gap"]
-                p = at(b["at"][0], b["at"][1] + off)
-                if p is None:
-                    continue
-                s = b["size"]
-                m.merge(tapered_block(p - v * s * 0.4, p + v * s * 0.4, (s * 0.55, s * 0.5), (s * 0.5, s * 0.46), up=w, tag="bone"))
-        else:
+def skeleton_for(parts, seg, surface, vol, normal, mid):
+    """The bones of one piece that show in a bite: every component of its skeleton with a point
+    over the hole, shrunk to fit inside the cloth. Returns (meshes, how deep the nearest of them lies
+    under the rim, in metres)."""
+    if seg not in parts:
+        return [], 0.0
+    axis, s = fit_skeleton(parts[seg], seg, surface)
+    ru, rv, rw = vol.r
+    made, front = [], 9.0
+    for b in parts[seg]:
+        V = _shrunk(b.verts, axis, s)
+        a, bb, h = vol.local(V)
+        over = np.sqrt((a / ru) ** 2 + (bb / rv) ** 2) < 1.25
+        if not over.any() or np.abs(h[over]).min() > 0.2:
             continue
-        made.append(m)
-    return made
+        made.append(Bone([tuple(p) for p in V], b.faces, b.tags))
+        front = min(front, float(((mid - V[over]) @ normal).min()))
+    return made, (0.0 if front == 9.0 else front)
 
 
 def add_mesh(soup, mesh, seg, vd, like, kind="bone"):
@@ -624,9 +682,10 @@ def add_mesh(soup, mesh, seg, vd, like, kind="bone"):
 
 # --- Applying a bite ---------------------------------------------------------------------------
 
-def apply(soup, spec):
+def apply(soup, spec, parts=None):
     """Make the bite in `soup` (a fresh copy of the outfit). Returns a report: the centre, the
     pieces reached and how many triangles went from each."""
+    parts = skeleton_parts() if parts is None else parts
     c, w, to = find_centre(soup, spec)
     u, v, w = make_frame(w)
     ru, rv, rw = spec["r"]
@@ -646,17 +705,18 @@ def apply(soup, spec):
             continue
         like = soup.tris_of(seg)[0]
         normal = mean_n if mean_n is not None else w
-        # the largest loop gets the bones
         big = max(loops, key=lambda l: len(l))
-        mids = []
+        mid0 = np.mean([soup.P[i] for i in big], axis=0)
+        shown, front = skeleton_for(parts, seg, surface, vol, normal, mid0)
+        # the pit goes down to just behind the nearest bones, so they stand in it with flesh behind them
+        depth = max(spec["depth"], front + SKELETON_BEHIND) if front else spec["depth"]
         for lp in loops:
             rim_pts = [soup.P[i] for i in lp]
-            mid, room = make_crater(soup, seg, lp, normal, spec["depth"], rng, like)
+            make_crater(soup, seg, lp, normal, depth, rng, like)
             soak_rim(soup, seg, rim_pts)
-            mids.append((mid, room, lp))
-        mid, room, _ = next(m for m in mids if m[2] is big)
         vd = soup.vd[big[0]]
-        for m in place_bones(soup, seg, spec, (u, v, normal), mid, normal, room, surface):
+        room = depth
+        for m in shown:
             add_mesh(soup, m, seg, vd, like)
         report["segs"][seg] = dict(removed=gone, loops=len(loops), room=room)
     return report
