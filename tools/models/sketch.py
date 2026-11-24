@@ -85,3 +85,21 @@ def sheet(rows, path, labels=None):
             out[ri * h:(ri + 1) * h, ci * w:(ci + 1) * w] = im
     Image.fromarray(out).save(path)
     return path
+
+
+def sheet_mixed(rows, path):
+    """Like `sheet`, but each row may have its own height (and width): pictures laid left to
+    right, rows top to bottom, short ones padded with the background."""
+    heights = [max(im.shape[0] for im in r) for r in rows]
+    widths = [sum(im.shape[1] for im in r) for r in rows]
+    out = np.zeros((sum(heights), max(widths), 3), dtype=np.uint8)
+    out[:] = (16, 17, 22)
+    y = 0
+    for r, h in zip(rows, heights):
+        x = 0
+        for im in r:
+            out[y:y + im.shape[0], x:x + im.shape[1]] = im
+            x += im.shape[1]
+        y += h
+    Image.fromarray(out).save(path)
+    return path

@@ -200,6 +200,8 @@ func test_a_crowd_has_men_and_women_in_every_outfit() -> void:
 
 
 func test_walkers_wear_their_outfits_models_and_share_them() -> void:
+	for path in Characters.model_paths(): # the game loads them before the first spawn
+		CharacterModel.load_model(path)
 	Characters.zombie(4, 0, O.COP).free()
 	var t0 := Time.get_ticks_usec()
 	for i in 20:
@@ -208,8 +210,8 @@ func test_walkers_wear_their_outfits_models_and_share_them() -> void:
 	for id in [3, 4, 5, 6, 7, 8]:
 		var a := Characters.zombie(id, 0, O.NURSE)
 		var b := Characters.zombie(id, 0, O.NURSE)
-		var want := CharacterModel.outfit("nurse", Characters.is_female(id, O.NURSE))
-		assert_true(a.body_mesh.mesh == want.mesh, "zombie %d wears the nurse it should" % id)
+		var want := CharacterModel.outfit("nurse", Characters.is_female(id, O.NURSE), Characters.bite_for(id, O.NURSE))
+		assert_true(a.body_mesh.mesh == want.mesh, "zombie %d wears the nurse (and bite) it should" % id)
 		assert_true(a.body_mesh.mesh == b.body_mesh.mesh, "one mesh in memory for every one alike")
 		a.free()
 		b.free()

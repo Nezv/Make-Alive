@@ -263,6 +263,7 @@ const ZOMBIE_MAX := 60
 const ZOMBIE_RADIUS := 0.35
 const ZOMBIE_SEPARATION := 0.9 # zombies steer apart when closer than this
 const ZOMBIE_AGGRO_RANGE := 200.0
+const BITE_SHARE := 0.4         # share of a crowd that carries a bite (Characters.bite_for): a hole torn in clothes and flesh
 const ZOMBIE_NOTICE_RANGE := 15.0 # a player this close beats any noise: the zombie goes for them
 const FRIENDLY_FIRE_MULT := 0.5 # share of a bullet's damage a teammate takes (nightmare only)
 const WAVE_GAP := 15.0          # seconds of calm before a defended wave, unless the wave says otherwise
