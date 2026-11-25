@@ -125,6 +125,9 @@ func look(i: int) -> void:
 	elif i == 8:
 		# the head of a post (a hydrant's outlets, plate, dome); the middle of anything taller than a person
 		at = Vector3(0, size.y * (0.68 if size.y < 1.5 else 0.5), 0)
+		if model.info.has("close"): # the element says what its close-up is for (a chimney's pots)
+			var cl: Array = model.info.close
+			at = Vector3(cl[0], cl[1], cl[2])
 		eye = at + Vector3(-0.34, 0.12, -0.93)
 	elif i == 9:
 		eye = Vector3(-5.0, 1.7, -8.66)
@@ -133,6 +136,9 @@ func look(i: int) -> void:
 	camera.fov = 40.0 if i < 10 else 5.0 # the 50 m view is zoomed, so it shows the far LOD at a readable size
 	if i == 9:
 		camera.fov = 18.0
+	if i >= 9: # a wide element (a shopfront) is framed whole: the lens opens as far as it needs
+		var need := rad_to_deg(2.0 * atan(maxf(size.x, size.y) * 0.65 / eye.distance_to(at)))
+		camera.fov = maxf(camera.fov, need)
 	camera.look_at_from_position(eye, at)
 
 

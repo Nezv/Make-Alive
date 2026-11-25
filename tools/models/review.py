@@ -47,6 +47,8 @@ def sheet(name, shots_dir, out_path):
     rows = [[(os.path.join(shots_dir, v + ".png"), v) for v in row] for row in ORDER]
     rows.append([(os.path.join(shots_dir, f"state_{s}.png"), s) for s in states])
     ref_dir = os.path.join(ROOT, "references", "elements", name)
+    if not os.path.isdir(ref_dir):  # a variant (chimney_stack_long) shares its family's references
+        ref_dir = os.path.join(ROOT, "references", "elements", name.rsplit("_", 1)[0])
     refs = sorted(os.path.join(ref_dir, f) for f in os.listdir(ref_dir)) if os.path.isdir(ref_dir) else []
     refs = [r for r in refs if r.lower().endswith((".jpg", ".jpeg", ".png"))]
     small = len(refs) > 8  # many references (the kit's board): half-size tiles, four across

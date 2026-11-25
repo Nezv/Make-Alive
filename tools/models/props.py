@@ -190,6 +190,28 @@ def _part_object(pl, name, part, tags):
     return obj
 
 
+def _parts_apart(obj, n, step):
+    """For the AO bake: every moving part moved `step` metres away from the body and from each
+    other, then back. Baked at rest, a closed shutter's back and a cap's inside would be dark
+    with the wall and the body they touch, and show dark once open."""
+    me = obj.data
+    part = np.empty(len(me.polygons), np.float32)
+    me.attributes["part"].data.foreach_get("value", part)
+    of_vert = np.zeros(len(me.vertices), np.int32)
+    for poly, p in zip(me.polygons, part):
+        of_vert[list(poly.vertices)] = int(round(p))
+    co = np.empty(len(me.vertices) * 3, np.float32)
+    me.vertices.foreach_get("co", co)
+    rest = co.copy()
+    moved = co.reshape(-1, 3).copy()
+    moved[:, 0] += of_vert * step  # along Blender's X (the game's X)
+
+    def around(before):
+        me.vertices.foreach_set("co", moved.ravel() if before else rest)
+        me.update()
+    return around
+
+
 def build(name, quick=False):
     import bpy
     import pipeline as pl
@@ -210,6 +232,8 @@ def build(name, quick=False):
     os.makedirs(OUT, exist_ok=True)
     meta = {"name": name, "family": fam, "size": [float(v) for v in size], "min": [float(v) for v in lo],
             "states": spec["states"], "parts": {}, "tris": [], "emission": False}
+    if "close" in spec:  # where the rack's 1 m close-up looks (default: the head of a post, the middle of a tall thing)
+        meta["close"] = [float(v) for v in spec["close"]]
     for key in ("samples", "views"):  # the kit's board: where each sample stands, its close-ups
         if key in spec:
             meta[key] = spec[key]() if callable(spec[key]) else spec[key]
@@ -227,7 +251,8 @@ def build(name, quick=False):
             p.data.foreach_set("value", v)
         pl.unwrap(whole, scale or None, margin=spec.get("uv_margin", 0.006))
         pad = np.array([0.02, 0.02, 0.02])
-        maps = pl.bake_maps(whole, tex, lo - pad, hi + pad, attrs=("tag", "unit"))
+        apart = _parts_apart(whole, len(parts), float(max(size)) * 3 + 1) if len(parts) > 1 and spec.get("ao_apart", True) else None
+        maps = pl.bake_maps(whole, tex, lo - pad, hi + pad, attrs=("tag", "unit"), around_ao=apart)
         check_normals(maps)
         maps["edge"] = pl.bake_edges(whole, tex, radius=spec.get("edge_radius", 0.006))
         for state in spec["states"]:
@@ -333,23 +358,23 @@ def _sketch_colours(spec, ftags, units):
     return np.array(out, np.float64)
 
 
-def _opened(part):
-    """The part moved fully open (for the sketch)."""
-    if not part.motion:
+def _opened(part, amount=1.0):
+    """The part moved open (fully, or by `amount` 0..1; for the sketch and match.py)."""
+    if not part.motion or amount == 0:
         return part
     piv = np.asarray(part.pivot, np.float64)
     if "rotate" in part.motion:
         axis, deg = part.motion["rotate"]
         a = np.asarray(axis, np.float64)
         a /= np.linalg.norm(a)
-        t = np.radians(deg)
+        t = np.radians(deg) * amount
         K = np.array([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
         R = np.eye(3) + np.sin(t) * K + (1 - np.cos(t)) * K @ K
         m = part.mesh.copy()
         m.verts = [R @ (v - piv) + piv for v in m.verts]
     else:
         m = part.mesh.copy()
-        m.verts = [v + np.asarray(part.motion["move"], np.float64) for v in m.verts]
+        m.verts = [v + np.asarray(part.motion["move"], np.float64) * amount for v in m.verts]
     return Part(m, part.pivot, part.motion)
 
 

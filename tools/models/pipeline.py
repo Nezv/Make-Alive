@@ -168,11 +168,13 @@ def _use_gpu():
     return False
 
 
-def bake_maps(obj, size, lo, hi, margin=8, attrs=("piece",), ao_samples=64):
+def bake_maps(obj, size, lo, hi, margin=8, attrs=("piece",), ao_samples=64, around_ao=None):
     """Bake what the painter needs per texel: position (game coordinates), normal, ambient
     occlusion and every face attribute in `attrs` (whole numbers: the piece, a face's tag; a
     tenth each into a float image). Returns float arrays (size, size, ...) and the mask of used
-    texels."""
+    texels. `around_ao(True)` is called before the AO bake and `around_ao(False)` after it (an
+    element moves its moving parts out of the way, so a shutter's back is not baked dark from
+    the wall it lies against when closed)."""
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "GPU" if _use_gpu() else "CPU"
@@ -266,7 +268,11 @@ def bake_maps(obj, size, lo, hi, margin=8, attrs=("piece",), ao_samples=64):
     ao_img = new_image("bake_ao")
     img_node.image = ao_img
     scene.cycles.samples = ao_samples
+    if around_ao:
+        around_ao(True)
     bpy.ops.object.bake(type="AO", margin=margin, use_clear=True)
+    if around_ao:
+        around_ao(False)
     results["ao"] = read(ao_img)[..., 0]
     results["mask"] = mask
     obj.data.materials.clear()

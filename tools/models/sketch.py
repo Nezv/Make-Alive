@@ -19,17 +19,23 @@ def _look(eye, target, up=(0.0, 1.0, 0.0)):
 
 
 def render(P, T, colors, eye, target, size=(420, 640), focal=2.6, bg=(16, 17, 22),
-           key=(-0.45, 0.75, -0.5), fill=(0.6, 0.3, 0.4), ambient=0.32):
+           key=(-0.45, 0.75, -0.5), fill=(0.6, 0.3, 0.4), ambient=0.32, ortho=None, ids=False):
     """P (n, 3) points, T (m, 3) triangles, colors (m, 3) in 0..1. `focal` is the lens in
-    picture heights (bigger = narrower view). Returns an RGB uint8 picture."""
+    picture heights (bigger = narrower view). Returns an RGB uint8 picture.
+    `ortho`: pixels per metre for a flat elevation instead (no perspective; `eye` is only where
+    it looks from). `ids`: also return each pixel's triangle (-1 for the background)."""
     w, h = size
     eye, r, u, f = _look(eye, target)
     rel = P - eye
     cz = rel @ f
     cx = rel @ r
     cy = rel @ u
-    sx = w / 2 + cx / np.maximum(cz, 1e-4) * focal * h / 2
-    sy = h / 2 - cy / np.maximum(cz, 1e-4) * focal * h / 2
+    if ortho:
+        sx = w / 2 + cx * ortho
+        sy = h / 2 - cy * ortho
+    else:
+        sx = w / 2 + cx / np.maximum(cz, 1e-4) * focal * h / 2
+        sy = h / 2 - cy / np.maximum(cz, 1e-4) * focal * h / 2
     A, B, C = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
     N = np.cross(B - A, C - A)
     N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-12)
@@ -47,6 +53,7 @@ def render(P, T, colors, eye, target, size=(420, 640), focal=2.6, bg=(16, 17, 22
     img = np.empty((h, w, 3), dtype=np.float64)
     img[:] = np.array(bg) / 255.0
     zbuf = np.full((h, w), np.inf)
+    idbuf = np.full((h, w), -1, dtype=np.int64)
     for i in np.nonzero(facing)[0]:
         ia, ib, ic = T[i]
         x0, y0, x1, y1, x2, y2 = sx[ia], sy[ia], sx[ib], sy[ib], sx[ic], sy[ic]
@@ -72,7 +79,9 @@ def render(P, T, colors, eye, target, size=(420, 640), focal=2.6, bg=(16, 17, 22
         win = inside & (z < sub)
         sub[win] = z[win]
         img[lo_y:hi_y + 1, lo_x:hi_x + 1][win] = col[i]
-    return (np.clip(img, 0, 1) * 255).astype(np.uint8)
+        idbuf[lo_y:hi_y + 1, lo_x:hi_x + 1][win] = i
+    out = (np.clip(img, 0, 1) * 255).astype(np.uint8)
+    return (out, idbuf) if ids else out
 
 
 def sheet(rows, path, labels=None):

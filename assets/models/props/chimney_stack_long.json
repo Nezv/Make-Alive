@@ -1,0 +1,40 @@
+{
+ "name": "chimney_stack_long",
+ "family": "roofs",
+ "size": [
+  2.74,
+  1.8199999999999998,
+  0.7
+ ],
+ "min": [
+  -1.37,
+  0.0,
+  -0.35
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1690,
+  602,
+  344
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.4,
+  0.0
+ ]
+}

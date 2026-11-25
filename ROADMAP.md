@@ -1,4 +1,4 @@
-# Make Alive — steps
+# Make Alive — roadmap
 
 The build order for everything in `TODO.md`, cut into steps one agent can finish in one session.
 Finishing every step leaves a LAN co-op zombie extraction game set in an invented French town in the style of Paris around 1800, laid out on the bones of central Joinville.
@@ -17,7 +17,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 - `## Pnn · name` is a phase, `### [ ] Snnn · name` is a step, `- [ ]` is a feature, an indented `- [ ]` is a sub-feature. These are the map's nodes.
 - A plain `- ` bullet is a spec note of the node above it (a leaf, or hidden in the map).
-- A `> ` line under a step is its data: `needs` (step ids), `size`, `rounds` (how many look-and-fix rounds at least; such a step must have the features `Round 1` .. `Round N` and `Review`), `test`, `see`, separated by ` | `.
+- A `> ` line under a step is its data: `needs` (step ids), `size`, `rounds` (how many look-and-fix rounds at least; such a step must have the features `Round 1` .. `Round N` and `Review`), `asset` (`complex` or `simple`, on every step that makes an asset; see "Asset grade" below), `test`, `see`, separated by ` | `.
 - Nothing else has meaning. Keep ids unique and never renumber a step, append new ones.
 
 ## Rules every step obeys
@@ -34,10 +34,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - **One element, one step.** An agent given one well-bounded thing (the street signs) does it well; given "make the city detailed" it makes garbage. An element step makes one element, or one small family that shares one design. Assembly steps place finished elements. A step that would model two unrelated things is split, and the new part appended as a new step.
 - **References first.** Read every reference the step names before any geometry. Where `references/` has nothing for the element, put at least two photos of real French examples (old Paris first) in `references/elements/` first (from the user, or found, with the source on the card). Never model from memory.
 - **The card.** Every element has `references/elements/<name>.md` (from `_template.md`): its references, its measurements in metres taken against something of known size (a 2.1 m door, a 12 m bus, a 15 cm kerb, a 1.75 m person), every visible detail as a list, the materials, the triangle budget per LOD, the moving parts, the states (clean, abandoned, damaged, burnt), and one section per round.
+- **The workflow.** `references/elements/WORKFLOW.md`: references and the scale, a blockout matched against straightened photos (`tools/models/match.py`, seconds a loop) before anything is built, then the rounds below, with a checklist per round.
 - **The loop.** A round: shoot the review sheet (`python tools/models/review.py <name> --round=N`: the rack's eight angles, a 1 m close-up, 10 m and 50 m, beside the references), write on the card every difference from the references, fix them, write what was fixed. Round 1 is form (silhouette, proportions, real size), Round 2 structure (the secondary forms), Round 3 surface (wear, lettering, colour variation, states); later rounds are named in the step. A round with nothing written down does not count. The step is done when the last round's list is empty, or each leftover is marked accepted with a reason. The final sheet is shown in chat.
 - **Style match for places.** Assembly steps shoot fixed viewpoints with `--shot-cam` and review each screenshot beside the French references on the place's card, round by round, the same way. They are never rebuilt to match a Joinville photo.
 - **The data says it.** Element and assembly steps carry `rounds: N` and the features `Round 1` .. `Round N` and `Review`; `python tools/steps_map.py --check` fails a step that names rounds without them.
 - **Budgets hold.** Detail lives in silhouettes and baked textures, not in triangle soup: LODs, draw calls and triangles per LOD are on the card and checked by `tests/test_elements.gd`; repeated elements are instanced.
+- **Asset grade.** Every step that makes an asset (an element, a kit, a model) says `asset: complex` or `asset: simple`; assembly steps that only place finished elements carry none.
+  - `complex`: organic or deforming (skinned bodies, cloth, foliage), several linked moving parts or seen up close in first person (guns, hands, vehicles, the elevator), a whole building, room or structure fitted to the map's own data (streets, river, terrain, catenaries), or a parametric kit many other elements build on (windows, shopfronts, roofs, vehicles).
+  - `simple`: a rigid object or a small family of rigid objects built from the kit's helpers, with at most one moving part, or a variant of a finished kit (the ambulance on the van).
+  - A new asset step is graded when it is appended. `python tools/steps_map.py --stats` counts both.
 - **Later steps too.** Every weapon of P09 gets its model from its own element step, appended before its gameplay step starts. Effects and surfaces (P10) take rounds the same way on their racks when they are started.
 
 ---
@@ -296,7 +301,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [x] `--noise` debug flag draws expanding rings where noise happened
 
 ### [ ] S152 · Containers: lootbox, ammo crate, ammo cartons
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=containers`, `--host --map=corridor --shot-at=2`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=containers`, `--host --map=corridor --shot-at=2`
 - Today these are boxes in `lootbox.gd`, `ammo_crate.gd`, `ammo_box.gd`; the same nodes and states get new looks.
 - [ ] Card: a steel supply box, a military ammunition crate, a carton per calibre; references of each
 - [ ] Round 1 · form: sizes against a hand and a rifle; the lids and their hinge lines
@@ -306,7 +311,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the corridor shot and the rack at 1 m
 
 ### [ ] S153 · Carried things: medkit, bandage, pills, planks, backpack
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=carried`, `--host --map=corridor --wheel --shot-at=3`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=carried`, `--host --map=corridor --wheel --shot-at=3`
 - [ ] Card: a red medical bag with a white cross, a bandage roll, a pill bottle, rough planks with nails, a hiking backpack; references of each
 - [ ] Round 1 · form: sizes in a hand (the first-person heal and the wheel show them close)
 - [ ] Round 2 · structure: zips, straps and buckles, the roll's loose end and gauze weave, the bottle's cap and label, nail heads and split ends on the planks
@@ -399,7 +404,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - The city has no closets yet, so there the director still asks `CityMap.zombie_spawn_point` (a street corner out of sight); the closets come with S051
 
 ### [ ] S154 · Helicopter model 2
-> needs: S141, S179 | size: L | rounds: 4 | test: `tests/test_helicopter.gd` | see: `--prop-rack=helicopter`, `--host --map=corridor --heli --shot-at=3,6,9`
+> needs: S141, S179 | size: L | asset: complex | rounds: 4 | test: `tests/test_helicopter.gd` | see: `--prop-rack=helicopter`, `--host --map=corridor --heli --shot-at=3,6,9`
 - Today it is twenty boxes (S024), and it ends every mission. `Helicopter`'s nodes and `HeliFlight` stay; the look is rebuilt.
 - [ ] Card: a medium military transport helicopter of a French-style army (no one army's markings copied) (photos in `references/elements/` first), its real length and rotor span
 - [ ] Round 1 · form: the fuselage's curves, the nose and its glazing, the cabin, the tail boom's taper, the fin and stabiliser, the engine housing; skids or wheels as in the photos
@@ -534,7 +539,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
   - `PlayerWire` 26 bytes (u16 action: AIM, RELOAD, SHOVE, THROW, VAULT added; s8 look pitch), protocol 5; `Humanoid.Upper` layered by `_write_upper` over the legs, `look_pitch`, `kick`; `RemotePlayer.upper_for`, `_place_gun`; the death falls along `players[id].last_push`; `--survivor-rack`. Aiming arms and gun line up roughly, not exactly (the gun hangs from the spine, not the hands)
 
 ### [ ] S142 · First-person hands and sleeves
-> needs: S140, S136 | size: L | rounds: 4 | test: `tests/test_viewmodel.gd` | see: `--weapon=4 --pose=aim`, `--hands-rack`
+> needs: S140, S136 | size: L | asset: complex | rounds: 4 | test: `tests/test_viewmodel.gd` | see: `--weapon=4 --pose=aim`, `--hands-rack`
 - Today each arm is two boxes (a glove and a sleeve, `Viewmodel._make_arm`) while the zombies have real hands: the most-seen model of the game is the worst one.
 - [ ] Card: the hand of `tools/models/body.py` (the bodies' measured proportions), forearm and wrist; references of hands on a pistol grip, a rifle grip and a handguard
 - [ ] Rig: wrist, palm, five fingers in three segments, the thumb with its base; grip poses as data per gun and per moment (hip, aim, trigger pulled, magazine grab, pump, bolt, shove, bandage), blended like the rest of the viewmodel
@@ -547,7 +552,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S143 · Gun model 2: P19 pistol
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=1 --pose=aim`, `--weapon=1 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=1 --pose=aim`, `--weapon=1 --pose=reload`
 - [ ] Card: photos of the real gun (a modern polymer-frame pistol) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: slide, frame, the grip's angle and beavertail, trigger guard, the magazine in the grip; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: front and rear slide serrations, the ejection port with the barrel's hood, sights with white dots, takedown lever, slide stop, magazine release, the accessory rail's slots, the trigger with its safety blade
@@ -556,7 +561,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S144 · Gun model 2: P90
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=2 --pose=aim`, `--weapon=2 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=2 --pose=aim`, `--weapon=2 --pose=reload`
 - [ ] Card: photos of the real gun (the bullpup personal defence weapon) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the bullpup shell, the thumbhole grip, the translucent magazine along the top, the stubby barrel and flash hider; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the ring sight on top, both charging handles, the cartridges visible in the magazine, the ejection chute under the stock, the fire selector disc, sling points
@@ -565,7 +570,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S145 · Gun model 2: Type 95
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=3 --pose=aim`, `--weapon=3 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=3 --pose=aim`, `--weapon=3 --pose=reload`
 - [ ] Card: photos of the real gun (the bullpup assault rifle) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the bullpup body, the carry handle with its sight, the magazine behind the pistol grip, the cheek rest, the short barrel; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the rear aperture and front post, the charging handle under the carry handle, the ejection port, the selector behind the magazine, vent slots in the handguard, the flash hider
@@ -574,7 +579,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S146 · Gun model 2: AK47
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=4 --pose=aim`, `--weapon=4 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=4 --pose=aim`, `--weapon=4 --pose=reload`
 - [ ] Card: photos of the real gun (the rifle) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the receiver, the gas tube over the barrel, wooden handguards and stock, the curved magazine, the pistol grip; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the dust cover's ribs and rivets, the rear sight leaf with its range scale, the hooded front post, the slant brake, the cleaning rod, the selector lever, the charging handle, sling loops, the trigger guard
@@ -583,7 +588,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S147 · Gun model 2: AS Val
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=5 --pose=aim`, `--weapon=5 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=5 --pose=aim`, `--weapon=5 --pose=reload`
 - [ ] Card: photos of the real gun (the suppressed rifle) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the integral suppressor along the whole front, the receiver, the skeleton stock folded or out, the 20-round box magazine; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the suppressor's perforated sleeve and end cap, the side scope rail, the iron sights on the suppressor, the safety lever, the charging handle, the stock's tube frame and butt plate
@@ -592,7 +597,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S148 · Gun model 2: USAS-12
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=6 --pose=aim`, `--weapon=6 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=6 --pose=aim`, `--weapon=6 --pose=reload`
 - [ ] Card: photos of the real gun (the automatic shotgun) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the long boxy receiver, the carry handle, the pistol grip and fixed stock, the box magazine; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the handle's sight channel, the front sight, the charging handle, the barrel shroud's vents, sling swivels, the magazine release
@@ -601,7 +606,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S149 · Gun model 2: SPAS-12
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=7 --pose=aim`, `--weapon=7 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=7 --pose=aim`, `--weapon=7 --pose=reload`
 - [ ] Card: photos of the real gun (the pump shotgun) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the receiver, the perforated heat shield over the barrel, the pump fore-end, the tube magazine, the pistol grip, the folding stock with its hook; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the heat shield's holes, the fore-end's ribs, the pump and semi selector, the sights, the stock's hinge and hook, sling swivels
@@ -610,7 +615,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S150 · Gun model 2: Orsis T-5000
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=8 --pose=aim`, `--weapon=8 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=8 --pose=aim`, `--weapon=8 --pose=reload`
 - [ ] Card: photos of the real gun (the bolt-action sniper rifle) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the chassis stock with its skeleton butt, the long free-floated barrel, the big scope, the bolt with its large knob, the box magazine, the bipod; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the adjustable cheek riser and butt pad, the top rail, the scope's turrets and caps, the muzzle brake's ports, the folding hinge, the bipod's legs and feet
@@ -619,7 +624,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 
 ### [ ] S151 · Gun model 2: Dragunov
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=9 --pose=aim`, `--weapon=9 --pose=reload`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--gun-rack`, `--weapon=9 --pose=aim`, `--weapon=9 --pose=reload`
 - [ ] Card: photos of the real gun (the marksman rifle) from the left, the right and three-quarter, sizes from its overall length; the magazine and the moving action stay separate parts
 - [ ] Round 1 · form: the long thin barrel, the skeleton wooden thumbhole stock, the handguards, the scope offset to the left, the 10-round magazine; the profile matches the photo at the same scale
 - [ ] Round 2 · structure: the slotted flash hider, the bayonet lug, the handguards' vent holes, the cheek piece, the scope's rubber eyecup and turrets, the dust cover, the safety lever
@@ -656,7 +661,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - Done: 328 traced streets (76 main) and the hill road, `StreetNet` for junctions and strips, meshes in `CityMap._street_surfaces`. A first version invented an old core, a boulevard ring with a rond-point and faubourgs, inside a map cut to the hull of the POIs; both were dropped for Joinville's streets and the whole picture. Buildings still stand on the 4 m grid's BLOCK cells until S043 builds the îlots along the street lines. The detail area is a parameter of `CityMap` that nothing sets yet (S051 will).
 
 ### [ ] S041 · Road surface
-> needs: S040, S155 | size: L | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over the rue du Marché, `--street-rack`
+> needs: S040, S155 | size: L | asset: complex | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over the rue du Marché, `--street-rack`
 - [ ] Surfaces as vertex colour and one shared material, no textures
   - [ ] Pavés: square sandstone and granite setts in rows on the old streets, the squares and the quays, slightly domed each, the joints dark; drawn in vertex colour with height noise
   - [ ] The old lanes dished to a gutter (ruisseau) down the middle, as before pavements
@@ -674,7 +679,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the street rack sheet and the rue du Marché shot
 
 ### [ ] S042 · Sidewalks
-> needs: S040, S156 | size: M | rounds: 3 | test: `tests/test_sidewalks.gd` | see: `--host --shot-cam` on a street corner, `--street-rack`
+> needs: S040, S156 | size: M | asset: complex | rounds: 3 | test: `tests/test_sidewalks.gd` | see: `--host --shot-cam` on a street corner, `--street-rack`
 - [ ] Kerb as a real 12 to 15 cm step of long granite blocks, players and zombies walk it without a jump
 - [ ] Paving kinds by street
   - [ ] Poured grey asphalt pavements with the granite kerb, the Parisian kind
@@ -689,7 +694,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the street rack and the corner shot beside the references
 
 ### [x] S043 · Block massing
-> needs: S039, S040 | size: L | rounds: 2 | test: `tests/test_city_blocks.gd` | see: `tools\shots.ps1 city_`, `--city-plan`
+> needs: S039, S040 | size: L | asset: complex | rounds: 2 | test: `tests/test_city_blocks.gd` | see: `tools\shots.ps1 city_`, `--city-plan`
 - The traced footprints say how dense each part of town is and where the big buildings sit; the blocks are Paris's before Haussmann, not Joinville's lots.
 - [x] Îlots: each block between the new streets is closed by a row of narrow houses along its edge with courtyards and passages inside, seeded widths per house (two to four windows); footprints from `CityOsm` inside it set its density and where a big hall, court or garden breaks the row
 - [x] Height from a class picked by street, place and seed
@@ -721,7 +726,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the three views, day and night
 
 ### [ ] S045 · The river
-> needs: S040, S004, S165, S174 | size: L | rounds: 3 | test: `tests/test_river.gd` | see: `--host --shot-cam` on a bridge
+> needs: S040, S004, S165, S174 | size: L | asset: complex | rounds: 3 | test: `tests/test_river.gd` | see: `--host --shot-cam` on a bridge
 - The river runs where Joinville's does; its banks are Paris's quays.
 - [ ] Channel cut below street level: high stone quay walls with mooring rings, cobbled ramps (ports) and stairs down to a lower quay at the water, the quay road above with its parapet; grass banks and willows out of the centre
 - [ ] Water: one mesh, shader in code with slow flow along the river line, small ripples, dark green-brown, sky and lamp reflections as stretched streaks
@@ -787,7 +792,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the style match sheet
 
 ### [x] S050 · Sky and time of day
-> needs: S004 | size: L | rounds: 3 | test: `tests/test_sky.gd` | see: `python tools/sky_review.py N [--missions]`, `--time=clear|overcast|dusk|night|storm`
+> needs: S004 | size: L | asset: complex | rounds: 3 | test: `tests/test_sky.gd` | see: `python tools/sky_review.py N [--missions]`, `--time=clear|overcast|dusk|night|storm`
 - [x] Sky shader in code: gradient, sun or moon disc, stars that twinkle, two drifting cloud layers lit from below by the town at night
 - [x] Presets per mission in map data: overcast day, orange dusk with long shadows, moonlit night, storm
 - [x] One directional light per preset, shadows only by day and dusk
@@ -820,7 +825,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Bot scenario: walk the whole mission route without getting stuck
 
 ### [ ] S155 · Road details: manholes, drains, humps
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=road_details`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=road_details`
 - [ ] Card: photos of French manhole covers (regards), kerb drains (bouches d'égout) with their cast-iron mouths, the stone gutter channels, raised crossings
 - [ ] Round 1 · form: round and square covers with their frames, the kerb drain's mouth and its stone, the gutter's dish, the raised crossing's ramps
 - [ ] Round 2 · structure: cast patterns and lettering on the covers (the town's invented name and arms), the grate bars, the crossing's painted marks, setts laid round the covers
@@ -829,7 +834,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack and a street strip at 1 m and 10 m
 
 ### [ ] S156 · Front walls, railings and gates
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=boundaries`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=boundaries`
 - Most houses stand on the street; walls and gates are for the courts of the hôtels, the gardens and the villas on the hill road.
 - [ ] Card: photos of old Paris street fronts: portes cochères with their great wooden leaves, a court wall with a carved gateway, stone walls with iron railings on a low plinth, garden walls with copings
 - [ ] Round 1 · form: heights (0.6 m plinths, 2 m railings, 3 to 4 m court walls), pier spacing, gate widths for a carriage and for a person
@@ -839,33 +844,36 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a street front of ten lots at 10 m and the rack at 1 m
 
 ### [ ] S157 · Window kit
-> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=windows`
+> needs: S141 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=windows`
 - [ ] Card: photos of old Paris windows: tall French casements (fenêtres à la française) with small panes, louvred wooden shutters folding against the wall, low iron railings across the opening (garde-corps), the small windows of the timber houses, post-war ribbon glazing for the few new blocks
 - [ ] Round 1 · form: sizes and proportions per kind (tall, narrow, regular), how deep each sits in the wall, sills, the plaster or stone surrounds
 - [ ] Round 2 · structure: frames and glazing bars, the shutters' louvres, hinges and catches, the garde-corps' bars and scrolls, drip edges
 - [ ] Round 3 · surface: old glass that reflects the sky unevenly, dirt in the frame corners, flaking paint on the frames and shutters, net curtains behind some
 - [ ] States: open, shut, shutters closed, broken (shards left in the frame), boarded, burnt with soot above; lit warm, TV-blue or dark at night (emission)
 - [ ] Review: each kind at 1 m and on a test wall at 10 m, by day and night
+- Under way: the tall French casement `window_french` (card `references/elements/window_french.md`, family `tools/models/props/windows.py`) has its references and round 1; the timber houses' small casement and the post-war ribbon glazing are the family's next elements, each with its own card.
 
 ### [ ] S158 · Shopfront kit
-> needs: S141, S157 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shopfronts`
+> needs: S141, S157 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shopfronts`
 - [ ] Card: photos of old Paris shopfronts: the wooden front applied to the house (devanture en applique) with pilasters, a deep fascia and the side boxes that hold the night shutters, painted in dark green, oxblood or black
 - [ ] Round 1 · form: bay widths, the glazed front and its door, the fascia, the shutter boxes, awning depths
 - [ ] Round 2 · structure: the panels and mouldings, small-paned shop windows, the wooden shutter panels put up at night, the bars across them, striped fabric awnings (stores) on arms, a stone step, counters and shelves seen through the glass
 - [ ] Round 3 · surface: gilded or painted lettering on the fascia, posters and prices in the windows, dirty glass, flaking paint, tags on the shutters
 - [ ] States: open, shutters up, half shuttered, forced (panels torn off), looted (glass out, shelves bare)
 - [ ] Review: a row of six fronts at 1 m and 10 m
+- Under way: `shopfront` (card `references/elements/shopfront.md`, family `tools/models/props/shopfronts.py`): the central-door layout with its night shutters has its references and round 1; the other layouts (tall glass without the frieze, the door off-centre, other bay widths) are parameters of the family, registered as more elements when S044 needs them.
 
 ### [ ] S159 · Roofs, dormers and balconies
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=rooftops`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=rooftops`
 - [ ] Card: photos of old Paris roofs: slate and tile, mansards with their steep and shallow slopes, dormers (lucarnes), the tall party-wall chimney stacks with rows of pots, wrought-iron balconies
 - [ ] Round 1 · form: roof faces and mansard breaks, dormers with their pediments, chimney stacks, skylights, balconies on brackets
 - [ ] Round 2 · structure: slate and tile rows, ridge and hip caps, zinc flashing and gutters, downpipes, chimney pots (mitrons) in rows, the balconies' scrolled railings and stone brackets, TV antennas and dishes
 - [ ] Round 3 · surface: moss and lichen, soot round the chimneys, black stains below the gutters, laundry and plants on some balconies
 - [ ] Review: a roofscape and a balcony at 10 m and 50 m
+- Under way: `chimney_stack`, `chimney_stack_long` and `dormer` (cards in `references/elements/`, family `tools/models/props/roofs.py`) have their references and round 1; balconies, skylights and the roof faces' slate and zinc are the family's next elements.
 
 ### [ ] S160 · Shop signs and lettering
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_shops`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_shops`
 - [ ] Card: photos of old French shop signs; the kinds: PHARMACIE with a green cross, BOULANGERIE, BOUCHERIE, CAFÉ, BRASSERIE, TABAC with its red lozenge, QUINCAILLERIE, HERBORISTERIE, OPTICIEN, COIFFEUR, never a real brand
 - [ ] Round 1 · form: lettering painted on the fascia and on the wall over the shop, wrought-iron hanging signs on brackets with a shape cut out (a key, a boot, a bunch of grapes), the pharmacy cross
 - [ ] Round 2 · structure: letters painted, gilded or raised, the brackets' scrolls and chains, the cross's box and its cable
@@ -874,7 +882,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a street of signs by day and at night
 
 ### [ ] S161 · The timber-framed house
-> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=half_timber`
+> needs: S141, S157 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=half_timber`
 - Old Paris's houses on narrow medieval lots: timber frames (pans de bois), most plastered over, a few left bare, leaning with age.
 - [ ] Card: photos of the surviving timber houses of old Paris and French old towns: the narrow front, the jettied floors, the gable or the eaves to the street
 - [ ] Round 1 · form: four or five floors on a two-window front, the upper floors jutting, the steep roof; a plastered and a bare variant
@@ -884,7 +892,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: front, side and three-quarter at 1 m and 10 m beside the references
 
 ### [ ] S162 · Plastered stone houses
-> needs: S156, S157 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=houses`
+> needs: S156, S157 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=houses`
 - [ ] Card: photos of Paris houses of the late 1700s and early 1800s: four to six floors, plaster fronts in cream and grey over stone, a stone ground floor with arches, string courses at each floor, tall French windows with iron railings, a porte cochère, a mansard roof
 - [ ] Round 1 · form: floors and their heights (the ground floor and the first floor tallest), the arched ground floor, the porte cochère; modules that fill a block's row at any width
 - [ ] Round 2 · structure: windows (S157), string courses and the cornice, the arches' keystones, the gate's leaves, downpipes, the long iron balcony on the second floor of some
@@ -893,7 +901,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a street of eight houses at 10 m and one at 1 m
 
 ### [ ] S163 · Post-war blocks
-> needs: S157, S159 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=towers`
+> needs: S157, S159 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=towers`
 - Only a few, at the edge of the old town (round the hospital and the bus station): the contrast that makes the old town read as old.
 - [ ] Card: photos of French 1960s and 70s blocks: a rendered slab with loggias, a panel block, an office building with ribbon windows
 - [ ] Round 1 · form: the facade modules by kind (loggia bays, ribbon windows, punched windows), the shop floor at the foot, the roof edge
@@ -903,7 +911,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: each kind at 10 m and 50 m beside the references
 
 ### [ ] S164 · Ateliers
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=sheds`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=sheds`
 - [ ] Card: photos of old French riverside workshops and manufactures: stone and brick halls, glazed roofs, a tall brick chimney, a yard behind a gate
 - [ ] Round 1 · form: long low halls, pitched and glazed roofs, the yard, the chimney
 - [ ] Round 2 · structure: stone piers and arched windows, the roof glazing's bars, big wooden doors, a hoist beam over a loft door, painted names without brands
@@ -911,7 +919,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the street front at 10 m and the yard at 1 m
 
 ### [ ] S165 · Bridges
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bridges`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bridges`
 - [ ] Card: photos of old Paris bridges: a stone bridge of round arches with half-round bays over the piers, and an early cast-iron footbridge
 - [ ] Round 1 · form: deck widths and spans, the arches and piers in the water, pavements; a road bridge and a footbridge
 - [ ] Round 2 · structure: stone parapets with copings and the bays' benches, the piers' cutwaters, carved masks on the cornice, lanterns on the parapet, the footbridge's iron arches and wooden deck
@@ -919,7 +927,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: each bridge from the quay and from the water at 10 m and 50 m
 
 ### [ ] S166 · Street lamps
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=lamps_street`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=lamps_street`
 - [ ] Card: the réverbère of about 1800 (a lantern with a reflector hung on a rope across the street), the lantern on an iron wall bracket (potence), the cast-iron candelabrum of the main streets and quays, the modern mast on the outer roads
 - [ ] Round 1 · form: the lanterns' shapes, the brackets' curves, the candelabrum's height, base and arms
 - [ ] Round 2 · structure: the réverbère's glass, reflector and hook, the bracket's scrolls, the candelabrum's base with its access door and fluted column, the lantern's panes and crown
@@ -928,7 +936,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: each lamp at 1 m and 10 m, and lit at night
 
 ### [ ] S167 · Lantern ropes and wires
-> needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=poles`
+> needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=poles`
 - What hangs in the air of the old town is the réverbères' ropes across the streets, run through pulleys to a locked box on the wall to lower them; wooden poles only on the hill road and the outskirts.
 - [ ] Card: engravings and photos of réverbères on their ropes, the wall boxes and pulleys, later wires on wall brackets, wooden poles with crossarms on the edge of town
 - [ ] Round 1 · form: the anchors' heights, the ropes' spans across a street, the boxes' size, the pole heights and crossarms' levels
@@ -939,7 +947,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a street of three spans and a stretch of hill road at 10 m, and a wall box at 1 m
 
 ### [ ] S168 · Traffic lights
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=traffic_lights`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=traffic_lights`
 - [ ] Card: photos of French traffic lights on short poles at the kerb, with the small repeater lights at eye height and the pedestrian heads
 - [ ] Round 1 · form: poles, signal heads with three lenses, the repeaters, pedestrian heads, the controller cabinet
 - [ ] Round 2 · structure: visors, backplates, push-button boxes, the cabinet's door and vents, bolts and clamps
@@ -948,7 +956,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a junction at 10 m and a head at 1 m, lit at night
 
 ### [ ] S169 · Street signs
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_street`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_street`
 - The model of a good element step: one family, every sign as an extremely detailed low-poly model.
 - [ ] Card: photos of the street names carved in the corner stones of old Paris, the blue enamel street plates with their green frame and the quarter's line, and French traffic signs: STOP, CÉDEZ LE PASSAGE, speed limits, no parking, one-way, raised crossing, pedestrian crossing, bus stop, the white town direction signs
 - [ ] Round 1 · form: plate and sign sizes from the French standards, mounting heights, the poles
@@ -958,7 +966,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: every sign at 1 m and 10 m, lit by the flashlight at night
 
 ### [ ] S170 · Bus stop shelter
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bus_stop`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bus_stop`
 - [ ] Card: photos of French glass bus shelters (abribus) and a plain pole stop with its sign
 - [ ] Round 1 · form: the canopy, the frame, the bench, the panels
 - [ ] Round 2 · structure: glass panels, the lit poster case, the timetable frame, the map of the lines, a bin, the stop's sign with line numbers
@@ -966,17 +974,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] States: smashed glass, the poster light flickering
 - [ ] Review: at 1 m and 10 m, by day and night
 
-### [ ] S171 · Colonne Morris
-> needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ad_column`
-- [ ] Card: photos of the dark green Paris advertising column with its fringed dome and finial
-- [ ] Round 1 · form: the drum's height and diameter, the dome, the plinth
-- [ ] Round 2 · structure: the dome's scalloped fringe and ribs, the finial, the plinth's ring, the service door, the paper edges of the posters
-- [ ] Round 3 · surface: theatre and concert posters pasted over each other (invented, no real brands), torn layers, grime at the foot
-- [ ] States: posters half torn off, a quarantine notice pasted over them, knocked over by a car
-- [ ] Review: at 1 m and 10 m
+### [x] S171 · Colonne Morris
+> needs: S141 | size: S | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ad_column`
+- [x] Card: photos of the dark green Paris advertising column with its fringed dome and finial
+- [x] Round 1 · form: the drum's height and diameter, the dome, the plinth
+- [x] Round 2 · structure: the dome's scalloped fringe and ribs, the finial, the plinth's ring, the service door, the paper edges of the posters
+- [x] Round 3 · surface: theatre and concert posters pasted over each other (invented, no real brands), torn layers, grime at the foot
+- [x] States: posters half torn off, a quarantine notice pasted over them (knocked over by a car: left to street dressing)
+- [x] Review: at 1 m and 10 m
 
 ### [ ] S172 · Kiosk
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=kiosk`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=kiosk`
 - [ ] Card: photos of the dark green Paris newspaper kiosk with its domed roof and its hatch
 - [ ] Round 1 · form: the kiosk's octagon or box, the serving hatch with its fold-up shutter, the dome and the roof's overhang
 - [ ] Round 2 · structure: newspaper racks and clips, the hatch's hinges and props, the dome's ribs and finial, the name panel, the cast-iron frame
@@ -985,7 +993,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and 10 m
 
 ### [ ] S173 · Small street furniture
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_small`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_small`
 - [ ] Card: French double benches on cast legs, the green bins on a hoop, stone bornes and cast-iron bollards, a cast-iron drinking fountain, the column fire hydrant, the yellow post box on a wall, bike racks, tree grilles, the low hoop railings round the lawns
 - [ ] Round 1 · form: each at its real size
 - [ ] Round 2 · structure: slats and brackets, the bins' hoops and lids, the fountain's basin and button, the hydrant's caps and chains, the post box's slot and door
@@ -993,7 +1001,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: everything at 1 m
 
 ### [ ] S174 · Plane tree
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=plane_tree`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=plane_tree`
 - [ ] Card: photos of French avenue and quay plane trees: the mottled bark, the high broad crown, the pollarded ones in the squares
 - [ ] Round 1 · form: heights from 12 to 25 m, the trunk's lean and fork, the crown's spread; a pollarded variant with knuckled branch ends
 - [ ] Round 2 · structure: branching, leaf clusters, the hanging seed balls
@@ -1002,7 +1010,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a row of six along the quay
 
 ### [ ] S175 · The old chestnut
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=chestnut`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=chestnut`
 - [ ] Card: photos of the old horse chestnuts (marronniers) of French squares and gardens: a thick trunk, a dome crown, the white candles of flowers in spring
 - [ ] Round 1 · form: young and centuries-old shapes, trunk girths
 - [ ] Round 2 · structure: burrs on the old trunk, branching, the hand-shaped leaves, the flower candles, the conkers on the ground
@@ -1010,7 +1018,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: young and old at 10 m and 50 m
 
 ### [ ] S176 · Street trees
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_trees`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_trees`
 - [ ] Card: the trees of French streets and courts: elm, lime, a paulownia, a flowering cherry, a fig against a court wall; young trees with stakes in their pits
 - [ ] Round 1 · form: crown shapes and sizes, trunks
 - [ ] Round 2 · structure: branching, the cherry's and paulownia's blossom, the petals' carpet on the ground (decals), stakes and guards
@@ -1018,7 +1026,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: each at 10 m and in a street
 
 ### [ ] S177 · Shrubs and flowers
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shrubs`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shrubs`
 - [ ] Card: box parterres and clipped yews of a jardin à la française, roses, lilac, ivy and wisteria on walls, geraniums in window boxes, limes trained flat, the town hall's beds
 - [ ] Round 1 · form: sizes and shapes, the parterre and hedge modules, the window box
 - [ ] Round 2 · structure: flowers, branch structure, bed edges, ivy and wisteria following a wall
@@ -1026,7 +1034,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a parterre and a window row at 1 m and 10 m
 
 ### [ ] S178 · Forest wall
-> needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=forest`
+> needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=forest`
 - The hill keeps Joinville's place and height; its forest is the oak and chestnut woods round Paris.
 - [ ] Card: photos of the forests of the Île-de-France hills: oak, beech, sweet chestnut and hornbeam, the road's edge with brambles, ferns and ivy, sandstone boulders
 - [ ] Round 1 · form: the layers (canopy, understorey, ground) and the hill's silhouette
@@ -1036,7 +1044,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the hill road views and the hill from the town hall
 
 ### [ ] S179 · Vehicle kit
-> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=vehicle_kit`
+> needs: S141 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=vehicle_kit`
 - [ ] Card: what every vehicle shares, so each vehicle step is only its body: references of wheels, lamps, French plates, interiors, wrecks
 - [ ] Round 1 · form: a test car built from the kit: wheels, glass, lights, plates, mirrors
 - [ ] Round 2 · structure: rims (steel, alloy) with tyres whose tread and sidewall lettering show, hubcaps; headlamp and tail clusters with emission and indicators that blink for the hazard state; long white plates with a blue band at each end and seeded letters (an invented code and region number, no real one); door seams and handles cut as parts so doors open; seats, dash and steering wheel
@@ -1044,7 +1052,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the test car in every state at 1 m and 10 m
 
 ### [ ] S180 · Hatchback and estate
-> needs: S179 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=cars`
+> needs: S179 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=cars`
 - [ ] Card: photos of the commonest small hatchback and family estate on French streets (no badges, no brand's shapes copied)
 - [ ] Round 1 · form: proportions, the glasshouse, the wheel arches
 - [ ] Round 2 · structure: bumpers, grilles, lamps, door lines, mirrors, roof rails
@@ -1053,7 +1061,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: both bodies and the variants at 1 m and 10 m, in every state
 
 ### [ ] S181 · Pickup and van
-> needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=pickup_van`
+> needs: S179 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=pickup_van`
 - [ ] Card: a midsize double-cab pickup and a panel van
 - [ ] Round 1 · form: proportions, the bed, the van's box
 - [ ] Round 2 · structure: bed rails, tow hitch, roof rack, sliding door, rear doors
@@ -1061,7 +1069,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and 10 m in every state
 
 ### [ ] S182 · Ambulance
-> needs: S179, S181 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ambulance`
+> needs: S179, S181 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ambulance`
 - [ ] Card: photos of French box ambulances
 - [ ] Round 1 · form: the van with its raised box
 - [ ] Round 2 · structure: light bars, the rear doors open on the stretcher, the side door, the inside (stretcher, cabinets, oxygen)
@@ -1069,7 +1077,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: doors open and shut, lights on, at 1 m and 10 m
 
 ### [ ] S183 · Scooter and moped
-> needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=motorbike`
+> needs: S179 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=motorbike`
 - [ ] Card: the common 125 cc scooter, and a delivery moped with its box
 - [ ] Round 1 · form: frame and bodywork, seat, wheels
 - [ ] Round 2 · structure: forks, exhaust, mirrors, lights, the leg cover, the top box and the delivery box
@@ -1078,7 +1086,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and 10 m
 
 ### [ ] S184 · Evacuation remains
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=remains`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=remains`
 - [ ] Card: suitcases (hard and soft), prams, shoes, piles of clothes, supermarket trolleys, a teddy bear, mattresses roped to roofs, water bottles, plastic chairs, a small aluminium boat
 - [ ] Round 1 · form: each at its real size
 - [ ] Round 2 · structure: zips, wheels, handles, straps, the trolley's wire mesh, the bear's seams
@@ -1086,7 +1094,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a spill along a car at 1 m
 
 ### [ ] S185 · Barricades and checkpoint gear
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=checkpoint`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=checkpoint`
 - [ ] Card: concrete barriers, the grey metal crowd barriers of French streets, red-and-white works barriers, sandbags, concertina wire on pickets, water-filled plastic barriers, cones, police tape, body bags, tarps, and the old-town classic: a barricade of setts torn up from the street, carts and furniture (shared with the barracks)
 - [ ] Round 1 · form: sizes, how sandbags and setts stack and slump
 - [ ] Round 2 · structure: the barriers' feet and hooks, sandbag seams and ties, the wire's coils and barbs, the tape's sag, the sett barricade's pile with a cart wheel and a wardrobe in it
@@ -1094,7 +1102,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a checkpoint of each at 1 m and 10 m
 
 ### [ ] S186 · Posters, flyers and painted words
-> needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=decals`
+> needs: S141 | size: S | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=decals`
 - [ ] Card: spray-painted QUARANTAINE, NE PAS ENTRER, MORTS À L'INTÉRIEUR, arrows to ZONE SÛRE, missing-person flyers (DISPARU), official notices (AVIS À LA POPULATION) with the town's invented arms, old election posters, DÉFENSE D'AFFICHER painted on the walls
 - [ ] Round 1 · form: sizes, and where they go (walls, shutters, cars, the road)
 - [ ] Round 2 · structure: paint drips, layered and torn posters, tape holding the flyers
@@ -1102,7 +1110,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a wall of them at 1 m
 
 ### [ ] S187 · The market fountain
-> needs: S141 | size: M | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=monument`
+> needs: S141 | size: M | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=monument`
 - [ ] Card: photos of the Paris fountains of about 1800: a stone basin with a column or an obelisk in the middle, lion-mask spouts, a figure on top, the iron railing round it
 - [ ] Round 1 · form: the basin's plan and rim height, the column's height and section, the steps round it
 - [ ] Round 2 · structure: the spouts and their masks, the column's courses and capital, carved garlands and an inscription on the base, the railing
@@ -1111,7 +1119,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the square's corners and at 1 m
 
 ### [ ] S188 · The church
-> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=church`
+> needs: S141 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=church`
 - [ ] Card: photos of old Paris parish churches: a Gothic nave and apse with flying buttresses, a classical front of columns and a pediment added in the 1700s, a square bell tower (put them in `references/elements/` first)
 - [ ] Round 1 · form: its silhouette and roof as seen from the street and from the hill; the tower is the town's landmark
 - [ ] Round 2 · structure: the front's columns, pediment and portal, the tracery windows, the buttresses and pinnacles, the belfry's louvres, the doors and steps of the parvis
@@ -1119,7 +1127,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: beside the references at 10 m and 100 m
 
 ### [ ] S189 · The old cemetery
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=cemetery`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=cemetery`
 - [ ] Card: photos of the Paris cemeteries of the early 1800s: family chapels like little houses, obelisks, columns, iron crosses and railings round graves, cobbled alleys under trees, the gate and the wall
 - [ ] Round 1 · form: the chapels', tombs' and stones' shapes and sizes, their rows on the slope along the alleys
 - [ ] Round 2 · structure: carved lettering and urns, the chapels' doors and stained glass, the iron crosses' scrolls and railings, the gate's bars and posts
@@ -1127,7 +1135,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: an alley at 1 m and the slope at 30 m
 
 ### [ ] S190 · Jardin public gate and pond
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=park`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=park`
 - [ ] Card: photos of French public gardens: the gilded iron gate between stone piers, a round basin with a stone rim, a bandstand (kiosque à musique), gravel paths, iron chairs (put them in `references/elements/` first); tile 1 shows where the garden lies
 - [ ] Round 1 · form: the gate, the basin's edge, the bandstand and the ring of paths
 - [ ] Round 2 · structure: railings, signs, the basin's rim and jet, the bandstand's columns and roof, the chairs
@@ -1175,7 +1183,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the six rooms at eye height
 
 ### [ ] S191 · Doors and frames
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=doors`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=doors`
 - The corridor's door (`door.gd`) is a box today; it moves to this kit with its hinge and states.
 - [ ] Card: wooden swing doors, double doors, glass doors with push bars, fire doors with wired glass, roller shutters, frames and architraves, handles and locks
 - [ ] Round 1 · form: sizes (0.8 to 0.9 m by 2.1 m, doubles, shop shutters), frame depths
@@ -1185,7 +1193,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: each on the rack at 1 m, and the corridor's door in its four states
 
 ### [ ] S192 · Stairs, railings, ceilings and floors
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=stairs`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=stairs`
 - [ ] Card: the concrete stairs of public buildings, steel tube handrails, glass and concrete balustrades, suspended ceilings, granilite and tile floors
 - [ ] Round 1 · form: straight and dog-leg flights to the building pipeline's floor heights, landings, nosings
 - [ ] Round 2 · structure: handrail brackets and ends, balusters, ceiling grids with tiles and light openings, skirting, floor joints
@@ -1193,7 +1201,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a stairwell from bottom to top and a corridor ceiling at eye height
 
 ### [ ] S193 · Office and public furniture
-> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=office`
+> needs: S141 | size: L | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=office`
 - [ ] Card: desks with drawers, wheeled office chairs, filing cabinets, counters, shelves, computers and monitors, beam seating, a vending machine, a water cooler
 - [ ] Round 1 · form: real sizes
 - [ ] Round 2 · structure: drawers and handles, chair mechanisms and castors, cabinet labels, cables, the vending machine's window and coils
@@ -1202,7 +1210,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: an office corner at eye height
 
 ### [ ] S194 · Light fittings and signs
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=fittings`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=fittings`
 - [ ] Card: recessed and hanging tube fixtures, emergency lights, exit signs (the green running figure, SORTIE DE SECOURS), switches, fire alarm points, extinguishers
 - [ ] Round 1 · form: sizes and mountings
 - [ ] Round 2 · structure: diffusers and bare tubes, chains and wires, the exit sign's box, switch plates
@@ -1211,7 +1219,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a ceiling at night with every state
 
 ### [ ] S195 · Elevator
-> needs: S141, S191 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=elevator`
+> needs: S141, S191 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=elevator`
 - [ ] Card: a hospital elevator: the car, the landing doors, the shaft
 - [ ] Round 1 · form: a car a bed fits in, the shaft and pit, landing doors
 - [ ] Round 2 · structure: the car's panel, mirror and handrail, the door tracks and the gap to pry, guide rails, cables, the ladder in the shaft
@@ -1220,7 +1228,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the landing and from inside
 
 ### [ ] S196 · Clutter
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=clutter`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=clutter`
 - [ ] Card: papers and folders, broken glass, food packaging, phones, cups, bags, a fallen picture frame, cables
 - [ ] Round 1 · form: sizes, and how they lie on a floor
 - [ ] Round 2 · structure: folded and crumpled papers, shards, packaging shapes
@@ -1238,7 +1246,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] State through `get_state` / `apply_state`
 
 ### [ ] S197 · Bus station: roof slab and fascia
-> needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_roof`
+> needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_roof`
 - The town's gare routière is a 1970s concrete canopy dropped into the old fabric by the main street; `terminal1.png` gives only the idea (a long slab on steel columns over platform islands) and the scale.
 - [ ] Card: photos of French bus stations of the 1960s and 70s: a long concrete canopy, its edge band, the soffit; measured against 12 m buses under it
 - [ ] Round 1 · form: the two slab halves and the gap of the skylight between them, the soffit, the fascia band along the main street
@@ -1248,7 +1256,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack sheet and a view from the main street beside the references, with the old houses behind
 
 ### [ ] S198 · Bus station: steel columns and trusses
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_columns`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_columns`
 - [ ] Card: the columns of French canopy stations: steel trees opening from a node, on concrete pedestals (photos first)
 - [ ] Round 1 · form: the tree's height and spread, the pedestal, where the arms meet the slab
 - [ ] Round 2 · structure: I-section or tube members, gusset plates at the node, bolts, base plates, the trusses along the slab edges with their bracing
@@ -1256,7 +1264,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and from the platforms
 
 ### [ ] S199 · Bus station: the skylight
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_skylight`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_skylight`
 - [ ] Card: the glazed lantern in the gap between the slab halves (photos of French station roof lights)
 - [ ] Round 1 · form: the frame's size and depth, how it sits or hangs
 - [ ] Round 2 · structure: glass panes in frames, lattice members, fixtures inside, the hangers
@@ -1265,7 +1273,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from below on the platforms
 
 ### [ ] S200 · Bus station: platforms, bays and setts
-> needs: S141 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_platforms`
+> needs: S141 | size: L | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_platforms`
 - [ ] Card: photos of French bus station ground: granite setts in the bays, raised platform islands with high kerbs, the quay letters on posts
 - [ ] Round 1 · form: the islands' heights and widths, bays long enough for 18 m articulated buses, kerb radii
 - [ ] Round 2 · structure: the setts' rows and worn joints, tactile strips, drainage channels with grates, stop posts with their signs, quay letters, painted lines
@@ -1273,7 +1281,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: along a platform, wet
 
 ### [ ] S201 · Bus station: ticket office, kiosks and toilets
-> needs: S141, S158 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_kiosks`
+> needs: S141, S158 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_kiosks`
 - [ ] Card: photos of French bus station buildings: the ticket office (GUICHETS), ticket machines, a snack kiosk and a café counter, the toilet block
 - [ ] Round 1 · form: sizes and their places on the islands
 - [ ] Round 2 · structure: the office's glass with its counter, the ticket machines' screens and slots, the kiosks' counters and shutters, the toilet block's doors and vents
@@ -1282,7 +1290,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a platform at eye height
 
 ### [ ] S202 · Bus station: route boards and wayfinding
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_signs`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_signs`
 - [ ] Card: French bus station signs: quay letters, line boards, the departure display (DÉPARTS); the destinations are invented quarters and villages (Vieille Ville, Gare, Faubourg Saint-Rémy, La Butte, Les Moulins, Saint-Martin-des-Prés, Zone Industrielle...)
 - [ ] Round 1 · form: board sizes and heights, the quay letters
 - [ ] Round 2 · structure: line numbers and destinations as lettering, the LED departure board, arrows, frames and hangers
@@ -1290,7 +1298,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the platforms at 5 m
 
 ### [ ] S203 · The city bus
-> needs: S179 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=bus`
+> needs: S179 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=bus`
 - The town's buses fill the bus station and the jams; one livery, the town's own (white with a deep green band), no real operator's.
 - [ ] Card: photos of French low-floor 12 m city buses and the 18 m articulated one
 - [ ] Round 1 · form: the 12 m body, the big windscreen, the doors' places; the articulated variant with its bellows
@@ -1326,7 +1334,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Bot scenario finishes it on easy
 
 ### [ ] S204 · Hospital: the old Hôtel-Dieu
-> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_old`
+> needs: S141, S157 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_old`
 - The town's hospital grew over centuries: the old Hôtel-Dieu, a post-war wing and a new tower. `hospital1.jpg` and `hospital2.png` give only the arrangement (three volumes along one street, the tower tallest) and the scale.
 - [ ] Card: photos of the old French hospitals of the 1600s and 1700s (Hôtel-Dieu, hospices): long stone wings round an arcaded court, a chapel with a dome, a gate pavilion on the street
 - [ ] Round 1 · form: the wings' proportions round the court, the arcade, the chapel's dome, the gate pavilion
@@ -1336,7 +1344,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the street and the court at 10 m and 50 m beside the references
 
 ### [ ] S205 · Hospital: the post-war wing
-> needs: S141, S157 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_middle`
+> needs: S141, S157 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_middle`
 - [ ] Card: photos of French hospital wings of the 1960s and 70s: four or five floors, ribbon windows between coloured spandrel bands, a flat roof; an old house left standing beside it
 - [ ] Round 1 · form: the wing and how it meets the Hôtel-Dieu, the house
 - [ ] Round 2 · structure: the spandrels, the window bands (S157), the link bridge to the old wing, the house's windows, cornice and shopfront
@@ -1344,7 +1352,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 10 m beside the references
 
 ### [ ] S206 · Hospital: the new tower
-> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_tower`
+> needs: S141, S157 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_tower`
 - [ ] Card: photos of new French hospital buildings: about eight floors of white panels and glass, a taller core carrying the lit sign, plant on the roof, a red aircraft light
 - [ ] Round 1 · form: the volumes' heights and widths, the core
 - [ ] Round 2 · structure: the frames and mullions of the glazing, sunshade fins, the sign's letters, the roof's plant, the canopy at the foot
@@ -1353,7 +1361,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at night from the street and from the roof's height, over the old roofs
 
 ### [ ] S207 · Hospital: the street front
-> needs: S141, S166 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_front`
+> needs: S141, S166 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_front`
 - [ ] Card: photos of French hospital entrances: the drop-off canopy, the ramp, the ambulance bay, the low wall and the lamps
 - [ ] Round 1 · form: the canopy's length and height, the ramp's slope, the bay
 - [ ] Round 2 · structure: the canopy's posts, glass and gutters, railings, bollards, signs (URGENCES, RÉSERVÉ AMBULANCES)
@@ -1361,7 +1369,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the street at eye height and from the tower's roof
 
 ### [ ] S208 · Hospital: rooftop helipad
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=helipad`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=helipad`
 - [ ] Card: photos of rooftop helipads: the deck, the H in its circle, edge lights, safety netting, the windsock, the access stair
 - [ ] Round 1 · form: the deck's size for the helicopter of S154, its height above the roof
 - [ ] Round 2 · structure: the netting and its frame, edge lights, the windsock's mast, the stair and its gate, the fire hose box
@@ -1370,7 +1378,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the stair and from the helicopter's approach
 
 ### [ ] S209 · Hospital: lobby and emergency room
-> needs: S193, S194 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_er`
+> needs: S193, S194 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_er`
 - [ ] Card: photos of a French hospital's reception and urgences: the desk, waiting chairs, triage, curtained bays
 - [ ] Round 1 · form: the reception desk, the waiting rows, a curtained bay with its bed
 - [ ] Round 2 · structure: curtain rails and curtains, ER beds with rails, monitors on arms, a crash cart, wall gas outlets, signs
@@ -1378,7 +1386,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the lobby and a bay at eye height
 
 ### [ ] S210 · Hospital: ward and corridor kit
-> needs: S193, S194 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_ward`
+> needs: S193, S194 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_ward`
 - [ ] Card: ward rooms and corridors of a French hospital, and the long vaulted wards of the old Hôtel-Dieu
 - [ ] Round 1 · form: the ward bed, bedside cabinet, over-bed table, the room's window and door, the nurses' station, the old ward's vault
 - [ ] Round 2 · structure: bed rails and controls, curtain tracks, the bed-head panel with gas outlets and the nurse call, corridor handrails and bumper rails, vision panels in the doors
@@ -1386,7 +1394,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a corridor and a ward at eye height
 
 ### [ ] S211 · Hospital: medical props
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_props`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_props`
 - [ ] Card: IV stands, wheelchairs, gurneys, oxygen cylinders, medicine cabinets, sharps bins, monitors on poles
 - [ ] Round 1 · form: real sizes
 - [ ] Round 2 · structure: castors and brakes, the gurney's frame and mattress, the cylinder's valve and trolley
@@ -1395,7 +1403,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: everything at 1 m
 
 ### [ ] S212 · Hospital: generator room
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=generator`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=generator`
 - [ ] Card: an emergency diesel generator set with its fuel tank and switchgear
 - [ ] Round 1 · form: the set, the tank, the panels
 - [ ] Round 2 · structure: the radiator grille, the exhaust pipe, cable trays, breakers and gauges, the start switch the players use
@@ -1440,7 +1448,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Bot scenario finishes it on easy
 
 ### [ ] S213 · Town hall: the front's bay
-> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_bay`
+> needs: S141, S157 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_bay`
 - The town hall (`--mission=prefeitura`) is a French hôtel de ville in the classical style of about 1800: a long stone front with a central pavilion carrying a campanile, an office wing behind. Joinville's Prefeitura gives only its place between the river and the hill and its garden in front.
 - The front is one bay repeated: get one bay exactly right.
 - [ ] Card: photos of French town halls of the 1700s and early 1800s: rusticated ground floor with round-arched doors and windows, tall windows of the first floor under pediments, pilasters, the balustrade along the roof
@@ -1451,7 +1459,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a run of bays from the garden at 10 m and 1 m
 
 ### [ ] S214 · Town hall: the campanile
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_towers`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_towers`
 - [ ] Card: photos of French town hall campaniles: a square stone lantern on the central pavilion's roof, the clock face in the pediment below it, the bell, the dome and its finial
 - [ ] Round 1 · form: the campanile's height and plan, the dome
 - [ ] Round 2 · structure: the clock face and hands, the open arches and the bell, the dome's ribs and lead, the flagstaffs
@@ -1459,7 +1467,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the garden and from the quay
 
 ### [ ] S215 · Town hall: the office wing
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_frames`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_frames`
 - [ ] Card: photos of the later administrative wings behind French town halls: three or four floors of plain windows, a glazed stair tower, a link to the old house
 - [ ] Round 1 · form: the wing's length and floors, the stair tower, the link
 - [ ] Round 2 · structure: window bands and spandrels, the stair tower's mullions, the entrance canopy, the link bridge's glazing
@@ -1467,7 +1475,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the car park and at eye height
 
 ### [ ] S216 · Town hall: the roofs
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_roof`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_roof`
 - [ ] Card: aerial photos of French town halls: the slate mansard with its oeil-de-boeuf dormers, the pavilions' steeper roofs, the wing's flat roof
 - [ ] Round 1 · form: the roofs' plans and pitches, the campanile rising out of the middle
 - [ ] Round 2 · structure: slate rows, dormers, ridge and hips with lead, the balustrade behind which they rise, gutters, the flat roof's plant and vents
@@ -1475,7 +1483,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the helicopter's height
 
 ### [ ] S217 · Town hall: the garden
-> needs: S141, S177 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_lawn`
+> needs: S141, S177 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_lawn`
 - [ ] Card: photos of jardins à la française before French civic buildings: a raised terrace with stone stairs and balustrades, box parterres, gravel walks, clipped yews, a round basin, flagpoles
 - [ ] Round 1 · form: the terrace's shape and height, the stairs' flights and landings, the parterres and walks, the open lawn the helicopter lands on
 - [ ] Round 2 · structure: steps and copings, balusters, bed edging, the basin's rim, flagpoles with three flags, benches and urns
@@ -1483,7 +1491,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the town hall's door and from the quay
 
 ### [ ] S218 · Town hall: the name and the arms
-> needs: S141 | size: S | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_sign`
+> needs: S141 | size: S | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_sign`
 - [ ] Card: the carved and gilded HÔTEL DE VILLE over a French town hall's door, the motto on the frieze, and the town's coat of arms in the pediment; the arms are invented, never a real town's
 - [ ] Round 1 · form: the letters' height and spacing, the shield's shape and frame
 - [ ] Round 2 · structure: letters as geometry, the shield's charges in relief, the mural crown and the garlands round it
@@ -1491,7 +1499,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the garden and at 1 m
 
 ### [ ] S219 · Town hall: main hall and council chamber
-> needs: S192, S193 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_hall`
+> needs: S192, S193 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_hall`
 - [ ] Card: photos of French town halls' stair halls and salles du conseil (put them in `references/elements/` first)
 - [ ] Round 1 · form: the hall's height, the wide stone stair, the chamber's panelled room and its rows
 - [ ] Round 2 · structure: the stair's wrought-iron railing, reception counters, the chamber's desks with microphones, the mayor's table, flags, the bust of Marianne and the town's arms, paintings on the panelling
@@ -1528,7 +1536,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Bullets tear limbs off at any range
 
 ### [ ] S244 · Mounted machine gun model
-> needs: S141, S142 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mounted_gun`
+> needs: S141, S142 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mounted_gun`
 - [ ] Card: a heavy machine gun on a tripod with spade grips (photos first)
 - [ ] Round 1 · form: the receiver, the heavy barrel and its carrying handle, the tripod's legs and pintle, the spade grips, the ammo can on its tray
 - [ ] Round 2 · structure: the feed cover and its latch, the barrel's cooling holes, the leaf and ladder sights, the traverse and elevation gear, the belt of linked rounds, the cocking handle
@@ -1537,7 +1545,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the first-person manned view with the hands on the grips, and the rack
 
 ### [ ] S220 · Barracks: barrack blocks
-> needs: S141, S157 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_barracks`
+> needs: S141, S157 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_barracks`
 - The army barracks (`--mission=batalhao`) is a French caserne of the 1700s and the Empire: long stone blocks round a cour d'honneur. `batalhao.jpg` and `batalhao2.jpg` give only the arrangement (a quadrangle with a front building, a gym, a field behind) and the scale.
 - [ ] Card: photos of French casernes of about 1800: long three- or four-storey blocks of stone and plaster, regular windows, mansard or hipped slate roofs, a pediment on the middle pavilion
 - [ ] Round 1 · form: lengths, widths, floors, roof pitches and hips, the pavilions
@@ -1546,7 +1554,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the cour d'honneur and from above
 
 ### [ ] S221 · Barracks: the gate pavilion
-> needs: S141, S157 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_front`
+> needs: S141, S157 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_front`
 - [ ] Card: photos of French caserne gates: a two-storey stone pavilion with a great arch through it, carved trophies of arms over it, sentry boxes at both sides, wings at both ends
 - [ ] Round 1 · form: the front's length, the arch, the wings, the roof
 - [ ] Round 2 · structure: the arch and its rustication, the trophies and the carved QUARTIER name (invented), windows in stone frames, the cornice, the gate leaves under the arch, the sentry boxes
@@ -1555,7 +1563,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the street and from the cour d'honneur
 
 ### [ ] S222 · Barracks: the cour d'honneur
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_ground`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_ground`
 - [ ] Card: photos of French barracks courts: setts or gravel with painted lines, a lawn with a memorial and flagpoles
 - [ ] Round 1 · form: the court's size, the surface, the lawn
 - [ ] Round 2 · structure: joints, painted lines and markers, the memorial (a column with names), flagpoles and their bases, kerbs
@@ -1563,7 +1571,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from above
 
 ### [ ] S223 · Barracks: perimeter, gate and guard tower
-> needs: S141, S185 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gate`
+> needs: S141, S185 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gate`
 - [ ] Card: photos of French barracks perimeters: a high stone wall with a mesh fence and barbed wire on top, the vehicle gate with its guard house and boom barrier, a guard tower with a searchlight
 - [ ] Round 1 · form: wall height, gate width, the tower's height and cabin
 - [ ] Round 2 · structure: the wall's piers and coping, the fence, the barrier's arm and post, the guard house's windows, the tower's ladder and rail, the searchlight's yoke
@@ -1571,7 +1579,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the street at eye height
 
 ### [ ] S224 · Barracks: the riding hall and court
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gym`
+> needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gym`
 - [ ] Card: photos of the old riding halls (manèges) of French casernes, now gyms: a long stone hall with a big timber or iron roof, the sports court beside it
 - [ ] Round 1 · form: the roof's span and length, the end walls, the court
 - [ ] Round 2 · structure: the roof's trusses, the end walls' round windows and great doors, the court's lines, posts and nets
@@ -1579,7 +1587,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: from the cour d'honneur
 
 ### [ ] S225 · Army truck
-> needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_truck`
+> needs: S179 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_truck`
 - [ ] Card: photos of European armies' cargo trucks (no one army's markings copied)
 - [ ] Round 1 · form: cab, chassis, the cargo bed under its canvas
 - [ ] Round 2 · structure: the canvas hoops and straps, tailgate, spare wheel, jerrycans, bumpers, mirrors
@@ -1587,7 +1595,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and 10 m in every state
 
 ### [ ] S226 · Light 4×4
-> needs: S179 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_4x4`
+> needs: S179 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_4x4`
 - [ ] Card: photos of European armies' light 4×4 utility vehicles
 - [ ] Round 1 · form: body, soft top or open, wheels
 - [ ] Round 2 · structure: roll bar, gun mount, jerrycans, antennas, tow hooks
@@ -1595,7 +1603,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and 10 m
 
 ### [ ] S227 · Wheeled armoured personnel carrier
-> needs: S179 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=apc`
+> needs: S179 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=apc`
 - [ ] Card: photos of European 6×6 and 8×8 wheeled APCs (no one model copied)
 - [ ] Round 1 · form: the faceted hull, six wheels, the turret
 - [ ] Round 2 · structure: hatches, periscopes, the rear ramp, lights in their guards, smoke launchers, the turret's gun
@@ -1603,7 +1611,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: at 1 m and 10 m, the ramp down
 
 ### [ ] S228 · Military camp gear
-> needs: S141, S185 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=camp`
+> needs: S141, S185 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=camp`
 - [ ] Card: field tents, camouflage nets, ammunition crates, weapon racks, field radios, cots, jerrycans
 - [ ] Round 1 · form: sizes
 - [ ] Round 2 · structure: the tents' ropes, pegs and seams, the net's leaves, crate latches, the radio's knobs and handset
@@ -1611,7 +1619,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a corner of the camp at eye height
 
 ### [ ] S229 · Barracks interiors
-> needs: S191, S193 | size: L | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_rooms`
+> needs: S191, S193 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_rooms`
 - [ ] Card: photos of barracks rooms, an armoury and a mess hall (put them in `references/elements/` first)
 - [ ] Round 1 · form: the armoury's cage, rows of bunks and lockers, mess tables, the command room's desk and map wall
 - [ ] Round 2 · structure: gun racks and their locks, bunk frames and mattresses, the lockers' vents and names, the radio set
@@ -1639,7 +1647,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Bot scenario survives on easy
 
 ### [ ] S230 · Lookout: the telegraph tower
-> needs: S141 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_tower`
+> needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_tower`
 - The hill keeps Morro da Boa Vista's place and height (`CityHeights`); on top stands the old stone tower that carried a Chappe telegraph around 1800, now a lookout (`--mission=mirante`), with a windmill beside it.
 - [ ] Card: engravings and photos of Chappe telegraph towers and the windmills of the hills round Paris (put them in `references/elements/` first and build nothing from memory; S066 waits on this too)
 - [ ] Round 1 · form: the tower's height and plan, the deck on top, the stair inside; the windmill's tower and sails
@@ -1649,7 +1657,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: beside the references
 
 ### [ ] S231 · Lookout: summit furniture
-> needs: S141 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_summit`
+> needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_summit`
 - [ ] Card: coin binoculars, a panorama table naming what you see, the summit's railings, a guinguette with its terrace, antenna masts with red lights (photos first)
 - [ ] Round 1 · form: sizes
 - [ ] Round 2 · structure: the binoculars' head and coin box, the panorama table's engraved plate, railing posts, the guinguette's arbour, tables and lamps, the masts' lattice and guy wires
@@ -1657,7 +1665,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the summit at eye height
 
 ### [ ] S232 · Lookout: the park gate
-> needs: S141, S177 | size: L | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_gate`
+> needs: S141, S177 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_gate`
 - [ ] Card: photos of the gates of French hill parks and estates: stone piers with urns and the hill's invented name carved on them, an iron grille, a small gatekeeper's lodge (pavillon de garde), the car park's edge, a map board; `mirante_entrance.jpg` gives only the scale (a two-lane road through it)
 - [ ] Round 1 · form: the piers' and the lodge's sizes against a car, the road through
 - [ ] Round 2 · structure: the piers' caps, urns and lettering, the grille's bars and gilded tips, the lodge's windows, door and roof, a barrier added later, kerbs, the map board
@@ -1666,7 +1674,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the style match and the rack at 1 m
 
 ### [ ] S233 · Lookout: the hill road
-> needs: S141, S167 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_road`
+> needs: S141, S167 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_road`
 - [ ] Card: photos of old French roads up a wooded hill: a narrow road of setts, a gravel verge, stone gutters, a low stone parapet on the outside of bends, a mossy retaining wall uphill
 - [ ] Round 1 · form: lane widths, verges; modules that follow the road's curve and grade
 - [ ] Round 2 · structure: the setts' edges and asphalt patches, gutters, parapets on the outside of bends, the retaining wall, milestones (bornes kilométriques)
@@ -1674,7 +1682,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a bend and the hairpin at eye height
 
 ### [ ] S234 · Lookout: the trail
-> needs: S141, S178 | size: M | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=trail`
+> needs: S141, S178 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=trail`
 - [ ] Card: photos of French forest trails (put them in `references/elements/` first): dirt steps held by logs, roots, sandstone rocks, a wooden handrail, a painted waymark on a trunk
 - [ ] Round 1 · form: the steps' heights, the path's width
 - [ ] Round 2 · structure: logs and stakes, roots across the path, rocks, a fallen tree, waymarks
@@ -1729,7 +1737,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
   - `Interest.pick`; today's cap of 60 fits in one packet with eight players, so it only starts to matter above `Interest.budget`. Clients keep a zombie that missed a packet for `Config.ZOMBIE_STALE` seconds
 
 ### [x] S136 · Low-poly bodies and skeleton ✅
-> needs: none | size: L | test: `tests/test_body_model.gd` | see: `--host --body-rack`
+> needs: none | size: L | asset: complex | test: `tests/test_body_model.gd` | see: `--host --body-rack`
 - [x] `tools/models/poly.py`: low-poly kit, rings lofted into flat-shaded prisms, a tag per face ✅
 - [x] `tools/models/measure.py`: proportions, face layout and colours read off `references/zombies.png` ✅
 - [x] Generic male and female bodies (`body.py`): one closed piece per joint, shoulder ledge, torso break that bends closed ✅
@@ -1740,7 +1748,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [x] The old SDF cop model removed ✅
 
 ### [x] S137 · Outfit models ✅
-> needs: S136 | size: L | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=1`
+> needs: S136 | size: L | asset: complex | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=1`
 - [x] Garment kit `tools/models/clothes.py`, fitted by slicing the body ✅
   - [x] Shirts and jackets: long, short or no sleeves; crew, collar or high neck; tucked or over the trousers; open front ✅
   - [x] Trousers and shorts with an optional belt ✅
@@ -1754,7 +1762,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [x] Tools: `outfits.py --sketch` (posed previews without Blender), `--folds`, `--outfit-rack`, `--rack-sever` ✅
 
 ### [ ] S138 · Bite variants
-> needs: S137 | size: L | test: `tests/test_bite_variants.gd` | see: `python tools/models/outfits.py --bites nurse --f`
+> needs: S137 | size: L | asset: complex | test: `tests/test_bite_variants.gd` | see: `python tools/models/outfits.py --bites nurse --f`
 - Agent: Opus 5.5 at effort max. Geometry-heavy work with many look-and-fix rounds; it needs the whole pipeline (body, skeleton, clothes, rig, piece cuts) in its head at once. Plan first, then build one bite end to end before the other nine.
 - [ ] Optimized variant producer in `tools/models/`: from one outfit and body, many variants that share what they can
   - [ ] Clothes swaps per variant (sleeve length, open or closed, hat or none, colour sets)
@@ -1769,7 +1777,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Contact sheet of every bone, clothes and body variant of the female nurse in one isometric picture, shown in chat when done
 
 ### [ ] S139 · Outfit details: uniforms
-> needs: S137 | size: L | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=2`
+> needs: S137 | size: L | asset: complex | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=2`
 - The nine outfits are plain colours per garment today. This step does the four uniforms; the civilians are S235.
 - [ ] Card per uniform with photos of the real ones: the Santa Catarina military police, the army's field uniform, the firefighters (Corpo de Bombeiros), a prison uniform
 - [ ] Round 1 · form: the garments' cut against the photos: pocket shapes, collars, belts with their gear, boots
@@ -1778,7 +1786,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the outfit rack front and back at 1 m beside the photos
 
 ### [ ] S235 · Outfit details: civilians
-> needs: S137 | size: L | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=1`
+> needs: S137 | size: L | asset: complex | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=1`
 - [ ] Card: civilian, worker, office, nurse and doctor, with photos of each kind of clothing
 - [ ] Round 1 · form: shirt and trouser cuts, collars and cuffs, the doctor's long coat, the nurse's scrubs, the worker's overalls
 - [ ] Round 2 · structure: ties, lanyards with ID cards, a stethoscope, pens in pockets, aprons, tool belts, buttons, prints on t-shirts
@@ -1786,7 +1794,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the outfit rack front and back at 1 m
 
 ### [ ] S236 · Skirts and dresses
-> needs: S137 | size: L | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=3`
+> needs: S137 | size: L | asset: complex | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --outfit-rack=3`
 - [ ] Card: skirts (straight, flared), dresses (shift, wrap), a nurse's dress, fitted like the other garments
 - [ ] Round 1 · form: hem lengths, the waist, the flare; walk, run and crawl poses without cloth folding through the legs
 - [ ] Round 2 · structure: hems, slits, pleats, belts, buttons
@@ -1794,7 +1802,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the sketch's poses and the outfit rack
 
 ### [ ] S237 · Blood that varies per zombie
-> needs: S137 | size: L | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --zombie-rack=1`
+> needs: S137 | size: L | asset: complex | rounds: 3 | test: `tests/test_outfit_models.gd` | see: `--host --zombie-rack=1`
 - [ ] Card: how blood sits on clothes and skin: bites, wounds, feeding, drips
 - [ ] Round 1 · form: placement chosen from the id: around the mouth and chest for feeders, from wounds downward with gravity, soaked cuffs
 - [ ] Round 2 · structure: a second texture layer or decal mask so no two zombies of an outfit wear the same blood
@@ -1802,7 +1810,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: a horde where every zombie of one outfit looks different
 
 ### [ ] S238 · Special body: bloater
-> needs: S136 | size: L | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
+> needs: S136 | size: L | asset: complex | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
 - [ ] Card: references of bloated bodies in fiction: a swollen torso and neck, a split shirt, pale green skin, veins
 - [ ] Round 1 · form: the swollen belly and neck on the generic body's joints; it still bends and severs like the others
 - [ ] Round 2 · structure: the split shirt (garment kit) straining over the belly, stretch marks, the navel, sores
@@ -1810,7 +1818,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack front, side and back at 1 m
 
 ### [ ] S239 · Special body: spitter
-> needs: S136 | size: L | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
+> needs: S136 | size: L | asset: complex | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
 - [ ] Card: a long neck, a distended jaw, a burnt chest, thin limbs
 - [ ] Round 1 · form: the neck's length, the hinged jaw, the thin limbs on the generic joints
 - [ ] Round 2 · structure: the throat sac that bulges before a spit, ribs through the burnt chest, teeth
@@ -1818,7 +1826,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack front, side and back at 1 m
 
 ### [ ] S240 · Special body: brute
-> needs: S136 | size: L | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
+> needs: S136 | size: L | asset: complex | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
 - [ ] Card: a head taller, huge arms and shoulders, a small head, firefighter or riot gear fused into it
 - [ ] Round 1 · form: proportions on scaled joints, the hitboxes S078 needs
 - [ ] Round 2 · structure: armour plates as separate parts (each with its HP for S078), straps sunk into flesh, swollen veins, broken gear
@@ -1826,7 +1834,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack front, side and back at 1 m
 
 ### [ ] S241 · Special body: screamer
-> needs: S136 | size: L | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
+> needs: S136 | size: L | asset: complex | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
 - [ ] Card: gaunt, a torn hospital gown, the jaw unhinged, hands clawing at its own head
 - [ ] Round 1 · form: the gaunt body, the dislocated jaw, long fingers
 - [ ] Round 2 · structure: ribs and tendons, the gown's ties and tears, hair
@@ -1834,7 +1842,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack front, side and back at 1 m
 
 ### [ ] S242 · Special look: crawler
-> needs: S136 | size: L | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
+> needs: S136 | size: L | asset: complex | rounds: 3 | test: `tests/test_body_model.gd` | see: `--host --zombie-rack=1`
 - [ ] Card: a body without working legs: torn trousers, entrails dragging
 - [ ] Round 1 · form: the mangled or missing legs, the torso low
 - [ ] Round 2 · structure: torn trousers, entrails as a chain of segments that trail and swing
@@ -1842,7 +1850,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the rack front, side and back at 1 m
 
 ### [ ] S243 · Survivor models
-> needs: S136, S137 | size: L | rounds: 4 | test: `tests/test_body_model.gd` | see: `--host --survivor-rack`
+> needs: S136, S137 | size: L | asset: complex | rounds: 4 | test: `tests/test_body_model.gd` | see: `--host --survivor-rack`
 - [ ] Card: four distinct survivor looks, one per player slot, with living faces (photos of the kinds of clothing)
 - [ ] Round 1 · form: four bodies and outfits from the garment kit: a tactical vest, a jacket, a hoodie, backpack straps
 - [ ] Round 2 · structure: living faces (eyes, brows, a mouth that is not a zombie's), hair styles, pouches and gear

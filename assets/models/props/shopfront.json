@@ -1,0 +1,62 @@
+{
+ "name": "shopfront",
+ "family": "shopfronts",
+ "size": [
+  5.22,
+  3.564,
+  1.655
+ ],
+ "min": [
+  -2.61,
+  0.0,
+  -0.435
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "door": {
+   "pivot": [
+    0.496,
+    0.135,
+    -0.15000000000000002
+   ],
+   "rotate": [
+    [
+     0,
+     1,
+     0
+    ],
+    95.0
+   ]
+  },
+  "shutters": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "move": [
+    0.0,
+    0.0,
+    1.05
+   ]
+  }
+ },
+ "tris": [
+  1584,
+  992,
+  748
+ ],
+ "emission": false
+}
