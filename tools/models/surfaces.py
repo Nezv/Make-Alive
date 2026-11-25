@@ -10,6 +10,7 @@ Modelled (geometry, one unit per piece so the painter can vary each):
     setts             stone setts in rows or in Paris fans, each a chamfered block, on a sand bed
     pavers            interlocking concrete pavers (double-T), chamfered
     roof_tiles        flat clay tiles or canal tiles in overlapping rows; ridge_caps along a ridge
+    slates            Paris slates (ardoises) in rows a half slate on, nailed: thin, nearly flat
     corrugated, ribbed  sheet metal: a sine wave or trapezoid ribs
     grille, wire_mesh, louvres   a round cast-iron tree grate, welded mesh, a shutter's slats
 
@@ -370,6 +371,58 @@ def roof_tiles(w, length, pitch_deg, kind="flat", origin=(0, 0, 0), unit0=1, tag
                 t.loft(rings, tag)
                 m.merge(S.weld(t).set_unit(unit))
                 unit += 1
+    return m
+
+
+def slates(w, length, pitch_deg, origin=(0, 0, 0), unit0=1, tag="slate", lod=0, seed=0, size=(0.22, 0.32), gauge=0.11,
+           th=0.006, missing=()):
+    """Slates on a slope `w` wide (along x) and `length` up it from the eaves at `origin` (its
+    left end), rising towards +Z at `pitch_deg` (a mansard's brisis: about 72). Rows a half slate
+    on; each slate rests on the two under it, so its tail stands off the slope a little and the
+    rows step; each a little out of line (seeded). LOD 0: every slate its own unit; LOD 1: one
+    stepped board per row (the slates' joints baked onto it); LOD 2: the slope as one sheet.
+    `missing`: (row, column) pairs left out (a slipped slate shows the deck)."""
+    o = np.asarray(origin, np.float64)
+    rng = np.random.default_rng(seed)
+    p = np.radians(pitch_deg)
+    up_slope = np.array([0.0, np.sin(p), np.cos(p)])
+    normal = np.array([0.0, np.cos(p), -np.sin(p)])
+    sw, sl = size
+    m = Mesh()
+    rows = max(1, int(np.ceil((length - sl) / gauge)) + 1)
+    if lod >= 2:
+        q = [o, o + np.array([w, 0, 0]), o + np.array([w, 0, 0]) + up_slope * length, o + up_slope * length]
+        q = [v + normal * th for v in q]
+        return S.box((0, 0, 0), (w / 2, th / 2, length / 2), tag).transformed(
+            np.stack([np.array([1.0, 0, 0]), normal, up_slope], 1), o + np.array([w / 2, 0, 0]) + up_slope * length / 2 + normal * th)
+    unit = unit0
+    for r in range(rows):
+        lo = r * gauge
+        hi = min(lo + sl, length)
+        if hi - lo < 0.02:
+            break
+        tilt = np.radians(1.6)
+        if lod == 1:  # one board a row, its tail standing off as the slates' do
+            R = S.rotation((1, 0, 0), -tilt) @ np.stack([np.array([1.0, 0, 0]), normal, up_slope], 1)
+            c = o + np.array([w / 2, 0, 0]) + up_slope * ((lo + hi) / 2) + normal * (th * 1.5)
+            m.merge(S.box((0, 0, 0), (w / 2, th / 2, (hi - lo) / 2), tag).transformed(R, c).set_unit(unit))
+            unit += 1
+            continue
+        x = (sw / 2 if r % 2 == 0 else 0.0) + 0.002
+        col = 0
+        while x < w + sw / 2:
+            x0, x1 = max(x - sw / 2, 0.0), min(x + sw / 2, w)
+            if x1 - x0 > 0.03 and (r, col) not in missing:
+                t = tilt + rng.uniform(-0.006, 0.006)
+                yaw = rng.uniform(-0.012, 0.012)
+                R = S.rotation((1, 0, 0), -t) @ S.rotation((0, 1, 0), yaw) @ np.stack([np.array([1.0, 0, 0]), normal, up_slope], 1)
+                c = o + np.array([(x0 + x1) / 2 + rng.uniform(-0.004, 0.004), 0, 0]) + up_slope * ((lo + hi) / 2) \
+                    + normal * (th * 1.5 + 0.0015 * (r % 2))
+                half = ((x1 - x0) / 2 - 0.0015, th / 2, (hi - lo) / 2)
+                m.merge(S.box((0, 0, 0), half, tag).transformed(R, c).set_unit(unit))
+            unit += 1
+            col += 1
+            x += sw + 0.003
     return m
 
 

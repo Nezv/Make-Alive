@@ -17,14 +17,15 @@ Wikimedia Commons, `references/elements/chimney_stack/` (shared with chimney_sta
 ## Measurements
 The scale: a pot is 0.22 across (the merchants' common size); on three_pots that gives ~500 px/m and pots 0.36 tall, as in the catalogues. Read off `chimney_stack_grid_three_pots.jpg`.
 
-- size (m): 1.36 x 1.70 x 0.70
+- size (m): 1.37 x 2.34 x 0.70 (round 2: the extension pipe and its hat on the third flue stand 0.63 over the pots)
 - the body 1.16 x 1.20 x 0.50 (the party wall), the roof hiding ~0.40 of it
 - the coping 0.12 thick, 0.10 past the body all round, its top weathered down to its edges
 - pots: Ø 0.215 at the foot, 0.195 at the top under a rolled lip, 0.36 tall, 0.28 apart, on a mortar bed Ø 0.30
 
 ## Visible details
 - [x] M body with chamfered corners, coping with a weathered top, flaunching, pots with lips and dark flues (R1)
-- [ ] M zinc cowls and extension pipes on some flues, a broken pot, a TV antenna on a bracket (R2: stacks_rows, pots_antennas)
+- [x] M zinc cowls and extension pipes on some flues, a broken pot, a TV antenna on a bracket (R2: stacks_rows, pots_antennas; the cowl, broken pot and aerial on `chimney_stack_long`)
+- [x] M the render's band round the body, iron rungs on the end for the sweep (R2: stacks_rows)
 - [ ] M brick variant (stacks_street), render cracked off it in patches (R2/R3)
 - [ ] B moss on the coping, soot at the pots' mouths and streaks down the render, the render's damp line (R3)
 
@@ -62,11 +63,16 @@ Open:
 - the render reads white on the rack; three_pots' is a darker grey with damp (round 3)
 
 ## Round 2 — structure
-Sheet:
-Differences:
--
+Sheet: `references/elements/reviews/chimney_stack_r2_sketch.png` (flat-shaded close-ups from the sketch renderer; the rack's review sheet `chimney_stack_r2.jpg` needs a windowed Godot run: `python tools/models/review.py chimney_stack --round=2`, left for the user).
+Differences (against stacks_rows, pots_antennas):
+- every flue ended in a plain pot; pots_antennas has a galvanised extension on every flue with a conical hat on struts, stacks_rows one here and there
+- the body was a plain block; stacks_rows' stacks carry a band where they were raised and iron rungs up the end
 Fixed:
--
+- the third flue's extension pipe: a sleeve joint half way, a dark mouth, the hat on three struts (`_extension`)
+- the band (`BAND`) round the body, two rungs on the +X end (`_rungs`)
+- size 1.37 x 2.34 x 0.70 now (the pipe's hat); triangles 1074 / 290 / 160 (budget 1500 / 500 / 200)
+Open:
+- the brick variant with the render cracked off it (stacks_street): round 3, with the render's damp and soot
 
 ## Round 3 — surface
 Sheet:

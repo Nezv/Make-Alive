@@ -29,7 +29,7 @@ The scale: the casement taken as 0.95 x 1.9 (a porte-fenêtre), which makes the 
 - [x] M the hipped cap with fascia, rolls on hips and ridge and down the front (R1)
 - [x] M casement: frame, two leaves of three panes (fixed), the dark room (R1)
 - [x] M railing and floor plate (R1)
-- [ ] M leaves that open (as window_french), the cap's standing seams, the jambs' panel mouldings, a gutter end, slate courses where the cheeks meet the slope (R2)
+- [x] M leaves that open (as window_french), the cap's standing seams, the cornice's drip, the jambs' panel mouldings, the architrave strip, the flashing where the cheeks meet the slope (R2)
 - [ ] M variants: stone front with a segmental pediment (slate_pediments, slate_dormer), an awning (slate_pediments)
 - [ ] B zinc's dull blue-grey and its white bloom, dark streaks below the cap, plants on the railing (R3)
 
@@ -50,7 +50,9 @@ The scale: the casement taken as 0.95 x 1.9 (a porte-fenêtre), which makes the 
 | 2 | 500 | 1 | 300 m |
 
 ## Moving parts
-None yet (the leaves: round 2).
+| part | pivot | motion |
+|---|---|---|
+| leaf_l, leaf_r | the frame's jamb, behind | turn 100° into the room about Y |
 
 ## States
 clean · abandoned · damaged · burnt.
@@ -67,11 +69,21 @@ Open:
 - the room and the cheeks' backs show on the rack from behind; in a roof they are hidden (accepted)
 
 ## Round 2 — structure
-Sheet:
-Differences:
--
+Sheet: `references/elements/reviews/dormer_r2_sketch.png` (flat-shaded close-ups from the sketch renderer; the rack's review sheet `dormer_r2.jpg` needs a windowed Godot run: `python tools/models/review.py dormer --round=2`, left for the user).
+Differences (against zinc_row):
+- the casement's leaves were fixed: zinc_row shows two of the four standing open
+- the cap's side slopes were plain sheets; zinc_row's have rolls (standing seams) running from the ridge down to the eaves, and the cap's eave stands out over its fascia as a drip
+- the jambs were flat zinc; zinc_row's carry a raised panel each and a strip under the cap
+- the cheeks met the slope with nothing between; every reference has a zinc flashing there
 Fixed:
--
+- `leaf_l` and `leaf_r` as parts hinged on the frame (100° into the room), each with stiles, rails, three panes, bars and its jet d'eau; past LOD 0 merged closed (draws 3)
+- two rolls down each side slope, the cornice's drip front and sides
+- raised panel mouldings on both jambs, the architrave strip
+- a flashing strip along each cheek's foot on the slope
+- triangles 1388 / 692 / 476 (budget 3000 / 800 / 500)
+Open:
+- the slates themselves belong to the mansard's roof face (the family's next element), not to the dormer
+- a gutter end: zinc_row's dormers have none (the cap drips onto the slope); dropped
 
 ## Round 3 — surface
 Sheet:

@@ -93,6 +93,46 @@ back here or into chat.
   - see: references/elements/reviews/kit_r5*.jpg, references/shots/prop_rack_kit.png, references/shots/sketch_kit*.png
   - ref: references/elements/kit/*.jpg
   - make: python tools/models/review.py kit --round=5
+- [ ] **window_french** · The French casement, round 2 (S157) — the cast garde-corps (oval, rosette, scrolls, lattice) reads as tall_railing's; pentures and pins on the persiennes, the catch; jet d'eau on the leaves; the sill's drip; persiennes open flat against the wall without passing through it.
+  - see: references/elements/reviews/window_french_r2*.*, references/shots/sketch_window_french.png
+  - ref: references/elements/window_french/*.jpg
+  - make: python tools/models/review.py window_french --round=2
+  - src: tools/models/props/windows.py
+- [ ] **shopfront** · The shopfront, round 2 (S158) — fluted pilasters with console capitals, the fascia's rosette blocks, the rolled striped store, studded night shutters with hooked bars, letterbox and kick plate, counter and shelves behind the glass; nothing reads as a box.
+  - see: references/elements/reviews/shopfront_r2*.*, references/shots/sketch_shopfront.png
+  - ref: references/elements/shopfront/*.jpg
+  - make: python tools/models/review.py shopfront --round=2
+  - src: tools/models/props/shopfronts.py
+- [ ] **chimney_stacks** · Chimney stacks, round 2 (S159) — the extension pipes and hats, the cowl, the broken pot, the aerial on the long stack read as pots_antennas and stacks_rows; the render band and rungs.
+  - see: references/elements/reviews/chimney_stack*_r2*.*, references/shots/sketch_chimney_stack*.png
+  - ref: references/elements/chimney_stack/*.jpg
+  - make: python tools/models/review.py chimney_stack_long --round=2
+  - src: tools/models/props/roofs.py
+- [ ] **dormer** · The zinc dormer, round 2 (S159) — leaves open into the room clear of the frame; standing seams and the cornice's drip on the cap; the jambs' panels; the flashing on the slope.
+  - see: references/elements/reviews/dormer_r2*.*, references/shots/sketch_dormer.png
+  - ref: references/elements/dormer/*.jpg
+  - make: python tools/models/review.py dormer --round=2
+  - src: tools/models/props/roofs.py
+- [ ] **balcony** · Stone balconies on consoles, round 1 (S159) — the slab's moulding and rounded ends, the consoles' volutes, the railing's hearts read as consoles_front; the long one across three bays; at 50 m the railing still reads as bars.
+  - see: references/elements/reviews/balcony*_r1*.*, references/shots/sketch_balcony*.png
+  - ref: references/elements/balcony/*.jpg
+  - make: python tools/models/review.py balcony --round=1
+  - src: tools/models/props/roofs.py
+- [ ] **mansard** · The mansard bay, round 1 (S159) — slates in rows with a few missing, the zinc roll at the break, the terrasson's seams, the gutter's lip, the tabatière; slates not a checkerboard; at 80 m the slope still reads as slate.
+  - see: references/elements/reviews/mansard_r1*.*, references/shots/sketch_mansard.png
+  - ref: references/elements/mansard/*.jpg
+  - make: python tools/models/review.py mansard --round=1
+  - src: tools/models/props/roofs.py, tools/models/surfaces.py
+- [ ] **manholes** · Manhole covers and the gas valve, round 1 (S155) — the round cover in its square frame reads as round_ballu (rings, EAUX / ÉGOUTS the right way round, the studs' checker in the bake); the square one's diamonds; GAZ; the cover pried off beside an open shaft.
+  - see: references/elements/reviews/manhole*_r1*.*, references/elements/reviews/valve_cover_r1*.*, references/shots/sketch_manhole*.png
+  - ref: references/elements/manhole/*.jpg
+  - make: python tools/models/review.py manhole --round=1
+  - src: tools/models/props/road.py
+- [ ] **lamps** · The candélabre and the wall lantern, round 1 (S166) — the post's sections in louvre's proportions (pedestal, bell, collar, fluted shaft, capital), the lantern's shape; the wall bracket's scrolls; the glass glows warm at night.
+  - see: references/elements/reviews/lamp_post_r1*.*, references/elements/reviews/wall_lantern_r1*.*, references/shots/sketch_lamp_post.png, references/shots/sketch_wall_lantern.png
+  - ref: references/elements/lamp_post/*.jpg
+  - make: python tools/models/review.py lamp_post --round=1
+  - src: tools/models/props/lamps.py
 
 ## Sounds
 

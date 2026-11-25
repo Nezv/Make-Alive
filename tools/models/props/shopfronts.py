@@ -32,6 +32,9 @@ CORNICE_SIDE = 0.20      # and past the side boxes (frontal_wood, brown_frontal)
 DOOR_W = 1.00
 POST = 0.09              # the posts between the windows and the door
 ROOM_D = 1.40            # the dark shop behind the glass
+PILASTER = (0.15, 0.03)  # round 2: the fluted pilaster on each side box's outer half: width, proud
+CAPITAL = 0.13           # its console capital's height, under the box's capital band
+STORE = (0.075, 0.12)    # the rolled awning: radius, stripe width
 
 
 def _bx(x0, x1, y0, y1, z0, z1, tag, c=0.0, edges="front"):
@@ -64,6 +67,11 @@ def materials():
         "bolt": Material((0.12, 0.12, 0.12), under=(0.30, 0.18, 0.10), bare=(0.30, 0.17, 0.08), grain=0.1, fixing=True),
         "brass": Material((0.62, 0.50, 0.24), under=(0.45, 0.36, 0.18), bare=(0.5, 0.4, 0.2), chip=0.2, rusts=False, grain=0.1),
         "room": Material((0.05, 0.045, 0.04), kind="sand", chip=0.0, rusts=False, grain=0.2, sheds=False),
+        "fitting": Material((0.20, 0.13, 0.08), under=(0.30, 0.22, 0.15), bare=(0.35, 0.27, 0.18), kind="wood", chip=0.3, rusts=False, sheds=False),
+        "goods": Material((0.45, 0.40, 0.32), kind="paper", chip=0.0, rusts=False, grain=0.1, sheds=False,
+                          palette=[(0.55, 0.48, 0.36), (0.30, 0.34, 0.40), (0.58, 0.20, 0.16), (0.70, 0.66, 0.58), (0.25, 0.32, 0.22)]),
+        "store": Material((0.62, 0.16, 0.13), kind="paper", chip=0.0, rusts=False, grain=0.15,
+                          palette=[(0.62, 0.16, 0.13), (0.86, 0.82, 0.72)]),
     }
 
 
@@ -87,7 +95,11 @@ def _front(lod):
         x0, x1 = s * half, s * inner
         m.merge(_bx(x0, x1, STEP[0], FASCIA[0], ZF - 0.02, 0.0, "joinery", c))
         m.merge(_bx(x0 + s * 0.015, x1 - s * 0.015, STEP[0], STEP[0] + 0.18, ZF - 0.04, ZF, "joinery", c))
-        m.merge(_panel(x0 - s * 0.05, x1 + s * 0.05, STEP[0] + 0.26, FRIEZE_TOP - 0.18, ZF - 0.02, 0.025, lod))
+        if lod == 0:  # round 2: a fluted pilaster on the outer half, the panel on the inner (brown_frontal)
+            m.merge(_panel(x0 - s * (PILASTER[0] + 0.07), x1 + s * 0.04, STEP[0] + 0.26, FRIEZE_TOP - 0.18, ZF - 0.02, 0.025, lod))
+            m.merge(_pilaster(s, x0 - s * 0.035, lod))
+        else:
+            m.merge(_panel(x0 - s * 0.05, x1 + s * 0.05, STEP[0] + 0.26, FRIEZE_TOP - 0.18, ZF - 0.02, 0.025, lod))
         m.merge(_bx(x0 + s * 0.015, x1 - s * 0.015, FRIEZE_TOP - 0.12, FASCIA[0], ZF - 0.05, ZF, "joinery", c))
     # the stall risers, the windows' frames and their glass
     for s in (1, -1):
@@ -117,7 +129,75 @@ def _front(lod):
     m.merge(_bx(-half - 0.03, half + 0.03, FASCIA[0], FASCIA[1], ZF - 0.05, 0.0, "fascia", c))
     for y in (FASCIA[0] + 0.03, FASCIA[1] - 0.03):
         m.merge(_bx(-half - 0.04, half + 0.04, y - 0.025, y + 0.025, ZF - 0.08, ZF - 0.05, "joinery", c))
+    if lod < 2:  # round 2: the fascia's end blocks, each with a rosette (brown_frontal)
+        for s in (1, -1):
+            bx0, bx1 = s * (half - 0.02), s * (half - 0.26)
+            m.merge(_bx(bx0, bx1, FASCIA[0] + 0.06, FASCIA[1] - 0.06, ZF - 0.10, ZF - 0.05, "joinery", c))
+            if lod == 0:
+                cx, cy = (bx0 + bx1) / 2, (FASCIA[0] + FASCIA[1]) / 2
+                m.merge(S.prism((cx, cy, ZF - 0.10), 0.085, 0.012, 12, axis=(0, 0, -1), tag="joinery"))
+                m.merge(S.prism((cx, cy, ZF - 0.112), 0.055, 0.014, 8, turn=np.pi / 8, axis=(0, 0, -1), tag="joinery"))
+                m.merge(S.prism((cx, cy, ZF - 0.126), 0.022, 0.012, 6, axis=(0, 0, -1), tag="brass"))
     m.merge(_cornice(lod))
+    if lod < 2:
+        m.merge(_store(lod))
+    return m
+
+
+def _pilaster(s, x_out, lod):
+    """A fluted pilaster on a side box (x_out its outer edge), its base, and a console capital
+    with two volutes under the box's capital band (brown_frontal, yellow_pilasters)."""
+    m = Mesh()
+    w, p = PILASTER
+    a, b = x_out, x_out - s * w
+    z = ZF - 0.02
+    y0, y1 = STEP[0] + 0.18, FRIEZE_TOP - 0.12 - CAPITAL
+    m.merge(_bx(a, b, y0, y1, z - p * 0.5, z, "joinery", 0.004))  # the shaft
+    for k in range(4):  # the fillets between the flutes
+        x = a - s * (0.018 + k * (w - 0.036) / 3)
+        m.merge(_bx(x - 0.007, x + 0.007, y0 + 0.08, y1 - 0.06, z - p, z - p * 0.5, "joinery", 0.003))
+    m.merge(_bx(a + s * 0.01, b - s * 0.01, y0, y0 + 0.08, z - p - 0.012, z, "joinery", 0.006, "top"))  # the base
+    # the console: a neck, a block widening upwards, an abacus
+    m.merge(_bx(a, b, y1, y1 + 0.03, z - p - 0.005, z, "joinery", 0.004))
+    m.merge(_bx(a + s * 0.008, b - s * 0.008, y1 + 0.03, y1 + CAPITAL - 0.03, z - p - 0.03, z, "joinery", 0.008, "front"))
+    m.merge(_bx(a + s * 0.02, b - s * 0.02, y1 + CAPITAL - 0.03, y1 + CAPITAL, z - p - 0.05, z, "joinery", 0.006, "front"))
+    for x in (a, b):  # the volutes curling out at its corners
+        m.merge(S.prism((x, y1 + CAPITAL - 0.05, z - p - 0.035), 0.026, 0.03, 8, axis=(0, 0, 1), tag="joinery"))
+        m.merge(S.prism((x, y1 + CAPITAL - 0.05, z - p - 0.040), 0.012, 0.006, 6, axis=(0, 0, 1), tag="joinery"))
+    return m
+
+
+def _store(lod):
+    """The striped fabric awning (store) rolled up on its roller under the fascia, under a zinc
+    hood, its folded arms hanging down the side boxes (rolled out: a later round)."""
+    m = Mesh()
+    r, stripe = STORE
+    inner = W / 2 - 0.10
+    y = FRIEZE_TOP - 0.01
+    z = ZF - 0.05 - r
+    n = int(round(2 * inner / stripe)) if lod == 0 else 1  # far: one roll, its stripes baked from LOD 0
+    sides = 8 if lod == 0 else 5
+    for k in range(n):  # the roll: one band per stripe, alternating
+        x0 = -inner + k * 2 * inner / n
+        band = S.lathe([(0.0, r), (2 * inner / n, r)], sides, tag="store", caps=(k == 0, k == n - 1))
+        band.set_unit(k % 2)
+        m.merge(S.along(band, (1, 0, 0), (x0, y, z)))
+    if lod == 0:  # the valance hanging from the roll: scalloped edge
+        for k in range(n):
+            x0 = -inner + k * 2 * inner / n
+            v = S.box((x0 + inner / n, y - r - 0.07, z - r * 0.6), (inner / n - 0.002, 0.07, 0.003), "store")
+            v.set_unit(k % 2)
+            m.merge(v)
+    # the hood: a zinc sheet sloping over the roll
+    hood = [(0.0, 0.0), (0.0, 0.03), (-(r * 2 + 0.03), -0.04), (-(r * 2 + 0.03), -0.06), (-(r * 2 + 0.02), -0.06), (-0.003, 0.0)]
+    hood = [(-q[0], q[1]) for q in hood]
+    m.merge(S.sweep([(inner + 0.06, y + r + 0.01, ZF - 0.05), (-inner - 0.06, y + r + 0.01, ZF - 0.05)],
+                    [(-hz, hy) for hz, hy in hood], "zinc"))
+    for s in (1, -1):  # the roller's brackets and the folded arms down the boxes
+        m.merge(_bx(s * (inner + 0.02), s * (inner + 0.05), y - r, y + r + 0.01, z - 0.02, ZF - 0.05, "iron"))
+        if lod == 0:
+            ax = s * (inner + 0.035)
+            m.merge(S.pipe([(ax, y - r, z), (ax, y - 0.75, z + 0.03), (ax, y - 0.80, ZF - 0.05)], 0.012, 6, tag="iron"))
     return m
 
 
@@ -149,6 +229,26 @@ def _room(lod):
         m.merge(_bx(s * inner, s * (inner + 0.02), STEP[0], GLASS_TOP + 0.4, z0, z1, "room"))
     m.merge(_bx(-inner, inner, STEP[0] - 0.02, STEP[0], z0, z1, "room"))
     m.merge(_bx(-inner, inner, GLASS_TOP + 0.4, GLASS_TOP + 0.42, z0, z1, "room"))
+    if lod < 2:  # round 2: the shop's fittings seen through the glass, a counter and the shelves
+        f = STEP[0]
+        m.merge(_bx(-inner + 0.25, -0.75, f, f + 0.92, z0 + 0.55, z0 + 1.0, "fitting", 0.01 if lod == 0 else 0.0, "top"))
+        m.merge(_bx(-inner + 0.22, -0.72, f + 0.92, f + 0.96, z0 + 0.52, z0 + 1.02, "fitting"))
+        for k, y in enumerate((0.55, 0.95, 1.35, 1.75)):  # shelves on the back wall
+            m.merge(_bx(-inner + 0.02, inner - 0.02, f + y, f + y + 0.025, z1 - 0.32, z1, "fitting"))
+            if lod == 0:  # goods on them: boxes and jars, coloured by the seed of their place
+                x = -inner + 0.08
+                j = 0
+                while x < inner - 0.2:
+                    w = 0.10 + 0.08 * ((k * 7 + j * 3) % 4) / 3
+                    h = 0.12 + 0.18 * ((k * 5 + j * 11) % 5) / 4
+                    if (k + j) % 6 != 3:  # a gap where something was taken
+                        g = S.box((x + w / 2, f + y + 0.025 + h / 2, z1 - 0.16), (w / 2 - 0.006, h / 2, 0.12), "goods")
+                        g.set_unit(k * 13 + j)
+                        m.merge(g)
+                    x += w + 0.01
+                    j += 1
+        for x in (-inner + 0.02, 0.0, inner - 0.02):
+            m.merge(_bx(x - 0.02, x + 0.02, f, f + 2.0, z1 - 0.32, z1, "fitting"))
     return m
 
 
@@ -174,6 +274,12 @@ def _door(lod):
         hx = -d + st * 0.5
         m.merge(_bx(hx - 0.012, hx + 0.012, 1.00, 1.16, z0 - 0.03, z0 - 0.01, "brass"))
         m.merge(_bx(hx - 0.02, hx + 0.02, 0.98, 1.18, z0 - 0.01, z0, "brass"))
+        m.merge(_bx(hx - 0.016, hx + 0.016, 0.86, 0.94, z0 - 0.004, z0, "brass"))  # the lock's escutcheon
+        m.merge(_bx(hx - 0.004, hx + 0.004, 0.875, 0.905, z0 - 0.006, z0 - 0.004, "room"))
+        # round 2: the kick plate across the bottom rail, the letterbox in the lock rail
+        m.merge(_bx(-d + 0.02, d - 0.02, y0 + 0.02, y0 + 0.17, z0 - 0.003, z0, "brass"))
+        m.merge(_bx(-0.14, 0.14, lock - 0.035, lock + 0.035, z0 - 0.004, z0, "brass", 0.002, "front"))
+        m.merge(_bx(-0.11, 0.11, lock - 0.012, lock + 0.012, z0 - 0.006, z0 - 0.004, "room"))
     return m, (d, y0, z1)
 
 
@@ -191,11 +297,19 @@ def _shutters(lod):
         for k in range(n):
             p, q = xs[k], xs[k + 1]
             m.merge(_panel(p - s * 0.002, q + s * 0.002, RISER_TOP, GLASS_TOP, z1, z1 - z0, lod, "shutter", 0.06, "inset"))
+            if lod == 0:  # round 2: the studs (clous) in rows down each panel's frame (shutters_up)
+                for xx in (p + (q - p) * 0.12, q - (q - p) * 0.12):
+                    for yy in np.linspace(RISER_TOP + 0.12, GLASS_TOP - 0.12, 6):
+                        if min(abs(yy - (RISER_TOP + 0.38)), abs(yy - (GLASS_TOP - 0.38))) > 0.05:
+                            m.merge(S.prism((xx, yy, z0), 0.009, 0.006, 6, axis=(0, 0, -1), tag="bolt"))
         for y in (RISER_TOP + 0.38, GLASS_TOP - 0.38):
             m.merge(_bx(a + s * 0.03, b - s * 0.03, y - 0.025, y + 0.025, z0 - 0.012, z0, "iron", c))
             if lod == 0:
                 for x in (a + s * 0.06, b - s * 0.06):  # the bolt heads holding the bar
                     m.merge(S.prism((x, y, z0 - 0.012), 0.012, 0.01, 6, axis=(0, 0, -1), tag="bolt"))
+                for x, d in ((a, s), (b, -s)):  # round 2: the bar's hooked ends into the eyes on the box and the post
+                    m.merge(S.pipe([(x + d * 0.03, y, z0 - 0.006), (x - d * 0.01, y, z0 - 0.006), (x - d * 0.025, y, z0 + 0.02)],
+                                   0.007, 5, tag="iron"))
     return m
 
 

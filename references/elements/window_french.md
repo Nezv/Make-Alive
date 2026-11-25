@@ -42,10 +42,10 @@ Every form that catches light. M modelled, B baked; the round that does it.
 - [x] M persiennes: stiles, rails, middle rail, tilted slats (R1); one board past 15 m
 - [x] M garde-corps: rails and bars (R1, plain)
 - [x] M raised plate over the head (R1)
-- [ ] M garde-corps: the cast panel's scrolls, rosette and lattice, its fixings into the jambs (R2)
-- [ ] M persiennes: hinges (pentures) and their pins on the wall, the catch (espagnolette bar and its handle), the shutter dogs that hold them open (R2)
-- [ ] M leaves: the espagnolette rod and handle, the mouldings of the meeting stiles (gueule de loup), putty fillets, the frame's drip rail over the sill (R2)
-- [ ] M sill: the drip under its nose, its ends (R2)
+- [x] M garde-corps: the cast panel's scrolls, rosette and lattice, its fixings into the jambs (R2)
+- [x] M persiennes: hinges (pentures) and their pins on the wall, the catch on the middle rail, the bolt down the inner stile (R2); the shutter dogs belong to the wall (S162)
+- [x] M leaves: the battement over the meeting stiles, the drip moulding (jet d'eau) on each bottom rail, the hinge knuckles, the frame's sill rail washed (R2); the espagnolette is inside (not seen from the street)
+- [x] M sill: the drip groove under its nose (R2)
 - [ ] B glass that reflects the sky unevenly, net curtains behind some (R3)
 - [ ] B dirt in the frame corners, flaking paint on the frame and persiennes (worn_shutters), streaks under the sill (R3)
 
@@ -102,11 +102,21 @@ Open:
 - far windows with their persiennes open: LOD 1 and 2 for the open pose, or open and closed as two elements; decided with S044's MultiMesh placement
 
 ## Round 2 — structure (the secondary forms)
-Sheet: `references/elements/reviews/window_french_r2.jpg`
-Differences:
--
+Sheet: `references/elements/reviews/window_french_r2_sketch.png` (flat-shaded close-ups from the sketch renderer; the rack's review sheet `window_french_r2.jpg` needs a windowed Godot run: `python tools/models/review.py window_french --round=2`, left for the user).
+Differences (against tall_railing, frontal_white, worn_shutters):
+- the garde-corps was a rail and eleven plain bars; tall_railing's is a cast panel: an oval with a rosette in the middle, C-scrolls winding out of it, a lattice in each top corner, small scrolls in the corners, a moulded handrail
+- the persiennes hung on nothing: frontal_white shows three pentures on each, their pins in the rebate's edge, a catch on the middle rail, a bolt down the inner stile
+- the leaves' bottom rails were flat; every reference has the sloped jet d'eau over the sill, and the right leaf's battement covering the joint
+- the sill's underside was flat (water would run back to the wall)
 Fixed:
--
+- the garde-corps panel as flat iron bars swept along spirals and an oval (`_spiral`, `_ellipse`, `_lattice`): frame, standards, oval and inner ring, rosette of six petals, three pairs of scrolls, lattices framed, a cast leaf, fixing lugs into the jambs; LOD 1 keeps the oval and the two big scroll pairs, LOD 2 seven bars
+- pentures with their spade ends and nails, pins (gonds) with their arms into the wall, the catch with its knob and bar, the bolt (`hardware`: painted with the shutters, its fixings rust)
+- jet d'eau on each leaf, the battement on the right leaf, two hinge knuckles per leaf
+- the sill's drip groove; the frame's sill rail washed off to the front
+- triangles 5884 / 1064 / 660 (budget 6000 / 1200 / 800)
+Open:
+- the shutter dogs (arrêts) that hold the open persiennes stand on the wall 0.7 m out: the house (S162) places them, so the element's size stays the opening's
+- the rosette and leaves are prisms, not carved: enough at 1 m (round 3 bakes their relief)
 
 ## Round 3 — surface (wear, lettering, colour variation, states)
 Sheet: `references/elements/reviews/window_french_r3.jpg`

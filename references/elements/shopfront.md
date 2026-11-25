@@ -40,10 +40,12 @@ The scale: on frontal_wood the table inside is 0.75 m high and a chair's back 0.
 - [x] M head rail, frieze of fielded panels, fanlight over the door (R1)
 - [x] M fascia with mouldings, cornice with cove and zinc capping (R1)
 - [x] M night shutters: three panels over each window, two iron bars with bolt heads (R1)
-- [ ] M pilaster capitals as consoles (brown_frontal, yellow_pilasters), the fascia's end blocks (R2)
-- [ ] M small panes for the red variant, the door's letterbox, a kick plate, the shutters' studs (shutters_up), the bars' hooks into the boxes (R2)
-- [ ] M striped fabric awning (store) on arms under the cornice, rolled up or out (R2)
-- [ ] M counters and shelves seen through the glass (R2)
+- [x] M pilaster capitals as consoles (brown_frontal, yellow_pilasters), the fascia's end blocks (R2)
+- [x] M the door's letterbox, a kick plate, the lock's escutcheon, the shutters' studs (shutters_up), the bars' hooks into the boxes (R2)
+- [ ] M small panes for the red variant (a layout of the family, with S044)
+- [x] M striped fabric awning (store) rolled up on its roller under a zinc hood, its folded arms (R2)
+- [ ] M the awning rolled out on its arms (a state or a variant: S044 decides which shops have it out)
+- [x] M counters and shelves seen through the glass, goods on them (R2)
 - [ ] B lettering on the fascia (painted, gilded, raised: from S160's kit), prices and posters in the windows, dirty glass, flaking paint, tags on the shutters (R3)
 
 ## Materials
@@ -90,11 +92,25 @@ Open:
 - past LOD 0 the parts are merged at rest: far shops always show their shutters up (fitting for an abandoned town; decided with S044)
 
 ## Round 2 — structure (the secondary forms)
-Sheet: `references/elements/reviews/shopfront_r2.jpg`
-Differences:
--
+Sheet: `references/elements/reviews/shopfront_r2_sketch.png` (flat-shaded close-ups from the sketch renderer; the rack's review sheet `shopfront_r2.jpg` needs a windowed Godot run: `python tools/models/review.py shopfront --round=2`, left for the user).
+Differences (against brown_frontal, yellow_pilasters, shutters_up, frontal_wood):
+- the side boxes were plain panels; brown_frontal's and yellow_pilasters' carry a fluted pilaster under a console capital
+- the fascia ran to its ends plain; brown_frontal has a square block with a rosette at each end
+- the door had only its handle; the references show a letterbox in the lock rail and a kick plate
+- the night shutters were smooth boards; shutters_up's are studded, their bars hooked into eyes on the boxes
+- the shop behind the glass was an empty black box
+- no awning; most of the references have a striped store rolled under the fascia
 Fixed:
--
+- fluted pilasters (four fillets) with a base and a console capital with volutes on each box's outer half (`_pilaster`)
+- end blocks with a three-step rosette and a brass boss
+- letterbox, escutcheon and kick plate in brass
+- studs down each shutter panel's sides, hooked bar ends
+- a counter, three uprights and four shelves with goods (`goods`, coloured per box; a gap here and there where something was taken)
+- the store rolled on its roller in red and cream stripes, its valance, a zinc hood, brackets and the folded arms (`_store`; LOD 1 one roll, its stripes baked)
+- triangles 5896 / 1184 / 748 (budget 6000 / 1400 / 900)
+Open:
+- the awning rolled out, and the layouts (tall glass without the frieze, door off-centre, other widths): with S044
+- the goods are boxes; jars, bottles and loaves wait for the shop kinds (S160 names them)
 
 ## Round 3 — surface (lettering, posters, dirty glass, flaking paint, tags; the states)
 Sheet: `references/elements/reviews/shopfront_r3.jpg`

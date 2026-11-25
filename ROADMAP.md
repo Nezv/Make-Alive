@@ -832,6 +832,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: rust and polish where tyres pass, leaves and silt in the drains, faded paint, patches and potholes as decals with depth
 - [ ] States: a missing cover (an open hole), a drain overflowing in rain (S110)
 - [ ] Review: the rack and a street strip at 1 m and 10 m
+- Under way: family `tools/models/props/road.py`: `manhole` (round cover in its square frame, after a Paris regard: rings, EAUX / ÉGOUTS cast round the ring, slot, the checker of studs baked by `road.Checker`, the shaft and rungs; the cover a part that lies pried off), `manhole_square` (radiating diamonds) and `valve_cover` (GAZ) have references and round 1, built. Left: the kerb drain (bouche d'égout; no square-on reference found yet), the gutter's dish and the raised crossing, rounds 2 and 3.
 
 ### [ ] S156 · Front walls, railings and gates
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=boundaries`
@@ -851,7 +852,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: old glass that reflects the sky unevenly, dirt in the frame corners, flaking paint on the frames and shutters, net curtains behind some
 - [ ] States: open, shut, shutters closed, broken (shards left in the frame), boarded, burnt with soot above; lit warm, TV-blue or dark at night (emission)
 - [ ] Review: each kind at 1 m and on a test wall at 10 m, by day and night
-- Under way: the tall French casement `window_french` (card `references/elements/window_french.md`, family `tools/models/props/windows.py`) has its references and round 1; the timber houses' small casement and the post-war ribbon glazing are the family's next elements, each with its own card.
+- Under way: the tall French casement `window_french` (card `references/elements/window_french.md`, family `tools/models/props/windows.py`) has its references, round 1 and round 2 (the cast garde-corps, pentures and pins, catch and bolt, jet d'eau, battement, the sill's drip; built, sketch close-ups, the rack's sheet not shot); the timber houses' small casement and the post-war ribbon glazing are the family's next elements, each with its own card.
 
 ### [ ] S158 · Shopfront kit
 > needs: S141, S157 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shopfronts`
@@ -861,7 +862,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: gilded or painted lettering on the fascia, posters and prices in the windows, dirty glass, flaking paint, tags on the shutters
 - [ ] States: open, shutters up, half shuttered, forced (panels torn off), looted (glass out, shelves bare)
 - [ ] Review: a row of six fronts at 1 m and 10 m
-- Under way: `shopfront` (card `references/elements/shopfront.md`, family `tools/models/props/shopfronts.py`): the central-door layout with its night shutters has its references and round 1; the other layouts (tall glass without the frieze, the door off-centre, other bay widths) are parameters of the family, registered as more elements when S044 needs them.
+- Under way: `shopfront` (card `references/elements/shopfront.md`, family `tools/models/props/shopfronts.py`): the central-door layout with its night shutters has its references, round 1 and round 2 (fluted pilasters with console capitals, the fascia's end blocks, letterbox and kick plate, studded shutters, the rolled store, the shop's counter and shelves); the other layouts (tall glass without the frieze, the door off-centre, other bay widths) are parameters of the family, registered as more elements when S044 needs them.
 
 ### [ ] S159 · Roofs, dormers and balconies
 > needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=rooftops`
@@ -870,7 +871,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: slate and tile rows, ridge and hip caps, zinc flashing and gutters, downpipes, chimney pots (mitrons) in rows, the balconies' scrolled railings and stone brackets, TV antennas and dishes
 - [ ] Round 3 · surface: moss and lichen, soot round the chimneys, black stains below the gutters, laundry and plants on some balconies
 - [ ] Review: a roofscape and a balcony at 10 m and 50 m
-- Under way: `chimney_stack`, `chimney_stack_long` and `dormer` (cards in `references/elements/`, family `tools/models/props/roofs.py`) have their references and round 1; balconies, skylights and the roof faces' slate and zinc are the family's next elements.
+- Under way (family `tools/models/props/roofs.py`, cards in `references/elements/`): `chimney_stack`, `chimney_stack_long` and `dormer` have rounds 1 and 2 (extension pipes, cowl, broken pot, aerial, rungs; the dormer's leaves open, standing seams, panels, flashing); `balcony` and `balcony_long` (stone slab on scrolled consoles, railing of bars and hearts) and `mansard` (a 3 m bay: box gutter, slate brisis on the kit's new `surfaces.slates`, the break's roll, zinc terrasson with seams, a tabatière) have round 1. All built; sketch close-ups in `references/elements/reviews/*_sketch.png`; the rack's review sheets wait for a windowed run. Left: rounds 3 (surface) of all, round 2 of the balconies and the mansard, the mansard's ends and corners.
 
 ### [ ] S160 · Shop signs and lettering
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_shops`
@@ -934,6 +935,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: dark green or black paint with chips, stickers on the posts, rust at the foot, insects in the glass
 - [ ] States: lit (warm, a little flicker in the old lanterns), dead, flickering (S108), bent by a crash, a lantern hanging askew
 - [ ] Review: each lamp at 1 m and 10 m, and lit at night
+- Under way: family `tools/models/props/lamps.py`: `lamp_post` (Marville's cast-iron candélabre: slab, pedestal with cartouches, bell, collar, leaves and flutes, capital, the shared lantern lit) and `wall_lantern` (the same lantern on a scrolled wall bracket) have references and round 1, built. Left: the réverbère on its rope (S167 hangs it), the modern mast of the outer roads, rounds 2 and 3, the lit / dead / flickering switch per instance (S046).
 
 ### [ ] S167 · Lantern ropes and wires
 > needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=poles`
