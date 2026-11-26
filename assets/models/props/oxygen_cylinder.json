@@ -1,0 +1,40 @@
+{
+ "name": "oxygen_cylinder",
+ "family": "hospital",
+ "size": [
+  0.3,
+  1.0987846202409768,
+  0.34
+ ],
+ "min": [
+  -0.15,
+  0.0012153797590233606,
+  -0.12
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  738,
+  550,
+  290
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.0,
+  0.0
+ ]
+}

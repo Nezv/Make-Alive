@@ -67,6 +67,41 @@ foreach ($m in 'terminal', 'hospital', 'prefeitura', 'batalhao', 'mirante') {
     $shots["${m}_landmark"] = @('--host', "--mission=$m", '--no-hordes', '--poi-cam')
 }
 
+# The Prefeitura from every side (references/prefeitura_elements.md): front, air, top, door, lawn,
+# roof, stair tower, the avenue from the forecourt, the back.
+$pref = @('--host', '--mission=prefeitura', '--no-hordes')
+$prefCams = [ordered]@{
+    'pref_front'     = '308.8,7.0,-649.4,-90.0,0.7'
+    'pref_air'       = '285.8,48.0,-594.4,-59.9,-20.9'
+    'pref_air_north' = '300.8,40.0,-709.4,-126.2,-18.5'
+    'pref_top'       = '388.8,150.0,-649.4,-90.0,-89.0'
+    'pref_door'      = '356.8,1.8,-656.4,-109.3,4.6'
+    'pref_lawn'      = '324.8,1.7,-623.4,-71.6,3.3'
+    'pref_roof'      = '362.8,28.0,-619.4,-35.0,-14.9'
+    'pref_tower'     = '360.8,6.0,-701.4,-120.2,6.4'
+    'pref_avenue'    = '369.8,2.6,-649.4,90.0,-0.6'
+    'pref_back'      = '432.8,30.0,-659.4,102.8,-24.0'
+}
+foreach ($k in $prefCams.Keys) { $shots[$k] = $pref + "--shot-cam=$($prefCams[$k])" }
+
+# The Hospital Dona Helena from every side (references/hospital_elements.md): the street front,
+# two air views, the top, the ambulance bay, the old wing, the roof and its pad, the fire stair,
+# the yard behind, Rua Blumenau.
+$hosp = @('--host', '--mission=hospital', '--no-hordes')
+$hospCams = [ordered]@{
+    'hosp_front'      = '-598.4,6.0,-253.5,90.0,15.0'
+    'hosp_air'        = '-568.4,60.0,-182.5,55.7,-19.7'
+    'hosp_air_south'  = '-588.4,55.0,-322.5,129.4,-20.2'
+    'hosp_top'        = '-658.4,170.0,-232.5,90.0,-89.0'
+    'hosp_bay'        = '-634.4,1.8,-246.5,64.4,4.0'
+    'hosp_wing'       = '-612.4,3.0,-203.5,90.0,12.0'
+    'hosp_roof'       = '-680.4,40.0,-210.5,-14.5,-12.0'
+    'hosp_stair'      = '-718.4,4.0,-246.5,-90.0,25.0'
+    'hosp_yard'       = '-733.4,30.0,-253.5,-90.0,-25.0'
+    'hosp_street'     = '-611.4,3.0,-312.5,180.0,2.0'
+}
+foreach ($k in $hospCams.Keys) { $shots[$k] = $hosp + "--shot-cam=$($hospCams[$k])" }
+
 $made = @()
 foreach ($name in $shots.Keys) {
     if ($Filter -and $name -notlike "*$Filter*") { continue }

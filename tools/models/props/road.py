@@ -259,7 +259,89 @@ def valve_cover(lod):
     return {"body": Part(m)}
 
 
+# --- gully_grate (dr1: the double gully grate at the kerb) ----------------------------------------------
+GULLY = dict(grate=0.40, gap=0.06, rows=7, surround=0.07)
+HUMP = dict(w=3.50, ramp=1.00, top=2.50, h=0.10)
+
+
+def road_materials():
+    m = materials()
+    m.update({
+        "grate": Material((0.22, 0.17, 0.13), under=(0.24, 0.18, 0.13), bare=(0.34, 0.22, 0.13), chip=0.0, grain=0.12, fades=False),
+        "concrete": Material((0.62, 0.61, 0.58), kind="concrete", chip=0.0, rusts=False, grain=0.15),
+        "asphalt": Material((0.16, 0.16, 0.17), kind="concrete", chip=0.0, rusts=False, grain=0.25, fades=False),
+    })
+    return m
+
+
+def _grate(cx, lod):
+    """One square grate lying in the road at x = cx: its frame, the bar down the middle, the bars
+    between its rows of slots, the dark pit under them."""
+    g, rows = GULLY["grate"], GULLY["rows"]
+    m = Mesh()
+    t = 0.035
+    fr = 0.03
+    for sx in (1, -1):
+        m.merge(S.box((cx + sx * (g / 2 - fr / 2), -t / 2, 0), (fr / 2, t / 2, g / 2), "grate"))
+        m.merge(S.box((cx, -t / 2, sx * (g / 2 - fr / 2)), (g / 2 - fr, t / 2, fr / 2), "grate"))
+    m.merge(S.box((cx, -t / 2, 0), (0.025, t / 2, g / 2 - fr), "grate"))
+    if lod < 2:
+        inner = g - 2 * fr
+        pitch = inner / rows
+        for k in range(1, rows):
+            z = -inner / 2 + k * pitch
+            m.merge(S.box((cx, -t / 2, z), (g / 2 - fr, t / 2, (pitch - 0.022) / 2), "grate"))
+        if lod == 0:  # the lifting slot through the bar and a rib across each slot's floor
+            m.merge(S.box((cx, -0.001, -pitch * 0.5), (0.01, 0.001, 0.03), "hole"))
+    m.merge(S.box((cx, -0.10, 0), (g / 2, 0.06, g / 2), "hole"))
+    return m
+
+
+def gully_grate(lod):
+    g, gap, sr = GULLY["grate"], GULLY["gap"], GULLY["surround"]
+    m = Mesh()
+    for s in (1, -1):
+        m.merge(_grate(s * (g + gap) / 2, lod))
+    # the concrete surround they sit in, its top flush with the road
+    W, D = 2 * g + gap + 2 * sr, g + 2 * sr
+    outer = [(-W / 2, -D / 2), (W / 2, -D / 2), (W / 2, D / 2), (-W / 2, D / 2)]
+    for k, (x0, x1, z0, z1) in enumerate(((-W / 2, W / 2, -D / 2, -g / 2), (-W / 2, W / 2, g / 2, D / 2),
+                                          (-W / 2, -g - gap / 2, -g / 2, g / 2), (g + gap / 2, W / 2, -g / 2, g / 2), (-gap / 2, gap / 2, -g / 2, g / 2))):
+        m.merge(S.box(((x0 + x1) / 2, -0.03, (z0 + z1) / 2), ((x1 - x0) / 2, 0.03, (z1 - z0) / 2), "concrete"))
+    return {"body": Part(m)}
+
+
+# --- speed_hump (hu1: a flat-topped hump with its painted teeth) -----------------------------------------
+def speed_hump(lod):
+    w, ramp, top, h = HUMP["w"], HUMP["ramp"], HUMP["top"], HUMP["h"]
+    z0 = -(ramp + top / 2)
+    prof = [(z0, 0.0), (-top / 2, h), (top / 2, h), (-z0, 0.0)]
+    if lod == 0:  # the ramps' foot and head eased
+        prof = [(z0, 0.0), (z0 + 0.15, 0.010), (-top / 2 - 0.15, h - 0.010), (-top / 2, h), (top / 2, h), (top / 2 + 0.15, h - 0.010), (-z0 - 0.15, 0.010), (-z0, 0.0)]
+    outline = [(z, y) for z, y in prof]
+    m = S.extrude(outline, w, 0.0, "asphalt", origin=(-w / 2, 0, 0), right=(0, 0, 1), up=(0, 1, 0))
+    return {"body": Part(m)}
+
+
+def _paint_hump(P, N, tag, tags, state, col):
+    """White teeth on each ramp, their points up the slope (the French marking)."""
+    w, ramp, top = HUMP["w"], HUMP["ramp"], HUMP["top"]
+    sel = (tag == tags.index("asphalt")) & (N[:, 1] > 0.5)
+    x, z = P[:, 0], P[:, 2]
+    tooth = 0.50
+    u = np.mod(x + w / 2, tooth) / tooth - 0.5                  # -0.5..0.5 across each tooth
+    d = np.abs(z) - top / 2                                    # 0 at the ramp's head, `ramp` at its foot
+    on_ramp = (d > 0.05) & (d < ramp - 0.05)
+    t = (d - 0.05) / (ramp - 0.10)                             # 0 at the head (the point), 1 at the foot (the base)
+    white = on_ramp & (np.abs(u) < 0.42 * t) & (np.abs(x) < w / 2 - 0.05)
+    return np.where((sel & white)[:, None], np.array([0.88, 0.88, 0.85], np.float32), col)
+
+
 ELEMENTS = {
+    "gully_grate": dict(build=gully_grate, materials=road_materials(), states=["clean", "abandoned", "damaged", "burnt"], lods=3,
+                        edge_radius=0.003, close=(0.0, 0.0, 0.0)),
+    "speed_hump": dict(build=speed_hump, materials=road_materials(), extra=_paint_hump, extra_first=True,
+                       states=["clean", "abandoned", "damaged", "burnt"], lods=2, edge_radius=0.004, close=(0.0, 0.1, -1.6)),
     "manhole": {
         "build": manhole,
         "materials": materials(),

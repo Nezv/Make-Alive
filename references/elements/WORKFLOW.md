@@ -1,6 +1,6 @@
 # How an element is made
 
-The order every element step follows (ROADMAP.md, "Detail and iteration", says why). Each stage has
+The order every element step follows (`Management Dashboard.md`, "Detail and iteration", says why). Each stage has
 a tool that shows the work beside the references, and something to write on the card. A stage
 with nothing written down did not happen. The worked examples are the hydrant (`street.py`, the
 first) and window_french (`windows.py`, the first made this way from the start).

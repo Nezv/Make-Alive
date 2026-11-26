@@ -1,0 +1,40 @@
+{
+ "name": "decals",
+ "family": "decals",
+ "size": [
+  4.0,
+  2.6,
+  0.16
+ ],
+ "min": [
+  -2.0,
+  0.0,
+  -0.16
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  20,
+  12,
+  2
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.4,
+  0.0
+ ]
+}

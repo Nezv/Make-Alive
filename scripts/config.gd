@@ -286,6 +286,12 @@ const ZOMBIE_ATTACK_RANGE := 1.3
 const ZOMBIE_ATTACK_TIME := 0.7   # length of the swing
 const ZOMBIE_ATTACK_HIT_AT := 0.3 # moment in the swing the damage lands
 const ZOMBIE_DAMAGE := 12
+# Runner looks (every peer): below this ground speed while chasing for this long, a runner
+# stops sprinting; with another zombie within RUNNER_JAM_RANGE ahead it claws over them.
+const RUNNER_STALL_SPEED := 1.0
+const RUNNER_STALL_TIME := 0.25
+const RUNNER_JAM_RANGE := 1.2
+const RUNNER_JAM_CHECK := 0.2 # seconds between looks for a jam
 const ARMLESS_DAMAGE_MULT := 0.4  # no arms = it can only bite
 const CRAWL_SPEED_MULT := 0.35
 const STAGGER_TIME := 0.35
@@ -360,8 +366,26 @@ const CITY_BACK_MIN := 60.0        # m²: a traced footprint smaller than this i
 const CITY_HALL_AREA := 1200.0     # m²: a traced footprint larger than this is a hall
 const CITY_LIT_SHARE := 0.1        # houses with a window still lit
 const CITY_BLOCK_TRIANGLES := 1500000 # the whole town's walls and roofs
+const CITY_ROAD_STEP := 1.0      # metres between the points of the smoothed road up the hill (CityMap.hill_line)
+const CITY_ROAD_STRAIGHTEN := 4.0 # metres of wobble in the traced road that are straightened out before it is smoothed
+const CITY_ROAD_SMOOTH := 12.0    # metres either side over which the road's rise is averaged, so it climbs without bumps
+const CITY_ROAD_BLEND := 10.0     # metres over which the level road bench eases back into the hillside
+const CITY_ROAD_KERB := 0.25      # the flush concrete edging along both sides of the road up
+const CITY_ROAD_VERGE := 2.2      # then a strip of packed earth and leaves before the trees
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
+
+# --- The look (Game._apply_tier_look; references/asset_quality.md) ---
+const LOOK_SSAO_RADIUS := 1.4      # metres: contact shadows where things meet the ground and each other
+const LOOK_SSAO_INTENSITY := 2.2
+const LOOK_SSAO_POWER := 1.6
+const LOOK_SSIL_INTENSITY := 0.8   # bounced light (high tier only)
+const LOOK_GLOW_INTENSITY := 0.9   # lamps, lit windows and signs bloom
+const LOOK_GLOW_BLOOM := 0.04
+const LOOK_GLOW_THRESHOLD := 0.9
+const LOOK_CONTRAST := 1.06
+const LOOK_SATURATION := 1.12
+const LOOK_LAMP_WARM := Color("ffc887")  # the colour of an old incandescent or sodium lamp
 
 # --- The test bot (scripts/bot.gd) ---
 const BOT_SIGHT := 25.0         # metres at which it notices and shoots a zombie
@@ -376,7 +400,7 @@ const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than 
 # --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
 const BUDGET := {
 	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 11 }, # +1: the checkpoint's lamp
-	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # shapes: the whole of joinville.png is built until the performance pass decides what stays in detail
+	"city": { "meshes": 16, "surfaces": 16, "lights": 20, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # lights +3: the Mirante gate, guard hut and snack bar; +1 the Prefeitura door; +2 the Hospital wash and bay
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
 const PROTOCOL_VERSION := 6   # bump when anything on the wire changes: a client of another build is refused with a message
@@ -516,3 +540,4 @@ const OPEN_HORDE_EVERY := 25.0    # seconds between a horde night's waves
 const OPEN_HORDE_SIZE := 14       # zombies per wave on the first horde night (more on each after)
 const OPEN_NIGHT_HORDE_EVERY := 60.0 # seconds between hordes on an ordinary night
 const OPEN_NIGHT_HORDE_SIZE := 6
+

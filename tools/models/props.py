@@ -17,6 +17,7 @@ A family file says `ELEMENTS = {"name": spec}`, a spec being a dict:
     states     ["clean", ...]           one albedo each (clean, abandoned, damaged, burnt)
     lods       number of LODs
     extra(maps, state, col) -> col     optional: lettering and anything else painted by position
+    emit_where(P, N, tag, tags) -> bool optional: which texels of the lit tags glow (default all)
 
 The first part is the fixed body; the others move (`Part.motion`): {"rotate": [axis, degrees]}
 about the part's pivot, or {"move": [x, y, z]}. Game coordinates: metres, Y up, facing -Z,
@@ -263,6 +264,12 @@ def build(name, quick=False):
             em = np.zeros((tex, tex, 3), np.float32)
             for t in emits:
                 em[maps["mask"] & (maps["tag"] == tags.index(t))] = spec["materials"][t].emit
+            if "emit_where" in spec:  # only part of a lit tag glows (an LED board's letters)
+                msk = maps["mask"]
+                keep = spec["emit_where"](maps["pos"][msk], maps["nrm"][msk], maps["tag"][msk], tags)
+                flat = em[msk]
+                flat[~keep] = 0.0
+                em[msk] = flat
             pl.save_png(em, os.path.join(OUT, f"{name}_emission.png"), tex)
             meta["emission"] = True
     # LOD 0: the parts apart again, each object's origin on its pivot.

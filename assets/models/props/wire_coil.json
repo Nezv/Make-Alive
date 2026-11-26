@@ -1,0 +1,40 @@
+{
+ "name": "wire_coil",
+ "family": "checkpoint",
+ "size": [
+  3.04,
+  1.15,
+  0.9066307699379228
+ ],
+ "min": [
+  -1.52,
+  0.0,
+  -0.4531388423820332
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  2212,
+  796,
+  530
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.6,
+  -0.4
+ ]
+}

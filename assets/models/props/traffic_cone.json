@@ -1,0 +1,40 @@
+{
+ "name": "traffic_cone",
+ "family": "checkpoint",
+ "size": [
+  0.38,
+  0.75,
+  0.38
+ ],
+ "min": [
+  -0.19,
+  0.0,
+  -0.19
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  252,
+  158,
+  26
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.4,
+  -0.1
+ ]
+}

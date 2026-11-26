@@ -1,0 +1,55 @@
+{
+ "name": "door_plank",
+ "family": "doors",
+ "size": [
+  2.32,
+  2.81,
+  0.32
+ ],
+ "min": [
+  -1.16,
+  0.0,
+  -0.06
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "leaf": {
+   "pivot": [
+    0.995,
+    0.0,
+    0.12
+   ],
+   "rotate": [
+    [
+     0,
+     1,
+     0
+    ],
+    100.0
+   ]
+  }
+ },
+ "tris": [
+  1420,
+  444,
+  108
+ ],
+ "emission": false,
+ "close": [
+  -0.8,
+  1.2,
+  -0.05
+ ]
+}

@@ -18,6 +18,6 @@ const INFO := {
 		"brief": "Defend the barracks' parade ground until the helicopter lands. Ammo crates in the armoury, a mounted position on the guard tower, soldiers who turned.",
 		"start": "Main gate", "goal": "Hold the parade ground" },
 	"mirante": { "sky": "night", "title": "MIRANTE DE JOINVILLE", "kind": "EXTRACTION", "difficulty": 5,
-		"brief": "Start on the lookout tower at the top of Morro da Boa Vista and get down alive. Narrow stairs, then the switchback road through the forest; leapers in the trees.",
-		"start": "Tower deck, 230 m", "goal": "Foot of the hill road" },
+		"brief": "Start at the gate at the foot of Morro da Boa Vista and climb the switchback road through the forest to the lookout. Hold the summit until the helicopter comes, then up the tower to board it.",
+		"start": "Gate at the foot of the hill", "goal": "Helicopter at the tower deck, 230 m" },
 }

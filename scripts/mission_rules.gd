@@ -176,8 +176,12 @@ func _send_wave(o: Dictionary) -> void:
 		heli_left = heli
 		_topup = Config.LAST_WAVE_TOPUP
 		var zone: String = o.get("zone", "")
-		var lz := game.map.data.zone_center(zone) if zone != "" and game.map.data.zones.has(zone) else game.map.player_spawn()
-		game.call_heli(Vector3(lz.x, game.map.ground_y(lz), lz.z), heli)
+		var spot: Dictionary = game.map.data.raw.get("heli", {})
+		if spot.has("at"): # a pad of its own, up on a roof or a deck (the map's data says where)
+			game.call_heli(spot.at, heli)
+		else:
+			var lz := game.map.data.zone_center(zone) if zone != "" and game.map.data.zones.has(zone) else game.map.player_spawn()
+			game.call_heli(Vector3(lz.x, game.map.ground_y(lz), lz.z), heli)
 	_changed()
 
 

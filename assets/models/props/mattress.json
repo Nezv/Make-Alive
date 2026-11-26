@@ -1,0 +1,40 @@
+{
+ "name": "mattress",
+ "family": "remains",
+ "size": [
+  1.914,
+  0.2751548463696959,
+  1.424
+ ],
+ "min": [
+  -0.957,
+  -0.0011548463696958624,
+  -0.712
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1116,
+  332,
+  76
+ ],
+ "emission": false,
+ "close": [
+  0.6,
+  0.2,
+  -0.7
+ ]
+}

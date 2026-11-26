@@ -1,0 +1,40 @@
+{
+ "name": "tomb_cross",
+ "family": "cemetery",
+ "size": [
+  0.72,
+  2.162,
+  0.8639999999999999
+ ],
+ "min": [
+  -0.36,
+  0.0,
+  -0.43199999999999994
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  688,
+  332,
+  72
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.6,
+  0.0
+ ]
+}

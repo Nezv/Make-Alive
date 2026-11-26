@@ -1,0 +1,40 @@
+{
+ "name": "departure_board",
+ "family": "terminal_signs",
+ "size": [
+  2.4,
+  2.1,
+  0.14400000000000002
+ ],
+ "min": [
+  -1.2,
+  -2.1,
+  -0.07400000000000001
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  236,
+  132,
+  48
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  -1.6,
+  -0.1
+ ]
+}

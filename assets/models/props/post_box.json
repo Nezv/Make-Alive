@@ -1,0 +1,40 @@
+{
+ "name": "post_box",
+ "family": "street_small",
+ "size": [
+  0.48000000000000004,
+  0.5800000000000001,
+  0.23
+ ],
+ "min": [
+  -0.24000000000000002,
+  1.0,
+  -0.23
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  196,
+  112,
+  24
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.46,
+  -0.2
+ ]
+}

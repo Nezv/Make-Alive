@@ -92,6 +92,6 @@ Fixed: nothing in this round; each item above is accepted as left over (see the 
 ## Review
 Accepted as left over, with reasons:
 - *Real wound photographs were not collected* (card References): the reference is `references/zombies.png` and the project's own skeleton. The tear shapes are by taste, not copied.
-- *Clothes swaps per variant (sleeve length, open or closed, hat or none, colour sets)* is **not done** and stays unticked in `ROADMAP.md`: a swap needs its own geometry and its own texture, which breaks the shared-texture budget this step set; it is its own step.
+- *Clothes swaps per variant (sleeve length, open or closed, hat or none, colour sets)* is **not done** and stays unticked in `Management Dashboard.md`: a swap needs its own geometry and its own texture, which breaks the shared-texture budget this step set; it is its own step.
 - The contact sheet of every bone, clothes and body variant of the female nurse: the bites and their bones are shown (`bites_nurse_f_game.png`); clothes variants do not exist yet, so the sheet is ticked off only as far as that.
 - The round-1 star-shaped fan of the pit's floor remains: the floor is a fan to one point.

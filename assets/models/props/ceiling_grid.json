@@ -1,0 +1,40 @@
+{
+ "name": "ceiling_grid",
+ "family": "stairs",
+ "size": [
+  2.424,
+  0.909787702809253,
+  2.424
+ ],
+ "min": [
+  -1.212,
+  -0.909787702809253,
+  -1.212
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  888,
+  616,
+  300
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  -0.5,
+  0.0
+ ]
+}
