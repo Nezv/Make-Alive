@@ -18,9 +18,10 @@ TOPO = "references/joinville_topography.png"
 OUT = "scripts/world/city_picture.gd"
 TOPO_OFFSET = (183, -477)        # CityData.TOPO_OFFSET_PX
 TOP = -180                       # first row, in joinville.png pixels (negative = above the picture)
-LEFT = 183                       # first column: where the topography picture starts, so the band has no seam
+LEFT = 0                         # first column: all of joinville.png, like the city map (CityData.FRAME)
 RIGHT = 2103                     # last column + 1: past joinville.png's right edge, for the Mirante's side of the hill
-UI = [(1878, 0, 1920, 365), (1845, 990, 1920, 1020), (0, 0, 345, 40)]   # zoom/layer buttons, credits, search box
+UI = [(1878, 0, 1920, 365), (1845, 990, 1920, 1020), (0, 0, 352, 50), (0, 975, 110, 1020)]   # zoom/layer buttons, credits, search box, scale bar
+SEARCH = (0, 0, 352, 50)         # the search box: mirrored from below, not filled
 TOPO_UI = [(1855, 0, 1920, 500), (0, 0, 60, 190)]
 
 GROUND, BUILDING, STREET, MAIN, WATER, GREEN = range(6)
@@ -66,6 +67,10 @@ def main():
     for x0, y0, x1, y1 in UI:
         holes[y0:y1, x0:x1] = True
     cls = fill_holes(cls, holes)
+    # The search box is too big to fill from its edges: the city below it, mirrored up into it.
+    sx0, sy0, sx1, sy1 = SEARCH
+    for y in range(sy0, sy1):
+        cls[y, sx0:sx1] = cls[2 * sy1 - y, sx0:sx1]
     # Labels written along main roads cut them into dashes: close the gaps.
     main = ndimage.binary_closing(cls == MAIN, structure=np.ones((3, 3)), iterations=2)
     cls = np.where(main & (cls != WATER), MAIN, cls)

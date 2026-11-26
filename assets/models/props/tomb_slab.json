@@ -1,0 +1,40 @@
+{
+ "name": "tomb_slab",
+ "family": "cemetery",
+ "size": [
+  1.194,
+  1.15,
+  2.2881051177665155
+ ],
+ "min": [
+  -0.597,
+  0.0,
+  -1.1190525588832578
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  914,
+  264,
+  48
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.7,
+  -0.9
+ ]
+}

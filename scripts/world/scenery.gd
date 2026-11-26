@@ -121,6 +121,13 @@ func decal(x: float, z: float, w: float, d: float, color: Color, layer := 3, yaw
 
 
 ## A place a gun may lie: `pos` where it lies, `stand` where a player reaches it from.
+## A looping sound standing at `pos` in the piece's own numbers (a SoundSpot): a generator, an alarm.
+func sound(sound_name: String, pos: Vector3, volume_db := 0.0, period := 0.0, duty := 1.0) -> SoundSpot:
+	var s := SoundSpot.make(sound_name, _w * pos, volume_db, period, duty)
+	root.add_child(s)
+	return s
+
+
 func spot(kind: String, pos: Vector3, stand: Vector3, yaw_deg := 0.0) -> WeaponPickup:
 	var s := WeaponPickup.new()
 	s.iid = next_iid
@@ -390,6 +397,8 @@ func triage_camp() -> void:
 		prop_counts["bodybag"] = prop_counts.get("bodybag", 0) + 2
 	put("barrel", Props.barrel(b, t(-14.5, 3.5)), t(-14.5, 3.5))
 	flame(Vector3(-14.5, 0.9, 3.5), 0.35)
+	sound("generator", Vector3(-24.5, 0.6, 4.0), -4.0)                                # keeping the tents lit
+	sound("hazard_tick", Vector3(-11, 1.0, 15), -8.0)                                  # the ambulance's flashers
 	corpse(-17.2, 8.8, 120, P.PRONE, O.NURSE, true)
 	corpse(-18.6, -3.8, 260, P.SIDE, O.DOCTOR, true)
 	corpse(-15.5, 1.4, 15, P.PRONE, O.NURSE, false)
@@ -418,6 +427,7 @@ func motor_pool() -> void:
 	spot("table", Vector3(19.5, 0.83, -9.9), Vector3(19.5, 0, -8.6), -10)
 	box(Vector3(0.5, 0.35, 0.3), Vector3(18.9, 0.98, -9.9), Props.DARK)               # radio
 	box(Vector3(0.03, 0.9, 0.03), Vector3(18.7, 1.5, -9.9), Props.STEEL)
+	sound("generator", Vector3(16.2, 0.6, -10.6), -3.0)                              # the command post's power
 	for p: Array in [[32.0, 13.2], [32.0, 14.5], [32.0, 15.8], [32.0, 17.1], [30.7, 12.5], [29.4, 12.5]]:
 		put("hesco", Props.hesco(b, t(p[0], p[1])), t(p[0], p[1]))                   # ammo dump
 	put("crate", Props.crate(b, t(30.6, 16.6)), t(30.6, 16.6))
@@ -455,6 +465,8 @@ func checkpoint() -> void:
 		Props.cone(b, t(p[0], p[1], rng.randf() * 90))
 	put("floodlight", Props.floodlight(b, t(9.6, 21.2)), t(9.6, 21.2))
 	put("floodlight", Props.floodlight(b, t(-12.5, 21.6)), t(-12.5, 21.6))
+	sound("generator", Vector3(10.6, 0.6, 22.2), -6.0)                               # the floodlights' generator
+	sound("tube_buzz", Vector3(7.4, 2.3, 22.8), Config.TUBE_BUZZ_DB)                # the booth's tube
 	corpse(-3.6, 23.5, 40, P.PRONE, O.SOLDIER, true)
 	corpse(7.4, 21.35, 0, P.SITTING, O.SOLDIER, true)
 	spot("corpse", Vector3(-2.9, 0.1, 23.0), Vector3(-1.9, 0, 23.7), 300)
@@ -488,14 +500,18 @@ func street_wrecks() -> void:
 	_origin(0, 30)
 	var police := t(-17, 29.5, 70)
 	put("car", Props.car(b, police, Color("20242c"), false, true), police)
+	sound("hazard_tick", Vector3(-17, 0.9, 29.5), -8.0)
 	spot_world("vehicle", at(police, 0, 1.06, 1.75), at(police, 0, 0, 3.4), 70)
 	put("car", Props.car(b, t(9, 31.8, 185), Color("8a2222")), t(9, 31.8, 185))
+	sound("car_alarm", Vector3(9, 0.9, 31.8), -2.0, 45.0, 0.4)                      # someone bumped it; it gives up after a while
 	put("car", Props.car(b, t(15.5, 28.3, 20), Props.SOOT, true), t(15.5, 28.3, 20))
 	flame(Vector3(15.3, 0.9, 27.6), 0.7)
 	smoke(Vector3(15.5, 1.6, 28.3))
 	var flipped := _w * Transform3D(Basis(Vector3.UP, deg_to_rad(95)) * Basis(Vector3.FORWARD, PI / 2.0), Vector3(23, 0.9, 31))
 	put("car", Props.car(b, flipped, Color("2a4a8a")), flipped)
+	sound("engine_tick", Vector3(23, 0.9, 31), -6.0)                                 # still hot
 	put("humvee", Props.humvee(b, t(-8, 32.3, 80), Props.OLIVE), t(-8, 32.3, 80))
+	sound("horn_stuck", Vector3(-8, 1.0, 32.3), -8.0, 60.0, 0.75)                    # the driver slumped on the wheel
 	put("crater", Props.crater(g, t(4.6, 27.0, 0, 0.03), 1.6, rng), t(4.6, 27.0))
 	Props.luggage(b, t(3.2, 33.6), 5, rng)
 	Props.casings(b, t(-13, 28), 30, rng)

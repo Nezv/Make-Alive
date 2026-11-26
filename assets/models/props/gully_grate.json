@@ -1,0 +1,40 @@
+{
+ "name": "gully_grate",
+ "family": "road",
+ "size": [
+  1.0,
+  0.16,
+  0.54
+ ],
+ "min": [
+  -0.5,
+  -0.16,
+  -0.27
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  372,
+  348,
+  204
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.0,
+  0.0
+ ]
+}

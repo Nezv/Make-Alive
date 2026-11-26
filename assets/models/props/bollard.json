@@ -1,0 +1,40 @@
+{
+ "name": "bollard",
+ "family": "street_small",
+ "size": [
+  0.124,
+  1.005,
+  0.124
+ ],
+ "min": [
+  -0.062,
+  0.0,
+  -0.062
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  348,
+  120,
+  54
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.85,
+  0.0
+ ]
+}

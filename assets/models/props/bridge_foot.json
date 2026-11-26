@@ -1,0 +1,40 @@
+{
+ "name": "bridge_foot",
+ "family": "bridges",
+ "size": [
+  28.9,
+  8.25,
+  6.2
+ ],
+ "min": [
+  -14.45,
+  -5.0,
+  -3.1
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  11556,
+  2992,
+  452
+ ],
+ "emission": true,
+ "close": [
+  -10.0,
+  0.5,
+  -2.5
+ ]
+}

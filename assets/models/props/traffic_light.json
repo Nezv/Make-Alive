@@ -1,0 +1,40 @@
+{
+ "name": "traffic_light",
+ "family": "traffic",
+ "size": [
+  0.3,
+  3.14,
+  0.63
+ ],
+ "min": [
+  -0.15,
+  0.0,
+  -0.475
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1142,
+  646,
+  262
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  2.5999999999999996,
+  -0.2
+ ]
+}

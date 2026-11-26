@@ -1,0 +1,40 @@
+{
+ "name": "barrier_concrete",
+ "family": "checkpoint",
+ "size": [
+  2.06,
+  0.8,
+  0.608
+ ],
+ "min": [
+  -1.0,
+  0.0,
+  -0.304
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  128,
+  100,
+  28
+ ],
+ "emission": false,
+ "close": [
+  0.55,
+  0.6,
+  -0.15
+ ]
+}

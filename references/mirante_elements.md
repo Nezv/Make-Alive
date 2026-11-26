@@ -4,6 +4,8 @@ Everything that belongs on Morro da Boa Vista, from the gate at the foot to the 
 summit, and whether the game has it yet. Built from `mirante_entrance.jpg`, `mirante_street.jpg`,
 the topography map, and what is written about the place (sources at the bottom).
 
+Art quality: everything here has had the pass in `references/asset_quality.md` (bevels, trims, details, materials); its inventory says what is left.
+
 Legend: [x] built · [~] built roughly, needs a better pass · [ ] not built yet.
 Code: `scripts/world/mirante_set.gd` (the pieces), `scripts/world/vegetation.gd` (plants),
 `CityMap._hill_road` / `_mirante` (where they go), `MapAreas.mirante` (the mission's data).
@@ -33,7 +35,7 @@ Code: `scripts/world/mirante_set.gd` (the pieces), `scripts/world/vegetation.gd`
 - [x] A few street lamps on the poles, most dark: long unlit stretches
 - [x] Galvanised guard rails round the outside of the sharp bends
 - [x] Atlantic forest walls both sides: broad canopy trees, tree ferns (xaxim), juçara palms, araucárias, ipês in bloom
-- [~] Herringbone paver pattern itself (texture or a pattern in the mesh)
+- [x] Paver pattern (a basket weave drawn by the world shader's PAVERS class; the brick lane is BRICK)
 - [ ] Grass verge between the brick lane and the forest
 - [ ] Tall grass, bamboo clumps and lianas hanging off the trees
 - [ ] Canopy closing over the road (branches reaching across)
@@ -44,17 +46,20 @@ Code: `scripts/world/mirante_set.gd` (the pieces), `scripts/world/vegetation.gd`
 
 ## Road scatter (what an emptied hill would have on it)
 
-None of this is built yet; it is the list for the props thread.
+Placed by `RoadScatter.HILL` (`scripts/world/road_scatter.gd`), models in `scripts/world/road_props.gd`.
+Edit HILL to move, add or drop any of them.
 
-- [ ] Abandoned cars on the road (the bus line's minibus, a taxi, a couple of hatchbacks), doors open
-- [ ] A car that slid off a bend into the guard rail
-- [ ] Fallen tree across part of the road, a snapped power pole with its cables on the ground
-- [ ] Bicycles dropped by the kerb (the road is a favourite climb for cyclists and runners)
-- [ ] Backpacks, water bottles, a dropped phone, a selfie stick, flip-flops on the brick lane
-- [ ] Police or Guarda Municipal motorbike at the gate, a patrol car across the road higher up
-- [ ] Traffic cones and a PARE board dragged up the road, a makeshift barricade of benches
-- [ ] Blood trails into the forest, a body bag or two at the hairpin
-- [ ] Rubbish bins knocked over, a bench at a viewpoint bend
+- [x] Abandoned cars on the road (the bus line's minibus, a taxi, three hatchbacks), doors open
+- [x] A car that slid off a bend into the guard rail (first sharp bend)
+- [x] Fallen tree across part of the road, a snapped power pole with its cables on the ground
+- [x] Bicycles dropped by the kerb (the road is a favourite climb for cyclists and runners)
+- [x] Backpacks, water bottles, a dropped phone (some still lit), a selfie stick, flip-flops on the brick lane
+- [x] Guarda Municipal motorbike at the gate, a patrol car across the road higher up (one lamp of its bar still lit)
+- [x] Traffic cones and a PARE board dragged up the road, a makeshift barricade of benches below the hairpin
+- [x] Blood trails into the forest, two body bags at the hairpin
+- [x] Rubbish bins knocked over, a bench at the viewpoint bend near the top
+- [ ] Sound or light on any of it (a car alarm, a hazard light blinking): none yet
+- [ ] Props that move when shot or shoved (all static and baked into the map's mesh)
 
 ## The summit
 

@@ -1,0 +1,40 @@
+{
+ "name": "tube_light",
+ "family": "fittings",
+ "size": [
+  1.27,
+  0.5586832013797941,
+  0.14
+ ],
+ "min": [
+  -0.635,
+  -0.5,
+  -0.07
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1236,
+  156,
+  36
+ ],
+ "emission": true,
+ "close": [
+  0.5,
+  -0.4,
+  0.0
+ ]
+}

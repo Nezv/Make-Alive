@@ -6,7 +6,7 @@ extends CharacterBody3D
 ## Both sides animate the same rig from the same `state`, so everyone sees the same moves.
 
 enum Type { WALKER, RUNNER, LEAPER }
-enum State { CHASE, ATTACK, WINDUP, LEAP, LAND, STAGGER }
+enum State { CHASE, ATTACK, WINDUP, LEAP, LAND, STAGGER, FEED }
 
 ## Per-type stats: [min speed, max speed, hit points]
 const STATS := {
@@ -38,6 +38,16 @@ var _waypoint_t := 0.0
 var push := Vector3.ZERO  ## a shove's knock-back, dying away
 var heard := Vector3.ZERO ## where the last noise it heard came from
 var heard_left := 0.0     ## seconds it still cares (0 = heard nothing)
+var idle := false         ## a wanderer: stands about until a player comes close, a noise or a hit wakes it
+var route: Array = []     ## points of a horde route still to walk before it goes for a player (HordeDirector)
+var meal := Vector3.INF   ## a dead player's body it is going to (or feeding on); INF = none
+
+# Looks only, worked out on every peer from what it can see (never sent):
+var _slow_t := 0.0        ## a runner: how long it has been barely moving while chasing
+var _jammed := false      ## ...with another zombie right in front of it (it claws over them)
+var _jam_check := 0.0
+var _last_yaw := 0.0
+var _turn := 0.0          ## smoothed turning speed, rad/s
 
 
 static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, severed := 0) -> Zombie:
@@ -86,6 +96,7 @@ static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, sev
 func shove(away: Vector3) -> void:
 	if state == State.LEAP:
 		return
+	idle = false
 	push = Vector3(away.x, 0, away.z)
 	if state == State.WINDUP or type == Type.LEAPER:
 		leap_cd = maxf(leap_cd, Config.SHOVE_LEAP_RESET)
@@ -97,8 +108,16 @@ func shove(away: Vector3) -> void:
 
 ## A noise reached it: it will go and look, unless a player is close enough to go for instead.
 func hear(spot: Vector3) -> void:
+	idle = false
 	heard = spot
 	heard_left = Config.NOISE_INVESTIGATE_TIME
+
+
+## A player died at `spot`: walk there and feed on the body for `Config.FEED_TIME`.
+func feed_at(spot: Vector3) -> void:
+	hear(spot)
+	heard_left = Config.FEED_TIME
+	meal = spot
 
 
 func investigating() -> bool:
@@ -129,6 +148,7 @@ func set_state(s: int) -> void:
 ## This only changes numbers; Game turns the result into blood, gibs and ragdolls on every peer.
 func take_hit(part: int, damage: int) -> Dictionary:
 	var result := { "killed": false, "severed": -1, "headshot": part == Humanoid.Part.HEAD }
+	idle = false
 	var body_damage := float(damage)
 	if part == Humanoid.Part.HEAD:
 		body_damage *= Config.HEAD_MULT
@@ -192,9 +212,26 @@ func host_step(delta: float, game: Game) -> void:
 		State.LAND:
 			if state_t >= 0.3:
 				set_state(State.CHASE)
+		State.FEED:
+			var someone_close := target_id != 0 and to_target.length() <= Config.ZOMBIE_NOTICE_RANGE
+			if someone_close or heard_left <= 0.0:
+				meal = Vector3.INF
+				heard_left = 0.0
+				set_state(State.CHASE)
+			else:
+				_face(meal - global_position)
 		State.CHASE:
-			if lured:
+			var player_close := target_id != 0 and to_target.length() <= Config.ZOMBIE_NOTICE_RANGE
+			if idle and (lured or player_close):
+				idle = false
+			if player_close:
+				route.clear() # it has someone to go for: it forgets the way it was told
+			if idle:
+				pass # standing about
+			elif lured:
 				move = _investigate(game)
+			elif not route.is_empty():
+				move = _follow_route(game)
 			elif target_id != 0:
 				move = _chase(game, target_id, target_pos, to_target)
 
@@ -232,6 +269,26 @@ func _chase(game: Game, target_id: int, target_pos: Vector3, to_target: Vector3)
 	return _steer_to(game, target_pos, direct, to_target)
 
 
+## Walk the horde's route: to each point in turn, then on to the players.
+func _follow_route(game: Game) -> Vector3:
+	var here := global_position
+	while not route.is_empty():
+		var to_point: Vector3 = route[0] - here
+		to_point.y = 0.0
+		if to_point.length() >= Config.ROUTE_ARRIVE:
+			break
+		route.remove_at(0)
+	if route.is_empty():
+		return Vector3.ZERO
+	var goal: Vector3 = route[0]
+	var to_goal := goal - here
+	to_goal.y = 0.0
+	var map := game.map
+	var costly := map.nav_refresh > 0.0
+	var direct := (not costly or to_goal.length() < Config.DIRECT_CHECK_RANGE) and map.is_direct(here, goal)
+	return _steer_to(game, goal, direct, to_goal)
+
+
 ## Walk to where the noise was and stand there looking for it.
 func _investigate(game: Game) -> Vector3:
 	var here := global_position
@@ -239,6 +296,8 @@ func _investigate(game: Game) -> Vector3:
 	to_spot.y = 0.0
 	var dist := to_spot.length()
 	if dist < Config.NOISE_ARRIVE:
+		if meal.is_finite() and meal.is_equal_approx(heard):
+			set_state(State.FEED) # down on the body
 		return Vector3.ZERO
 	var map := game.map
 	var door := map.door_in_the_way(here, heard)
@@ -302,14 +361,19 @@ func _face(dir: Vector3) -> void:
 
 func _anim_for_state() -> int:
 	match state:
-		State.ATTACK: return Humanoid.Anim.ATTACK
+		State.ATTACK: return Humanoid.Anim.LUNGE if type == Type.RUNNER else Humanoid.Anim.ATTACK
 		State.WINDUP: return Humanoid.Anim.WINDUP
 		State.LEAP: return Humanoid.Anim.LEAP
 		State.LAND: return Humanoid.Anim.LAND
 		State.STAGGER: return Humanoid.Anim.STAGGER
+		State.FEED: return Humanoid.Anim.FEED
 	if is_crawling():
 		return Humanoid.Anim.CRAWL
-	return Humanoid.Anim.RUN if type == Type.RUNNER else Humanoid.Anim.WALK
+	if type != Type.RUNNER:
+		return Humanoid.Anim.WALK
+	if _slow_t > Config.RUNNER_STALL_TIME:
+		return Humanoid.Anim.SURGE if _jammed else Humanoid.Anim.IDLE
+	return Humanoid.Anim.SPRINT
 
 
 func _process(delta: float) -> void:
@@ -325,5 +389,41 @@ func _process(delta: float) -> void:
 			est_velocity = (position - _last_pos) / delta
 		_last_pos = position
 		ground_speed = Vector2(est_velocity.x, est_velocity.z).length()
+	if type == Type.RUNNER:
+		_runner_looks(delta, ground_speed)
 	rig.set_anim(_anim_for_state())
 	rig.update(delta, ground_speed)
+
+
+## What a runner's body is doing that the state doesn't say: turning (it banks into it),
+## stalled (stands twitching), or stalled with a zombie in its face (claws over it).
+func _runner_looks(delta: float, ground_speed: float) -> void:
+	if delta <= 0.0:
+		return
+	var yaw_rate := wrapf(rotation.y - _last_yaw, -PI, PI) / delta
+	_last_yaw = rotation.y
+	_turn = lerpf(_turn, yaw_rate, 1.0 - exp(-8.0 * delta))
+	rig.turn = _turn
+	if state != State.CHASE or ground_speed > Config.RUNNER_STALL_SPEED:
+		_slow_t = 0.0
+		_jammed = false
+		return
+	_slow_t += delta
+	_jam_check -= delta
+	if _jam_check > 0.0:
+		return
+	_jam_check = Config.RUNNER_JAM_CHECK
+	_jammed = false
+	var game := get_parent() as Game
+	if game == null:
+		return
+	var fwd := -global_transform.basis.z
+	for other: Zombie in game.zombies.values():
+		if other == self:
+			continue
+		var off := other.global_position - global_position
+		off.y = 0.0
+		var d := off.length()
+		if d > 0.05 and d < Config.RUNNER_JAM_RANGE and fwd.dot(off / d) > 0.5:
+			_jammed = true
+			return

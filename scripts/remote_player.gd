@@ -9,6 +9,19 @@ var buffer := SnapshotBuffer.new()
 var gun: GunModel
 var weapon_id := -1
 var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
+var hp := 100 ## from the last snapshot (temporary HP included)
+var mag := 0 ## rounds in their magazine, from the last snapshot (for spectators)
+var flash: MuzzleFlash ## on their gun's muzzle
+var display_name := ""
+var _down_left := -1.0 ## counted here from when they went down (a guess: the host knows the real clock)
+var helper_near := false ## (set by the game) a standing teammate is close enough to get them up
+var look_pitch := 0.0 ## where they look, up + (from the snapshot)
+const GUN_HIP := Vector3(0.2, 0.36, -0.3)       ## (spine space) carried at the hip
+const GUN_SHOULDER := Vector3(0.12, 0.52, -0.42) ## shouldered, aiming
+var _aim_w := 0.0
+var _reload_w := 0.0
+var _was_downed := false
+var _getup_left := 0.0
 var _last_pos := Vector3.ZERO
 
 
@@ -19,6 +32,7 @@ static func create(id: int, player_name: String) -> RemotePlayer:
 	r.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	r.rig = Characters.survivor(id)
 	r.add_child(r.rig)
+	r.display_name = player_name
 	r.tag = Label3D.new()
 	r.tag.text = player_name
 	r.tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -39,8 +53,24 @@ func set_weapon(id: int) -> void:
 	if gun:
 		gun.queue_free()
 	gun = Guns.build(id)
-	gun.position = Vector3(0.2, 0.36, -0.3) - gun.grip
+	gun.position = GUN_HIP - gun.grip
 	rig.spine.add_child(gun)
+	flash = MuzzleFlash.create(Weapons.flash_shape(id))
+	flash.position = gun.muzzle + Vector3(0, 0, -0.02)
+	gun.add_child(flash)
+
+
+## Their gun went off: the flash (no light: others' guns are the cheaper tier).
+func fired(rng: RandomNumberGenerator) -> void:
+	if flash:
+		flash.fire(rng)
+	rig.kick = 1.0
+
+
+func muzzle_world() -> Vector3:
+	if gun == null or not gun.is_inside_tree():
+		return global_position + Vector3(0, 1.4, 0)
+	return gun.global_transform * gun.muzzle
 
 
 ## What the body is doing (crouching, off the ground), as PlayerWire.ACTION_* bits.
@@ -48,7 +78,24 @@ func set_action(bits: int) -> void:
 	action = bits
 
 
+## The name over their head; a downed one's says how long they have left.
+func step_tag(delta: float) -> void:
+	if action & PlayerWire.ACTION_DOWNED:
+		if _down_left < 0.0:
+			_down_left = Config.DOWNED_TIME
+		_down_left = maxf(0.0, _down_left - delta)
+		tag.text = "%s\n✚ DOWN %d s" % [display_name, ceili(_down_left)]
+		tag.modulate = Color("ff7a6a")
+	elif _down_left >= 0.0 or tag.text != display_name:
+		_down_left = -1.0
+		tag.text = display_name
+		tag.modulate = Color.WHITE
+
+
 func _process(delta: float) -> void:
+	step_tag(delta)
+	if flash:
+		flash.step(delta)
 	if buffer.is_empty():
 		return
 	var s := buffer.sample()
@@ -57,14 +104,69 @@ func _process(delta: float) -> void:
 	var moved := Vector2(position.x - _last_pos.x, position.z - _last_pos.z).length()
 	_last_pos = position
 	var ground_speed := moved / delta if delta > 0.0 else 0.0
-	var a := Humanoid.Anim.IDLE
-	if ground_speed > 6.0:
-		a = Humanoid.Anim.RUN
-	elif ground_speed > 0.3:
-		a = Humanoid.Anim.WALK
-	if action & PlayerWire.ACTION_AIR:
-		a = Humanoid.Anim.JUMP
-	elif action & PlayerWire.ACTION_CROUCH:
-		a = Humanoid.Anim.CROUCH
+	animate(delta, ground_speed)
+
+
+## Pick the rig's state and move it on: what the action bits say, a get-up after being downed, a
+## reaching hand while a teammate is near enough to help.
+func animate(delta: float, ground_speed: float) -> void:
+	var downed := action & PlayerWire.ACTION_DOWNED != 0
+	if _was_downed and not downed:
+		_getup_left = Config.GETUP_TIME
+	_was_downed = downed
+	var a := anim_for(action, ground_speed)
+	if _getup_left > 0.0 and not downed:
+		_getup_left = maxf(0.0, _getup_left - delta)
+		a = Humanoid.Anim.GETUP
+	rig.reach = 1.0 if downed and helper_near else 0.0
+	rig.look_pitch = look_pitch
+	_place_gun(delta)
+	rig.set_upper(upper_for(action))
 	rig.set_anim(a)
 	rig.update(delta, ground_speed)
+
+
+## The gun follows the arms: up to the shoulder and onto the look when aiming, tilted for a reload,
+## climbing with each shot.
+func _place_gun(delta: float) -> void:
+	if gun == null:
+		return
+	var up := upper_for(action)
+	_aim_w = move_toward(_aim_w, 1.0 if up == Humanoid.Upper.AIM else 0.0, delta * 6.0)
+	_reload_w = move_toward(_reload_w, 1.0 if up == Humanoid.Upper.RELOAD else 0.0, delta * 6.0)
+	var w := _aim_w * _aim_w * (3.0 - 2.0 * _aim_w)
+	gun.position = GUN_HIP.lerp(GUN_SHOULDER, w) - gun.grip
+	gun.rotation = Vector3(look_pitch * 0.7 * w + rig.kick * 0.15, 0.0, 0.5 * _reload_w)
+
+
+## What their arms are doing, from the action bits (one at a time: reloading beats shoving beats
+## throwing beats aiming).
+static func upper_for(bits: int) -> int:
+	if bits & (PlayerWire.ACTION_DOWNED | PlayerWire.ACTION_DEAD | PlayerWire.ACTION_HEAL):
+		return Humanoid.Upper.NONE
+	if bits & PlayerWire.ACTION_RELOAD:
+		return Humanoid.Upper.RELOAD
+	if bits & PlayerWire.ACTION_SHOVE:
+		return Humanoid.Upper.SHOVE
+	if bits & PlayerWire.ACTION_THROW:
+		return Humanoid.Upper.THROW
+	if bits & PlayerWire.ACTION_AIM:
+		return Humanoid.Upper.AIM
+	return Humanoid.Upper.NONE
+
+
+## The rig's state for a player's action bits and how fast they move over the ground.
+static func anim_for(bits: int, ground_speed: float) -> int:
+	if bits & PlayerWire.ACTION_DOWNED:
+		return Humanoid.Anim.CRAWL if ground_speed > 0.3 else Humanoid.Anim.DOWNED
+	if bits & (PlayerWire.ACTION_AIR | PlayerWire.ACTION_VAULT):
+		return Humanoid.Anim.JUMP
+	if bits & PlayerWire.ACTION_HEAL:
+		return Humanoid.Anim.HEAL
+	if bits & PlayerWire.ACTION_CROUCH:
+		return Humanoid.Anim.CROUCH
+	if ground_speed > 6.0:
+		return Humanoid.Anim.RUN
+	if ground_speed > 0.3:
+		return Humanoid.Anim.WALK
+	return Humanoid.Anim.IDLE

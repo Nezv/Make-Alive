@@ -5,6 +5,7 @@ class_name Controls
 const KEYS := {
 	"move_forward": KEY_W, "move_back": KEY_S, "move_left": KEY_A, "move_right": KEY_D,
 	"sprint": KEY_SHIFT, "jump": KEY_SPACE, "pause": KEY_ESCAPE, "reload": KEY_R, "last_weapon": KEY_Q, "crouch": KEY_CTRL, "shove": KEY_V,
+	"item_wheel": KEY_TAB, "quick_heal": KEY_H, "quick_throw": KEY_G, "chat": KEY_T, "ping": KEY_Z, "inspect": KEY_F,
 	"weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "weapon_4": KEY_4, "weapon_5": KEY_5,
 	"weapon_6": KEY_6, "weapon_7": KEY_7, "weapon_8": KEY_8, "weapon_9": KEY_9,
 }
@@ -27,6 +28,13 @@ static func setup() -> void:
 			var m := InputEventMouseButton.new()
 			m.button_index = MOUSE[action]
 			InputMap.action_add_event(action, m)
+
+
+## What to call the key or button `action` is on, for prompts: "RMB", "F".
+static func label_of(action: String) -> String:
+	if MOUSE.has(action):
+		return { MOUSE_BUTTON_LEFT: "LMB", MOUSE_BUTTON_RIGHT: "RMB", MOUSE_BUTTON_MIDDLE: "MMB" }.get(MOUSE[action], "Mouse")
+	return OS.get_keycode_string(key_of(action))
 
 
 ## The physical key `action` is on right now.

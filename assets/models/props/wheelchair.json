@@ -1,0 +1,40 @@
+{
+ "name": "wheelchair",
+ "family": "hospital",
+ "size": [
+  0.62,
+  0.9423371817617718,
+  0.91
+ ],
+ "min": [
+  -0.31,
+  0.0015192246987792007,
+  -0.49000000000000005
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1488,
+  1056,
+  608
+ ],
+ "emission": false,
+ "close": [
+  0.2,
+  0.5,
+  0.1
+ ]
+}

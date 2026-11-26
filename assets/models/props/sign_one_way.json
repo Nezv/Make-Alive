@@ -1,0 +1,40 @@
+{
+ "name": "sign_one_way",
+ "family": "signs_street",
+ "size": [
+  0.512,
+  2.99,
+  0.11032255589023782
+ ],
+ "min": [
+  -0.256,
+  0.0,
+  -0.05516127794511891
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  322,
+  138,
+  66
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  2.45,
+  0.0
+ ]
+}

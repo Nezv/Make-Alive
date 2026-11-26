@@ -1,0 +1,40 @@
+{
+ "name": "sign_tabac",
+ "family": "signs_shops",
+ "size": [
+  0.15200000000000002,
+  1.0,
+  0.66
+ ],
+ "min": [
+  -0.07600000000000001,
+  -0.5,
+  -0.66
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  136,
+  96,
+  84
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  0.0,
+  -0.45
+ ]
+}

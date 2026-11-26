@@ -13,7 +13,7 @@ tools\godot.ps1
 - Everyone else types that IP and clicks **Join**, or just clicks the game when it appears under "Games on your network".
 - First time, allow Godot through the Windows firewall on **Private networks** (port 7777 UDP, plus 7778 for the game list).
 
-Controls: WASD move, Shift sprint, Space jump, left click shoot, **right click aim** (or **use** when looking at a door or lootbox), R reload, 1-9 or mouse wheel change gun, Esc menu.
+Controls: WASD move, Shift sprint, Space jump, left click shoot, **right click aim** (or **use** when looking at a door or lootbox), R reload, 1-9 or mouse wheel change gun, H heal, G throw, hold Tab for the item wheel, Esc menu.
 
 Guns: P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, Orsis T-5000, Dragunov.
 

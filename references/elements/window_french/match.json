@@ -1,0 +1,20 @@
+{
+ "view": "front",
+ "ppm": 300,
+ "refs": {
+  "frontal_white.jpg": {
+   "px": [[575, 195], [1325, 195], [1325, 1485], [575, 1485]],
+   "m": [[-0.70, 2.49], [0.70, 2.49], [0.70, 0.08], [-0.70, 0.08]],
+   "crop": [-1.1, -0.1, 1.1, 2.75],
+   "open": {"shutter_l": 1, "shutter_r": 1},
+   "note": "rebate 1.40 x 2.41 over the sill (the scale: brick_railing's courses)"
+  },
+  "tall_railing.jpg": {
+   "px": [[564, 250], [1456, 250], [1456, 1950], [564, 1950]],
+   "m": [[-0.70, 2.75], [0.70, 2.75], [0.70, 0.08], [-0.70, 0.08]],
+   "crop": [-1.1, -0.1, 1.1, 2.95],
+   "open": {"shutter_l": 1, "shutter_r": 1},
+   "note": "a taller one (1.40 x 2.67): proportions of the panes only"
+  }
+ }
+}

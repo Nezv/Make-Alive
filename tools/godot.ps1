@@ -17,5 +17,7 @@ function Find-Godot {
 }
 
 $godot = Find-Godot
+# An engine error printed on stderr must not stop a caller that redirects it (shots.ps1, 2>&1).
+$ErrorActionPreference = 'Continue'
 & $godot --path $root @args
 exit $LASTEXITCODE
