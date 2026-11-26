@@ -27,7 +27,7 @@ Code: `scripts/world/prefeitura_set.gd` (the pieces), `CityMap._prefeitura` (whe
 - [x] Air conditioners hanging under the windows, many of them
 - [x] Planters on the first balcony band with plants spilling over (green along the band in `prefeitura2.jpg`)
 - [x] Entrance: glazed doors in a frame, a concrete canopy, steps up
-- [x] The three flags at the door (Brazil, Santa Catarina, Joinville)
+- [x] The three flags at the door (Brazil; Santa Catarina with its green lozenge; Joinville with a blue band and the shield: simplified)
 - [x] The back and the ends: plainer (bands and windows, no space frames)
 - [ ] Interiors: the main hall, the corridors along each floor, the council chamber
 - [ ] Barricaded windows (planks, furniture) for the defence
@@ -38,7 +38,7 @@ Code: `scripts/world/prefeitura_set.gd` (the pieces), `CityMap._prefeitura` (whe
 - [x] The lawn sloping down to the avenue (flat here), split by the walk up the middle
 - [x] Paved forecourt along the front of the building
 - [x] Zig-zag ramp with rails across the lawn
-- [x] "Prefeitura Municipal de Joinville" in white letters on a blue framed board on the lawn
+- [x] "Prefeitura Municipal de Joinville" in white letters (lit, readable at night) on a blue framed board on the lawn
 - [x] Flower beds with red and yellow flowers round the sign and by the steps
 - [x] Imperial palms in a row along the avenue
 - [x] The round concrete pad on the south lawn (the helicopter lands there in the mission)
@@ -47,7 +47,7 @@ Code: `scripts/world/prefeitura_set.gd` (the pieces), `CityMap._prefeitura` (whe
 - [ ] The slope itself (the lawn rises ~3 m from the avenue to the forecourt)
 - [ ] The riverside rail and the bike path along the avenue, the river bank's undergrowth
 - [ ] Festival Nacional de Dança sign at the corner
-- [ ] The car park behind (east), the service yard, the forest edge of the hill
+- [x] The car park behind (east) with the staff cars, bins by the back door, the first trees of the hill's forest
 
 ## What happened here (story, scatter)
 
@@ -71,3 +71,9 @@ Code: `scripts/world/prefeitura_set.gd` (the pieces), `CityMap._prefeitura` (whe
 ## Sources
 
 - `references/prefeitura1.jpg`, `references/prefeitura2.jpg`, `references/prefeitura3.png`
+
+## Screenshots
+
+`references/quality/prefeitura/after/` (from `tools\shots.ps1 pref`). First round's fixes: the sign's
+letters were unlit and hidden behind its frame, the Joinville flag read as Japan's, the yard behind was
+an empty grey slab.

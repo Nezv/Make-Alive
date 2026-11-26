@@ -642,7 +642,7 @@ func _t(x: float, z: float, yaw_deg := 0.0) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)), Vector3(x, 0, z))
 
 
-func _label(text: String, pos: Vector3, size: int, color: Color, yaw_deg := 0.0) -> void:
+func _label(text: String, pos: Vector3, size: int, color: Color, yaw_deg := 0.0, shaded := true) -> void:
 	var l := Label3D.new()
 	l.text = text
 	l.font_size = size
@@ -651,7 +651,7 @@ func _label(text: String, pos: Vector3, size: int, color: Color, yaw_deg := 0.0)
 	l.outline_size = 0
 	l.position = pos
 	l.rotation.y = deg_to_rad(yaw_deg)
-	l.shaded = true
+	l.shaded = shaded
 	root.add_child(l)
 
 
@@ -761,8 +761,8 @@ func _prefeitura(c: Vector3) -> void:
 	prefeitura.pad = pad.origin
 	var sign_t := lot * Transform3D(Basis(Vector3.UP, 0.12), Vector3(-13, 0, -24))
 	_put_free(PrefeituraSet.lawn_sign(_b, sign_t), sign_t)
-	_label("Prefeitura Municipal de Joinville", sign_t * (PrefeituraSet.SIGN_AT + Vector3(0, 0, -0.08)), 30, PrefeituraSet.SIGN_TEXT,
-		rad_to_deg(sign_t.basis.get_euler().y) + 180.0)
+	_label("Prefeitura Municipal de Joinville", sign_t * PrefeituraSet.SIGN_AT, 30, PrefeituraSet.SIGN_TEXT,
+		rad_to_deg(sign_t.basis.get_euler().y) + 180.0, false) # lit letters: readable at night
 	_put_free(PrefeituraSet.ramp(_b, _g, lot, Vector3(7, 0, -52), Vector3(11, 0, -13), 3, 5.0, 2.2), lot)
 	for e: Array in [[-6.5, -13.5, 4.0, 1.6], [6.5, -13.5, 4.0, 1.6], [-22.0, -3.2, 7.0, 1.2], [22.0, -3.2, 7.0, 1.2]]:
 		PrefeituraSet.flower_bed(_b, lot * Transform3D(Basis.IDENTITY, Vector3(e[0], 0, e[1])), e[2], e[3], int(e[0]) + 50)
@@ -775,6 +775,20 @@ func _prefeitura(c: Vector3) -> void:
 	for x in [-40.0, -28.0, -16.0, 16.0, 30.0, 42.0]:
 		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(x, 0, -55.5))
 		_put_free(Vegetation.plant(_trees, t, Vegetation.Kind.IMPERIAL_PALM, rng), t)
+	# The yard behind: the staff car park, bins by the back door, the forest's first trees.
+	_patch(lot, [-40.0, 31.0, 40.0, 54.0], y, PrefeituraSet.ASPHALT)
+	for k in 14:
+		_patch(lot, [-21.0 + k * 3.0, 31.0, -20.9 + k * 3.0, 36.5], y + 0.01, PrefeituraSet.LINE)
+	for k in 5:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf_range(-0.1, 0.1)), Vector3(-19.5 + k * 9.0, 0, 33.8))
+		var paint: Color = RoadProps.PAINTS[rng.randi() % RoadProps.PAINTS.size()]
+		_put_free(RoadProps.hatchback(_b, t, paint, rng.randi_range(0, 1)), t)
+	for x in [-6.0, -4.6, 6.4]:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * 0.6), Vector3(x, 0, 28.6))
+		_put_free(RoadProps.bin(_b, t, true, rng), t)
+	for k in 9:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(-40.0 + k * 10.0 + rng.randf_range(-2.0, 2.0), 0, 56.5))
+		_put_free(Vegetation.plant(_trees, t, Vegetation.Kind.BROADLEAF if k % 3 != 1 else Vegetation.Kind.JUCARA, rng), t)
 	# The last stand at the door: sandbags either side of the walk, a patrol car and an ambulance
 	# left across the forecourt, a bench dragged over, things dropped, a body dragged inside.
 	for x in [-4.4, 4.4]:

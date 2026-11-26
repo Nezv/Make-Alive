@@ -146,14 +146,16 @@ static func flag(b: MeshKit.Builder, f: Transform3D, kind: int) -> void:
 			0: # the yellow diamond, the blue globe across the middle
 				rb(b, hf, Vector3(0.62, 0.62, 0.03), Vector3(0.49 - k * 0.98, 0, 0), FLAG_YELLOW, 0.006, Basis(Vector3.BACK, PI * 0.25))
 				b.rcyl(0.3, 0.035, Vector3(0.49 - k * 0.98, 0, 0), FLAG_BLUE, 14, 0.008, Basis(Vector3.RIGHT, PI * 0.5), hf)
-			1: # red and white stripes, the arms on the white
+			1: # red and white stripes, the green lozenge with the arms across the middle
 				rb(b, hf, Vector3(0.98, 0.4, 0.03), Vector3(0, 0, 0), FLAG_WHITE, 0.006)
+				rb(b, hf, Vector3(0.42, 0.42, 0.035), Vector3(0.49 - k * 0.98, 0, 0), FLAG_GREEN, 0.006, Basis(Vector3.BACK, PI * 0.25))
+				rb(b, hf, Vector3(0.16, 0.2, 0.04), Vector3(0.49 - k * 0.98, 0, 0), FLAG_YELLOW, 0.01)
+			2: # Joinville: a blue band at the hoist, white field, the city's shield in the middle
 				if k == 0:
-					b.rcyl(0.17, 0.035, Vector3(0.49, 0, 0), FLAG_GREEN, 12, 0.008, Basis(Vector3.RIGHT, PI * 0.5), hf)
-			2: # white with the city's arms
-				if k == 0:
-					b.rcyl(0.26, 0.035, Vector3(0.49, 0, 0), FLAG_RED, 12, 0.008, Basis(Vector3.RIGHT, PI * 0.5), hf)
-					b.rcyl(0.16, 0.04, Vector3(0.49, 0, 0), FLAG_BLUE, 12, 0.008, Basis(Vector3.RIGHT, PI * 0.5), hf)
+					rb(b, hf, Vector3(0.3, 1.3, 0.03), Vector3(-0.34, 0, 0), FLAG_BLUE, 0.006)
+					rb(b, hf, Vector3(0.36, 0.34, 0.035), Vector3(0.3, 0.06, 0), FLAG_YELLOW, 0.02)
+					rb(b, hf, Vector3(0.3, 0.3, 0.04), Vector3(0.3, 0.06, 0), FLAG_BLUE, 0.02)
+					b.taper(0.2, 0.0, 0.22, Vector3(0.3, -0.11, 0), FLAG_YELLOW, 4, Basis(Vector3.RIGHT, PI) * Basis(Vector3.UP, PI * 0.25), hf)
 
 
 # --- The building -----------------------------------------------------------------------
@@ -364,7 +366,7 @@ static func _stair_tower(b: MeshKit.Builder, t: Transform3D) -> void:
 ## low brick bed of flowers. Its foot at the origin of `f`, facing -Z. The letters are the map's
 ## (`SIGN_AT`). Returns colliders.
 const SIGN_W := 11.0
-const SIGN_AT := Vector3(0, 1.35, -0.32)
+const SIGN_AT := Vector3(0, 1.35, -0.47)  ## in front of the frame's front grid
 static func lawn_sign(b: MeshKit.Builder, f: Transform3D) -> Array:
 	rb(b, f, Vector3(SIGN_W + 1.6, 0.45, 2.0), Vector3(0, 0.225, 0.3), BRICK, 0.04)                 # the bed
 	rb(b, f, Vector3(SIGN_W + 1.3, 0.06, 1.7), Vector3(0, 0.44, 0.3), Color("3a2a1e"), 0.01)         # soil
