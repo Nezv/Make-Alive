@@ -522,6 +522,10 @@ func _hill_ground() -> void:
 
 # --- City blocks ------------------------------------------------------------------------
 
+func _is(c: int, r: int, t: int) -> bool:
+	return c >= 0 and r >= 0 and c < gw and r < gh and grid[r * gw + c] == t
+
+
 func _open(c: int, r: int) -> bool:
 	if c < 0 or r < 0 or c >= gw or r >= gh:
 		return false
@@ -1434,7 +1438,12 @@ func _forest() -> void:
 			if grid[r * gw + c] != FOREST:
 				continue
 			var roadside := _open(c - 1, r) or _open(c + 1, r) or _open(c, r - 1) or _open(c, r + 1)
-			if roadside:
+			# Real trees (Vegetation) only along a street up on the hill: the forest's edge round
+			# the whole town is far longer and gets the cheap crowns below (it ran out of memory).
+			var by_road := _is(c - 1, r, STREET) or _is(c + 1, r, STREET) or _is(c, r - 1, STREET) or _is(c, r + 1, STREET)
+			if by_road and ground_y(Vector3(lo.x + (c + 0.5) * cell, 0.0, lo.y + (r + 0.5) * cell)) < Config.CITY_REAL_TREES_ABOVE:
+				by_road = false
+			if roadside and by_road:
 				# Back from the kerb: towards the side of the cell away from the open ground.
 				var away := Vector2(int(_open(c - 1, r)) - int(_open(c + 1, r)), int(_open(c, r - 1)) - int(_open(c, r + 1)))
 				var at := Vector3(lo.x + (c + 0.5 + away.x * 0.35 + _rng.randf_range(-0.1, 0.1)) * cell, 0.0,
@@ -1447,7 +1456,7 @@ func _forest() -> void:
 				roadside_trees.append({ "at": at, "kind": kind })
 				continue
 			var second := _open(c - 2, r) or _open(c + 2, r) or _open(c, r - 2) or _open(c, r + 2)
-			if _rng.randf() > (0.7 if second else 0.08):
+			if _rng.randf() > (0.85 if roadside else (0.7 if second else 0.08)):
 				continue
 			var w := _rng.randf_range(3.5, 6.5)
 			var h := _rng.randf_range(7.0, 15.0)
