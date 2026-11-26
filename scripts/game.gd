@@ -50,7 +50,7 @@ var looked_at: Interactable = null
 var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellets (tests seed it)
 
 # Host-only
-var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve }
+var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, shots, weapon, loadout: Loadout, swap_rounds, reserve }
 var _pending_shots: Array = []
 var _next_zombie := 1
 var _step_t := 0.0       ## seconds since players were last checked for sprinting footsteps
@@ -170,6 +170,7 @@ func _build_world() -> void:
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
+	local_player.view.muzzle.fx = fx
 	local_player.teleport(map.player_spawn())
 	if bot:
 		brain = Bot.new(self)
@@ -505,7 +506,7 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "shots": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
 		"reserve": map.starting_ammo() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
@@ -813,6 +814,7 @@ func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weap
 		return # rate limit: nobody fires faster than their gun can
 	p.last_shot = _now
 	p.weapon = weapon
+	p.shots += 1 # others see the flash when this moves (PlayerWire)
 	_pending_shots.append([shooter, origin, dir, weapon])
 	make_noise(origin, Weapons.loudness(weapon), shooter)
 
@@ -991,7 +993,8 @@ func build_snapshot() -> Array:
 	var pd := []
 	for id: int in players:
 		var p: Dictionary = players[id]
-		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon, "action": p.action })
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon,
+			"action": (int(p.action) & PlayerWire.ACTION_BODY) | PlayerWire.shots_bits(p.shots) })
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
@@ -1012,6 +1015,7 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		seen[id] = true
 		if not remotes.has(id):
 			var r := RemotePlayer.create(id, names.get(id, "Survivor"))
+			r.fx = fx
 			remotes[id] = r
 			add_child(r)
 		(remotes[id] as RemotePlayer).buffer.push(e.pos, e.yaw)

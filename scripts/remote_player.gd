@@ -9,6 +9,10 @@ var buffer := SnapshotBuffer.new()
 var gun: GunModel
 var weapon_id := -1
 var action := 0 ## PlayerWire.ACTION_* bits from the last snapshot
+var muzzle: MuzzleFlash ## on the gun in hand, the cheap tier
+var fx: Fx              ## where its muzzle smoke goes (the game's kit; null = none)
+var shots_seen := -1    ## the shot counter from the last snapshot (-1 = none yet)
+var flashes := 0        ## shots seen go off (tests)
 var _last_pos := Vector3.ZERO
 
 
@@ -41,11 +45,31 @@ func set_weapon(id: int) -> void:
 	gun = Guns.build(id)
 	gun.position = Vector3(0.2, 0.36, -0.3) - gun.grip
 	rig.spine.add_child(gun)
+	muzzle = MuzzleFlash.new(true)
+	muzzle.fx = fx
+	gun.add_child(muzzle)
+	muzzle.set_gun(id, gun.muzzle)
 
 
-## What the body is doing (crouching, off the ground), as PlayerWire.ACTION_* bits.
+## What the body is doing (crouching, off the ground) and how many shots so far, as
+## PlayerWire action bits. A counter that moved since the last snapshot is a shot: flash and bang.
+## The first snapshot only says where the counter stands.
 func set_action(bits: int) -> void:
 	action = bits
+	var count := PlayerWire.shots_of(bits)
+	if shots_seen >= 0 and count != shots_seen:
+		_shot()
+	shots_seen = count
+
+
+func _shot() -> void:
+	flashes += 1
+	if muzzle == null:
+		return
+	muzzle.fire()
+	var d := Weapons.def(weapon_id)
+	if muzzle.is_inside_tree():
+		Sfx.play("gunshot", muzzle.global_position, 0.04, d.volume, d.pitch)
 
 
 func _process(delta: float) -> void:
@@ -68,3 +92,5 @@ func _process(delta: float) -> void:
 		a = Humanoid.Anim.CROUCH
 	rig.set_anim(a)
 	rig.update(delta, ground_speed)
+	if muzzle:
+		muzzle.step(delta)

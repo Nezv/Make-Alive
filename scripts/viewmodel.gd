@@ -34,13 +34,11 @@ var shove_t := -1.0         ## seconds into a shove (-1 = none)
 var stow := 0.0            ## 0..1: the gun is down and out of the way (hands busy: vaulting)
 var stow_goal := 0.0       ## where `stow` is easing to; the player sets this, never the pose
 var bob := 0.0
-var flash: MeshInstance3D
-var light: OmniLight3D
+var muzzle: MuzzleFlash     ## the flash, light and smoke at the gun's muzzle (full tier)
 var arm_r: Node3D
 var arm_l: Node3D
 
 var _pending := -1
-var _flash_t := 0.0
 var _rng := RandomNumberGenerator.new()
 var _last_rot := Vector3.ZERO
 var _sway := Vector2.ZERO
@@ -52,22 +50,8 @@ func _init() -> void:
 	arm_r = _make_arm()
 	arm_l = _make_arm()
 
-	flash = MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.06
-	sphere.height = 0.12
-	sphere.radial_segments = 6
-	sphere.rings = 3
-	flash.mesh = sphere
-	flash.material_override = MeshKit.unshaded(Color("ffcc55"))
-	flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	flash.visible = false
-	pivot.add_child(flash)
-	light = OmniLight3D.new()
-	light.light_color = Color("ffaa33")
-	light.omni_range = 8
-	light.light_energy = 0
-	pivot.add_child(light)
+	muzzle = MuzzleFlash.new()
+	pivot.add_child(muzzle)
 
 
 ## A hand and a forearm. The node sits at the hand; the forearm runs back along +Z to the elbow.
@@ -95,16 +79,14 @@ func _swap(id: int) -> void:
 	weapon_id = id
 	_pending = -1
 	pivot.add_child(gun)
-	flash.position = gun.muzzle + Vector3(0, 0, -0.04)
-	light.position = flash.position
+	muzzle.set_gun(id, gun.muzzle)
 
 
 ## A shot went off: kick the gun, with a different sideways twist every time.
 func fire() -> void:
 	kick_pos = 1.0
 	kick_rot = Vector3(1.0, _rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0))
-	var has_flash: bool = Weapons.def(weapon_id).flash
-	_flash_t = 0.05 if has_flash else 0.0
+	muzzle.fire()
 
 
 ## A shove: the gun is pulled back, driven forward with a roll and swings home past its rest.
@@ -255,10 +237,7 @@ func update(delta: float, move_speed: float, aiming: bool, sprinting: bool, ws: 
 	_place_arm(arm_r, pivot.transform * right, ELBOW_R)
 	_place_arm(arm_l, pivot.transform * left, ELBOW_L)
 
-	_flash_t -= delta
-	flash.visible = _flash_t > 0.0
-	flash.scale = Vector3.ONE * _rng.randf_range(0.7, 1.3)
-	light.light_energy = 4.0 if _flash_t > 0.0 else 0.0
+	muzzle.step(delta)
 
 
 func _place_arm(arm: Node3D, hand: Vector3, elbow: Vector3) -> void:

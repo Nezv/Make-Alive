@@ -32,6 +32,11 @@ const GUN_SPRINT := [1.0, 1.0, 0.97, 0.95, 0.97, 0.88, 0.9, 0.85, 0.88]
 ## same with a suppressor fitted.
 const GUN_LOUDNESS := [35.0, 40.0, 55.0, 60.0, 14.0, 70.0, 70.0, 90.0, 80.0]
 const GUN_LOUDNESS_SUPPRESSED := [12.0, 13.0, 18.0, 20.0, 14.0, 28.0, 28.0, 35.0, 30.0]
+## The shape of each gun's muzzle flash, in id order (MuzzleFlash draws them): small and round for
+## the pistol and the P90, long and forked for rifles, a wide ball for shotguns, side jets out of
+## the T-5000's brake, nothing from the suppressed AS Val. NONE must agree with `flash: false`.
+enum Flash { NONE, ROUND, FORK, BALL, JETS }
+const GUN_FLASH := [Flash.ROUND, Flash.ROUND, Flash.FORK, Flash.FORK, Flash.NONE, Flash.BALL, Flash.BALL, Flash.JETS, Flash.FORK]
 ## Which calibre each gun is fed with, in id order (the two shotguns share shells).
 const GUN_AMMO := [Ammo.MM9, Ammo.MM57, Ammo.MM58, Ammo.MM762, Ammo.MM9X39, Ammo.GAUGE12, Ammo.GAUGE12, Ammo.LAPUA338, Ammo.MM762R]
 
@@ -115,6 +120,11 @@ static func draw_time(id: int) -> float:
 
 static func sprint_mult(id: int) -> float:
 	return GUN_SPRINT[id]
+
+
+## The muzzle flash of gun `id` (a Flash).
+static func flash_shape(id: int) -> int:
+	return GUN_FLASH[id] if id >= 0 and id < GUN_FLASH.size() else Flash.NONE
 
 
 ## Metres away one shot of gun `id` is heard (Game.make_noise).

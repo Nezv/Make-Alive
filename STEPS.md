@@ -326,14 +326,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in a recognis
 
 ### [ ] S029 · Muzzle flash and smoke
 > needs: S004 | size: M | test: `tests/test_muzzle_fx.gd` | see: `--host --demo --weapon=4 --bot --shot-at=1,1.05,1.1`
-- [ ] Flash mesh at the muzzle for one or two frames: star of 3 to 5 crossed quads, random roll, random scale
-  - [ ] Shape per gun class: small round for pistols, long forked for rifles, wide ball for shotguns, side jets for braked snipers
-  - [ ] Suppressed guns: no flash, a thin grey puff
-- [ ] Light: one pooled omni, warm orange, 0.05 s, no shadows, only on the shooter's gun
-- [ ] It lights the viewmodel hands and the nearest walls
-- [ ] Smoke: two or three soft puffs drifting up and with the wind, 0.8 s
-- [ ] Sustained fire: barrel heat shimmer and a steady wisp from the muzzle for 2 s after a long burst
-- [ ] Remote players flash too, cheaper tier
+- [x] Flash mesh at the muzzle for one or two frames: star of 3 to 5 crossed quads, random roll, random scale
+  - [x] Shape per gun class: small round for pistols, long forked for rifles, wide ball for shotguns, side jets for braked snipers
+  - [x] Suppressed guns: no flash, a thin grey puff
+- [x] Light: one pooled omni, warm orange, 0.05 s, no shadows, only on the shooter's gun
+- [x] It lights the viewmodel hands and the nearest walls
+- [x] Smoke: two or three soft puffs drifting up and with the wind, 0.8 s
+- [x] Sustained fire: a steady wisp from the muzzle for 2 s after a long burst
+  - [ ] Barrel heat shimmer (needs a screen-space distortion shader)
+- [x] Remote players flash too, cheaper tier (a shot counter in the snapshot's action bits; they are heard too)
 
 ### [ ] S030 · Tracers and bullet whiz
 > needs: S004 | size: M | test: `tests/test_tracers.gd` | see: `tools\play2.ps1`

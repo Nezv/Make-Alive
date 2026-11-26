@@ -4,11 +4,25 @@ class_name PlayerWire
 ## travel once through Game.player_names.
 ##
 ## Layout per player: u32 id | f32 x,y,z | u16 yaw | u8 hp | u16 kills | u8 weapon | u8 action
-## `action` is bits (ACTION_*): what the body is doing, so others can draw it.
+## `action` is bits: the low four what the body is doing (ACTION_*, so others can draw it), the high
+## four the player's shots so far, counting round at 16 (`shots_bits`), so others see each shot's
+## muzzle flash even when a snapshot is lost.
 
 const BYTES_EACH := 23
 const ACTION_CROUCH := 1
 const ACTION_AIR := 2 ## off the ground: jumping, falling, vaulting
+const ACTION_BODY := 0x0F ## the body bits; the rest is the shot counter
+const SHOTS_SHIFT := 4
+
+
+## The action bits that carry `shots` (the player's shots so far).
+static func shots_bits(shots: int) -> int:
+	return (shots & 0x0F) << SHOTS_SHIFT
+
+
+## The shot counter (0..15) in `action`.
+static func shots_of(action: int) -> int:
+	return (action >> SHOTS_SHIFT) & 0x0F
 
 
 ## `list`: Array of { id, pos: Vector3, yaw, hp, kills, weapon, action } (`action` may be left out).
