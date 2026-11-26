@@ -3,6 +3,7 @@ extends Node
 ##
 ## Command-line options (after `--`), handy for testing:
 ##   --host                 host immediately
+##   --mode=extraction      host: how the city match is played (extraction, defense, open_world; GameModes), else free play
 ##   --map=corridor         host on the test corridor instead of the city (the default)
 ##   --mission=mirante      a city mission (terminal, hospital, prefeitura, batalhao, mirante): with --host start it,
 ##                          without it just pick it on the menu map (for screenshots of the menu)
@@ -106,6 +107,8 @@ func _ready() -> void:
 	menu.open()
 	if _args.has("mission"):
 		menu.select(_args.mission)
+	if _args.has("mode"):
+		menu.set_mode(_args.mode)
 
 	_start_timers()
 	if _args.has("host"):
@@ -133,14 +136,19 @@ func _new_game(map_name := "city", mission := "") -> Game:
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
 	game.difficulty = _args.get("difficulty", "normal")
+	game.mode = menu.mode if menu else String(_args.get("mode", ""))
+	if not GameModes.valid(game.mode) or game.map_name != "city":
+		game.mode = ""
 	game.sky_choice = _args.get("time", "overcast" if _args.has("review-light") else "")
 	game.bot_fires = not _args.has("no-fire")
 	game.bot_aim = _args.get("bot-aim", "chest")
 	game.leave_requested.connect(func(): _to_menu())
 	game.join_refused.connect(func(message: String): _to_menu(message))
 	game.retry_requested.connect(func():
-		var again := [game.map_name, game.mission]
+		var again := [game.map_name, game.mission, game.mode]
 		_to_menu()
+		if menu:
+			menu.mode = again[2]
 		_host(again[0], again[1]))
 	add_child(game)
 	menu.close()

@@ -501,3 +501,18 @@ const HOUSE_STREAM_KEEP := 75.0         # ...and beyond which they are taken dow
 const HOUSE_STREAM_MAX := 12            # houses standing built at once (the shell shader holds this many holes)
 const HOUSE_STREAM_EVERY := 0.25        # seconds between looks around
 const HOUSE_LAYOUT_TRIES := 3           # simpler specs tried when a house's layout fails
+
+# --- Game modes on the city (scripts/game_modes.gd, open_world.gd) ---
+const MODE_EXTRACT_DIST := 380.0  # metres from the start to the way out (toward the next POI)
+const MODE_EXTRACT_HOLD := 15.0   # seconds everyone holds the way out
+const MODE_STREET_SEARCH := 80.0  # metres round a point a zone looks for a street to stand on
+const MODE_DEFENSE_HELI := 75.0   # seconds the helicopter needs once the last wave begins
+const MODE_DEFENSE_RESPAWN := 20.0 # seconds before the dead come back in a defense
+const MODE_BOARD := 3.0           # seconds everyone stands at the helicopter
+const OPEN_RESPAWN := 15.0        # seconds before the dead come back in the open world
+const OPEN_PHASES := [["day", "clear", 300.0], ["dusk", "dusk", 60.0], ["night", "night", 240.0], ["dawn", "overcast", 45.0]] # name, sky, seconds
+const OPEN_HORDE_NIGHT := 7       # every this many nights is a horde night
+const OPEN_HORDE_EVERY := 25.0    # seconds between a horde night's waves
+const OPEN_HORDE_SIZE := 14       # zombies per wave on the first horde night (more on each after)
+const OPEN_NIGHT_HORDE_EVERY := 60.0 # seconds between hordes on an ordinary night
+const OPEN_NIGHT_HORDE_SIZE := 6

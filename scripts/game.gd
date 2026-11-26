@@ -22,6 +22,9 @@ var bot_aim := "chest" ## chest | head | legs | arms
 var brain: Bot             ## what plays for the local player when `bot` is on (scripts/bot.gd)
 var map_name := "corridor" ## set before start_host; clients get it in `welcome`
 var mission := ""          ## a city POI id ("mirante"...) or "" for free play; clients get it in `welcome`
+var mode := ""             ## GameModes: "" (free play), extraction, defense, open_world; set before start_host, clients get it in `welcome`
+var open_world: OpenWorld = null ## the day and night clock, in the open world mode
+var _open_clock := 0.0     ## client: the host's open-world clock when we joined
 var difficulty := "normal" ## Difficulty.LEVELS; set before start_host, clients get it in `welcome`
 var sky_choice := ""       ## the host's `--time=` (a TimeOfDay name); "" = the mission's or the map's own
 var sky := "night"         ## the TimeOfDay preset this match plays; clients get it in `welcome`
@@ -134,6 +137,8 @@ func start_client(player_name_: String) -> void:
 func _build_world() -> void:
 	map = GameMap.create(map_name)
 	map.mission = mission
+	if GameModes.valid(mode):
+		GameModes.apply(mode, map) # the mode's zones and objectives, made from the same town on every peer
 	if limited_ammo:
 		map.infinite_ammo = false
 	gore.ground = map.ground_y
@@ -158,6 +163,9 @@ func _build_world() -> void:
 	sky_dome.name = "Sky"
 	add_child(sky_dome)
 	sky_dome.setup(map, sky)
+	if mode == "open_world" and map is CityMap:
+		open_world = OpenWorld.new(self, _open_clock)
+		add_child(open_world)
 
 	local_player = LocalPlayer.new()
 	local_player.name = "LocalPlayer"
@@ -206,7 +214,9 @@ func request_join(player_name_: String, version := 0) -> void:
 
 ## What a joining player must know about this match beyond the map: sent in `welcome`.
 func welcome_rules() -> Dictionary:
-	var r := { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION, "sky": sky }
+	var r := { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION, "sky": sky, "mode": mode }
+	if open_world != null:
+		r.open_clock = open_world.clock
 	if heli != null:
 		r.heli = heli_state()
 	return r
@@ -368,6 +378,8 @@ func welcome(map_name_: String, mission_: String, interactable_states: Dictionar
 	limited_ammo = not match_rules.get("infinite_ammo", true)
 	difficulty = match_rules.get("difficulty", "normal")
 	sky = TimeOfDay.resolve(match_rules.get("sky", "night"))
+	mode = match_rules.get("mode", "")
+	_open_clock = float(match_rules.get("open_clock", 0.0))
 	if match_rules.has("mission"):
 		mission_state(match_rules.mission)
 	_build_world()
