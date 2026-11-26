@@ -1,0 +1,40 @@
+{
+ "name": "works_barrier",
+ "family": "checkpoint",
+ "size": [
+  2.14,
+  1.215,
+  0.6
+ ],
+ "min": [
+  -1.07,
+  0.0,
+  -0.3
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  714,
+  276,
+  76
+ ],
+ "emission": true,
+ "close": [
+  -0.6,
+  0.8,
+  0.0
+ ]
+}

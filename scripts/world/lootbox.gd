@@ -28,7 +28,9 @@ func _init() -> void:
 	glow = gb.instance(MeshKit.emissive(Color("66ff99"), 3.0), false)
 	glow.visible = false
 	add_child(glow)
-	add_child(_click_body(Vector3(0.9, 0.58, 0.6), Vector3(0, 0.29, 0)))
+	var box_body := _click_body(Vector3(0.9, 0.58, 0.6), Vector3(0, 0.29, 0))
+	Surface.tag(box_body, Surface.Kind.METAL)
+	add_child(box_body)
 
 
 func prompt() -> String:

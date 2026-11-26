@@ -1,0 +1,40 @@
+{
+ "name": "wheel_steel",
+ "family": "vehicle_kit",
+ "size": [
+  0.20700000000000002,
+  0.635,
+  0.635
+ ],
+ "min": [
+  -0.10350000000000001,
+  0.0,
+  -0.3175
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1864,
+  684,
+  296
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  0.3175,
+  0.0
+ ]
+}

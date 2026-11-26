@@ -219,7 +219,7 @@ func test_without_respawn_the_dead_are_out_and_zombies_leave_them() -> void:
 	var calls := spy(g)
 	_guest(g)
 	g.players[7].pos = Vector3(0, 0.1, 10)
-	g.damage_player(1, 100000)
+	g.kill_player(1)
 	assert_eq(count(calls, &"on_player_died"), 1)
 	assert_true(g.rules.out.has(1))
 	assert_true(g.rules.running(), "the guest lives")

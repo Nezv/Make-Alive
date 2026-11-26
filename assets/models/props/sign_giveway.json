@@ -1,0 +1,40 @@
+{
+ "name": "sign_giveway",
+ "family": "signs_street",
+ "size": [
+  0.8838564064605512,
+  2.99,
+  0.11032255589023782
+ ],
+ "min": [
+  -0.4419282032302756,
+  0.0,
+  -0.05516127794511891
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  346,
+  126,
+  62
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  2.7,
+  0.0
+ ]
+}

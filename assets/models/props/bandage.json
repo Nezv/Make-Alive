@@ -1,0 +1,40 @@
+{
+ "name": "bandage",
+ "family": "carried",
+ "size": [
+  0.1,
+  0.12219532303224033,
+  0.211
+ ],
+ "min": [
+  -0.05,
+  -0.04619532303224033,
+  -0.173
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  260,
+  168,
+  60
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.04,
+  -0.05
+ ]
+}

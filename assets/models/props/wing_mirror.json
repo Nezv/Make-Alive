@@ -1,0 +1,39 @@
+{
+ "name": "wing_mirror",
+ "family": "vehicle_kit",
+ "size": [
+  0.24,
+  0.12,
+  0.10001853169596253
+ ],
+ "min": [
+  0.0,
+  0.0,
+  -0.0020185316959625338
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  104,
+  44
+ ],
+ "emission": true,
+ "close": [
+  0.15,
+  0.06,
+  0.05
+ ]
+}

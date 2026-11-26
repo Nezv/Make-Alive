@@ -1,0 +1,40 @@
+{
+ "name": "traffic_light_ped",
+ "family": "traffic",
+ "size": [
+  0.3,
+  2.64,
+  0.5599999999999999
+ ],
+ "min": [
+  -0.15,
+  0.0,
+  -0.475
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  654,
+  446,
+  158
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  2.25,
+  -0.2
+ ]
+}

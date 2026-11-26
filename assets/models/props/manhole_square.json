@@ -1,0 +1,52 @@
+{
+ "name": "manhole_square",
+ "family": "road",
+ "size": [
+  0.8,
+  1.41,
+  0.8
+ ],
+ "min": [
+  -0.4,
+  -1.4,
+  -0.4
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "cover": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "move": [
+    0.0,
+    0.04,
+    -0.7
+   ]
+  }
+ },
+ "tris": [
+  1612,
+  52,
+  44
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.0,
+  0.0
+ ]
+}

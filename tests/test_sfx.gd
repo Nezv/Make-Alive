@@ -203,4 +203,4 @@ func test_firing_a_gun_goes_through_the_engine() -> void:
 	g.local_player.weapons.step(1.0)
 	var before: int = Sfx.stats.played
 	g._fire(Weapons.def(Weapons.AK47))
-	assert_eq(Sfx.stats.played, before + 1)
+	assert_eq(Sfx.stats.played, before + 2, "the shot and the room's answer")

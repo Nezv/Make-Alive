@@ -1,9 +1,10 @@
 class_name CityData
-## Central Joinville as data, traced by hand from references/joinville.png.
+## Joinville as data, in pixels of references/joinville.png: the POIs, river, hill and squares by hand,
+## the streets traced by tools/trace_streets.py (CityStreets).
 ##
 ## Every coordinate here is a pixel of that picture (x right, y down, north is up). `to_world`
 ## turns a pixel into metres: the bus terminal is the origin, east is +X and north is -Z.
-## CityMap decides which part to keep (the POIs plus a margin) and builds it.
+## CityMap builds all of it, out to FRAME.
 
 const REF_IMAGE := "res://references/joinville.png"
 const M_PER_PX := 200.0 / 89.0             ## the picture's scale bar: 200 m is 89 px
@@ -12,9 +13,6 @@ const ORIGIN_PX := Vector2(1035, 504)      ## Terminal Central
 ## Matched on the Rio do Engenho park pond, which both pictures show.
 const TOPO_OFFSET_PX := Vector2(183, -477)
 
-const AVENUE := 16.0 ## street widths in metres, kerb to kerb plus sidewalks
-const STREET := 12.0
-const LANE := 8.0
 const RIVER_WIDTH := 26.0
 
 ## The five mission places. `at` is where a player stands, `lot` its grounds (cleared of city
@@ -22,11 +20,11 @@ const RIVER_WIDTH := 26.0
 const POIS := {
 	"hospital": { "name": "HOSPITAL DONA HELENA", "at": Vector2(742, 405), "gate": Vector2(763, 405),
 		"lot": [Vector2(722, 371), Vector2(762, 371), Vector2(762, 439), Vector2(722, 439)] },
-	"terminal": { "name": "TERMINAL CENTRAL", "at": Vector2(1035, 504), "gate": Vector2(1035, 527),
+	"terminal": { "name": "TERMINAL CENTRAL", "at": Vector2(1035, 504), "gate": Vector2(1035, 528),
 		"lot": [Vector2(1013, 488), Vector2(1057, 488), Vector2(1057, 520), Vector2(1013, 520)] },
-	"prefeitura": { "name": "PREFEITURA DE JOINVILLE", "at": Vector2(1200, 215), "gate": Vector2(1164, 215),
+	"prefeitura": { "name": "PREFEITURA DE JOINVILLE", "at": Vector2(1200, 215), "gate": Vector2(1159, 214),
 		"lot": [Vector2(1174, 195), Vector2(1226, 195), Vector2(1226, 235), Vector2(1174, 235)] },
-	"batalhao": { "name": "62º BATALHÃO DE INFANTARIA", "at": Vector2(665, 840), "gate": Vector2(700, 786),
+	"batalhao": { "name": "62º BATALHÃO DE INFANTARIA", "at": Vector2(665, 840), "gate": Vector2(674.5, 753),
 		"lot": [Vector2(578, 795), Vector2(640, 765), Vector2(775, 880), Vector2(745, 900), Vector2(620, 892), Vector2(568, 842)] },
 	# On the 230 m summit of Morro da Boa Vista, where the road ends. joinville.png shows only the tip
 	# of the hill under its zoom buttons; this and the road up come from joinville_topography.png.
@@ -35,87 +33,164 @@ const POIS := {
 			Vector2(1856, 35), Vector2(1866, 31), Vector2(1876, 35)] },
 }
 
-## Points the map's edge must also enclose: the hairpin of the road up to the Mirante, which
-## swings north of the summit (the edge is the hull of the POI lots plus these, grown by CITY_MARGIN).
-const EDGE_EXTRA := [Vector2(1808, -92), Vector2(1773, -37)]
+## The map: all of joinville.png, and above it as far as the hairpin of the road up to the Mirante,
+## which swings north of the summit with room round it for the hill (joinville_topography.png gives
+## the ground there; the menu's picture starts at the same row).
+const FRAME := Rect2(0, -180, 1920, 1200)
 
 ## Rio Cachoeira, north to south.
 const RIVER := [Vector2(1128, -90), Vector2(1130, 150), Vector2(1150, 220), Vector2(1154, 330), Vector2(1153, 440),
-	Vector2(1168, 500), Vector2(1195, 560), Vector2(1232, 640), Vector2(1300, 740), Vector2(1420, 840)]
+	Vector2(1168, 500), Vector2(1195, 560), Vector2(1232, 640), Vector2(1300, 740), Vector2(1380, 805), Vector2(1430, 865), Vector2(1462, 940),
+	Vector2(1490, 1030)]
 
 ## Morro da Boa Vista: forest, crossed only by the road up to the Mirante.
 const FOREST := [Vector2(1205, 265), Vector2(1290, 215), Vector2(1400, 200), Vector2(1410, 130), Vector2(1560, 110),
 	Vector2(1620, 60), Vector2(1625, -330), Vector2(2110, -330), Vector2(2100, 420), Vector2(1620, 440),
 	Vector2(1480, 600), Vector2(1340, 720), Vector2(1260, 600), Vector2(1215, 520), Vector2(1200, 420)]
 
-## Open green ground: the immigrants' cemetery and the squares.
+## Open green ground: the old cemetery by the Hôtel-Dieu.
 const PARKS := [
 	[Vector2(668, 352), Vector2(735, 352), Vector2(735, 420), Vector2(690, 420), Vector2(668, 395)],
-	[Vector2(930, 545), Vector2(995, 545), Vector2(995, 600), Vector2(945, 600)],
-	[Vector2(1068, 490), Vector2(1148, 495), Vector2(1160, 528), Vector2(1068, 522)],
 ]
 
-## Ways into squares the traced streets only pass near: [from, to], a LANE wide.
-const SQUARE_PATHS := [
-	[Vector2(962, 522), Vector2(962, 552)],  # Rua Nove de Março into the square south of it (the crash site)
+# --- The town's plan (S040) -----------------------------------------------------------------------
+# Joinville's own streets, traced off joinville.png (CityStreets): the main ones where its bus routes
+# run, every other street of the picture as a rue, all under invented French names; the road up the
+# hill by hand off joinville_topography.png. The look is a French town's (setts, pavements, pans coupés).
+
+const DRIVE := 8.0          ## metres: the way from a POI's gate to its door
+const NAV_MIN_WIDTH := 6.0  ## metres: no street is narrower than this on the 4 m navigation grid
+
+## Street surfaces (pavements are always `flags`).
+const SURFACES := ["setts", "asphalt", "flags"]
+
+## What each kind of street is, in metres: `road` the carriageway kerb to kerb, `walk` the pavement
+## [left, right] looking along the street's points, `oneway` 1 along the points, -1 against, 0 both
+## ways, `covered` for a passage through a block under the houses. A street may override any of them.
+const KINDS := {
+	"principale": { "road": 9.0, "walk": [2.5, 2.5], "surface": "asphalt", "oneway": 0 },
+	"rue": { "road": 5.5, "walk": [1.5, 1.5], "surface": "setts", "oneway": 0 },
+	"chemin": { "road": 6.0, "walk": [0.0, 0.0], "surface": "asphalt", "oneway": 0 },
+}
+
+## The names given by hand (the traced streets carry theirs in CityStreets.NAMES).
+const HAND_NAMES := {
+	"telegraphe": "chemin du Télégraphe",
+	"marche": "place du Marché",
+	"eglise": "place de l'Église",
+}
+
+## Paved squares, open ground.
+const SQUARES := [
+	{ "id": "marche", "pts": [Vector2(1068, 486), Vector2(1095, 482), Vector2(1121, 488), Vector2(1123, 520),
+		Vector2(1094, 527), Vector2(1066, 525)] },
+	{ "id": "eglise", "pts": [Vector2(893, 528), Vector2(985, 530), Vector2(992, 597), Vector2(930, 601), Vector2(906, 570)] },
 ]
 
-## [name, width, points...]. Only what lies inside the map's edge is built.
-const STREETS := [
-	# West to east
-	["Rua Max Colin", AVENUE, Vector2(660, 150), Vector2(775, 165), Vector2(885, 172), Vector2(985, 182), Vector2(1105, 190), Vector2(1135, 203), Vector2(1166, 207)],
-	["Rua Marechal Deodoro", STREET, Vector2(660, 215), Vector2(770, 222), Vector2(895, 232)],
-	["Rua Tijucas", STREET, Vector2(770, 226), Vector2(900, 240), Vector2(985, 245), Vector2(1105, 250)],
-	["Rua Lages", STREET, Vector2(600, 262), Vector2(660, 265), Vector2(770, 272), Vector2(900, 283), Vector2(985, 290), Vector2(1087, 293)],
-	["Rua Luiz Brockmann", STREET, Vector2(658, 310), Vector2(766, 318)],
-	["Rua dos Ginásticos", STREET, Vector2(766, 349), Vector2(896, 357), Vector2(1076, 343)],
-	["Rua Mário Lobo", STREET, Vector2(762, 412), Vector2(895, 422), Vector2(1066, 435), Vector2(1141, 440), Vector2(1167, 440)],
-	["Rua XV de Novembro", AVENUE, Vector2(470, 368), Vector2(620, 380), Vector2(690, 420), Vector2(760, 468), Vector2(895, 475),
-		Vector2(1063, 480), Vector2(1148, 487), Vector2(1186, 502)],
-	["Rua Otto Boehm", STREET, Vector2(440, 600), Vector2(540, 570), Vector2(622, 535), Vector2(690, 518), Vector2(758, 512)],
-	["Rua Nove de Março", AVENUE, Vector2(758, 512), Vector2(885, 520), Vector2(1040, 528), Vector2(1160, 540), Vector2(1206, 546)],
-	["Rua Jerônimo Coelho", STREET, Vector2(1000, 582), Vector2(1084, 588), Vector2(1160, 595), Vector2(1208, 600)],
-	["Rua Pedro Lobo leste", STREET, Vector2(885, 632), Vector2(1000, 640), Vector2(1082, 646), Vector2(1160, 648)],
-	["Rua Abdon Batista", STREET, Vector2(1010, 740), Vector2(1160, 741), Vector2(1215, 742)],
-	["Rua Ministro Calógeras", AVENUE, Vector2(660, 960), Vector2(740, 915), Vector2(800, 872), Vector2(900, 832), Vector2(990, 828), Vector2(1210, 835)],
-	["Rua Campo Alegre", STREET, Vector2(560, 500), Vector2(622, 470), Vector2(690, 452), Vector2(745, 458)],
-	# North to south
-	["Rua Conselheiro Arp", STREET, Vector2(660, 150), Vector2(658, 265), Vector2(655, 340), Vector2(645, 385)],
-	["Rua Expedicionário Holz", STREET, Vector2(645, 385), Vector2(626, 420), Vector2(620, 470), Vector2(622, 560), Vector2(630, 680), Vector2(650, 750)],
-	["Rua Blumenau", AVENUE, Vector2(778, 100), Vector2(775, 165), Vector2(770, 290), Vector2(762, 420), Vector2(760, 468), Vector2(758, 512)],
-	["Rua Henrique Meyer", STREET, Vector2(758, 512), Vector2(752, 560), Vector2(748, 600), Vector2(765, 632)],
-	["Rua Doutor João Colin", AVENUE, Vector2(882, 100), Vector2(885, 172), Vector2(898, 300), Vector2(895, 420), Vector2(888, 515)],
-	["Avenida Juscelino Kubitschek", AVENUE, Vector2(888, 515), Vector2(900, 560), Vector2(940, 620), Vector2(965, 700), Vector2(990, 830), Vector2(995, 960)],
-	["Rua Orestes Guimarães", STREET, Vector2(985, 100), Vector2(985, 182), Vector2(985, 290), Vector2(990, 345), Vector2(1005, 440)],
-	["Rua do Príncipe", STREET, Vector2(1005, 440), Vector2(1003, 520), Vector2(1000, 640), Vector2(1010, 740), Vector2(1030, 830)],
-	["Rua Dona Francisca", STREET, Vector2(1105, 250), Vector2(1087, 293), Vector2(1076, 343), Vector2(1066, 435), Vector2(1063, 480), Vector2(1062, 528)],
-	["Rua Rio Branco", STREET, Vector2(1084, 530), Vector2(1084, 588), Vector2(1082, 646)],
-	["Rua Itajaí", STREET, Vector2(1160, 540), Vector2(1160, 648), Vector2(1160, 741)],
-	["Avenida José Vieira", AVENUE, Vector2(1106, -20), Vector2(1110, 150), Vector2(1135, 203), Vector2(1139, 260), Vector2(1139, 430), Vector2(1148, 487), Vector2(1160, 540)],
-	["Avenida Hermann August Lepper", AVENUE, Vector2(1146, 60), Vector2(1150, 150), Vector2(1166, 207), Vector2(1169, 262), Vector2(1168, 330),
-		Vector2(1167, 440), Vector2(1186, 502), Vector2(1206, 546), Vector2(1208, 600), Vector2(1212, 648), Vector2(1215, 742), Vector2(1212, 835)],
-	["Rua Saguaçu", STREET, Vector2(1166, 207), Vector2(1226, 185), Vector2(1280, 175), Vector2(1330, 165)],
-	# The diagonals south-west of the centre, toward the barracks
-	["Rua Pedro Lobo", STREET, Vector2(835, 572), Vector2(885, 632), Vector2(940, 620)],
-	["Rua Visconde de Taunay", STREET, Vector2(888, 515), Vector2(835, 572), Vector2(765, 632), Vector2(740, 655), Vector2(650, 750)],
-	["Rua Senador Felipe Schmidt", STREET, Vector2(885, 632), Vector2(800, 720), Vector2(735, 786)],
-	["Rua Jaguaruna", STREET, Vector2(950, 660), Vector2(905, 690), Vector2(850, 745), Vector2(775, 815)],
-	["Rua Duque de Caxias", AVENUE, Vector2(650, 750), Vector2(720, 800), Vector2(790, 875), Vector2(800, 872)],
-	["Rua Jacob Eisenhuth", STREET, Vector2(650, 750), Vector2(600, 742), Vector2(560, 720), Vector2(522, 770)],
-	["Rua General Valgas Neves", STREET, Vector2(522, 770), Vector2(545, 850), Vector2(580, 895), Vector2(660, 960)],
-	# Up the hill
+## Streets drawn by hand, each `{ id, kind, pts }` in pixels of joinville.png, with optional overrides
+## of its kind (`road`, `walk`, `oneway`, `surface`, `covered`) and `narrow`: a factor on the
+## carriageway per point, where the street pinches or opens out. Streets meet where an end lies on
+## another street (within a few metres) or where two cross; StreetNet finds the junctions.
+const HAND_STREETS := [
 	# Traced on joinville_topography.png (pixel + TOPO_OFFSET_PX): two S-bends up the west slope, a
 	# hairpin north of the summit, then back south-east onto the top. Negative y is above joinville.png.
-	# The way up starts where Rua Saguaçu ends, along the south of the Rio do Engenho park. (Rua Otto
-	# Eduardo Lepper, west of it, is a dashed footpath on the map: not a road.)
-	["Rua Pastor Guilherme Rau", LANE, Vector2(1330, 165), Vector2(1385, 187), Vector2(1430, 198), Vector2(1470, 212),
+	# It starts where the road along the south of the Rio do Engenho park ends.
+	{ "id": "telegraphe", "kind": "chemin", "walk": [1.0, 1.0], "pts": [Vector2(1329.2, 167.4), Vector2(1385, 187), Vector2(1430, 198), Vector2(1470, 212),
 		Vector2(1500, 207), Vector2(1520, 212), Vector2(1535, 235), Vector2(1560, 255), Vector2(1590, 280), Vector2(1615, 297),
 		Vector2(1630, 300), Vector2(1648, 283), Vector2(1665, 253),
 		Vector2(1678, 218), Vector2(1680, 188), Vector2(1698, 168), Vector2(1700, 148), Vector2(1688, 118), Vector2(1688, 88),
 		Vector2(1668, 53), Vector2(1668, 33), Vector2(1683, 15), Vector2(1708, 10), Vector2(1733, -2), Vector2(1773, -37),
 		Vector2(1798, -77), Vector2(1808, -92), Vector2(1818, -87), Vector2(1825, -57), Vector2(1818, -27), Vector2(1813, 8),
-		Vector2(1823, 33), Vector2(1848, 43), Vector2(1866, 45)],
+		Vector2(1823, 33), Vector2(1848, 43), Vector2(1866, 45)] },
 ]
+
+## Every street of the plan: the traced ones, less those that lie mostly inside a POI's grounds (its
+## driveways and car parks: the POI builds its own) or along a hand-drawn street (the top of the hill
+## road, which joinville.png shows too), and the hand-drawn ones.
+static var STREETS: Array = _plan_streets()
+
+
+static func _plan_streets() -> Array:
+	var out := []
+	for s: Dictionary in CityStreets.STREETS:
+		if not _mostly_in_a_lot(s.pts) and not _along_a_hand_street(s.pts):
+			out.append(s)
+	out.append_array(HAND_STREETS)
+	return out
+
+
+static func _along_a_hand_street(pts: Array) -> bool:
+	var near := 0
+	var total := 0
+	for i in pts.size() - 1:
+		for j in 8:
+			var p: Vector2 = (pts[i] as Vector2).lerp(pts[i + 1], j / 8.0)
+			total += 1
+			for h: Dictionary in HAND_STREETS:
+				var q: Array = h.pts
+				var hit := false
+				for k in q.size() - 1:
+					if Geometry2D.get_closest_point_to_segment(p, q[k], q[k + 1]).distance_to(p) < 8.0:
+						hit = true
+						break
+				if hit:
+					near += 1
+					break
+	return near * 2 > total
+
+
+static func _mostly_in_a_lot(pts: Array) -> bool:
+	var inside := 0
+	var total := 0
+	for i in pts.size() - 1:
+		for j in 8:
+			var p: Vector2 = (pts[i] as Vector2).lerp(pts[i + 1], j / 8.0)
+			total += 1
+			for id: String in POIS:
+				if Geometry2D.is_point_in_polygon(p, PackedVector2Array(POIS[id].lot)):
+					inside += 1
+					break
+	return inside * 2 > total
+
+
+## The name of a street or square.
+static func name_of(id: String) -> String:
+	return HAND_NAMES.get(id, CityStreets.NAMES.get(id, ""))
+
+
+## A street's kind with its own overrides: road, walk [left, right], surface, oneway, covered.
+static func spec(street: Dictionary) -> Dictionary:
+	var out: Dictionary = (KINDS[street.kind] as Dictionary).duplicate(true)
+	for k in ["road", "walk", "surface", "oneway", "covered"]:
+		if street.has(k):
+			out[k] = street[k]
+	out.walk = [float(out.walk[0]), float(out.walk[1])]
+	out.road = float(out.road)
+	out.covered = bool(out.get("covered", false))
+	return out
+
+
+## Wall to wall in metres: carriageway (at its widest) and both pavements.
+static func width(street: Dictionary) -> float:
+	var sp := spec(street)
+	var most := 1.0
+	for f: float in street.get("narrow", [1.0]):
+		most = maxf(most, f)
+	return sp.road * most + sp.walk[0] + sp.walk[1]
+
+
+static func street(id: String) -> Dictionary:
+	for s: Dictionary in STREETS:
+		if s.id == id:
+			return s
+	return {}
+
+
+static func square(id: String) -> Dictionary:
+	for s: Dictionary in SQUARES:
+		if s.id == id:
+			return s
+	return {}
 
 
 static func to_world(px: Vector2) -> Vector3:

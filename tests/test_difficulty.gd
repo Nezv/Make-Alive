@@ -101,7 +101,7 @@ func test_the_level_is_sent_in_welcome_and_saved_with_records() -> void:
 	client.welcome("corridor", "", {}, g.welcome_rules())
 	assert_eq(client.difficulty, "hard")
 	assert_false(client.show_markers() == false, "hard still has markers")
-	client.welcome("corridor", "", {}, { "difficulty": "nightmare" })
+	client.welcome("corridor", "", {}, { "difficulty": "nightmare", "version": Config.PROTOCOL_VERSION })
 	assert_false(client.show_markers())
 
 

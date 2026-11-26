@@ -1,0 +1,40 @@
+{
+ "name": "railing_plinth",
+ "family": "boundaries",
+ "size": [
+  2.4,
+  2.08,
+  0.46
+ ],
+ "min": [
+  -1.2,
+  0.0,
+  -0.23
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  2324,
+  616,
+  288
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.8,
+  0.0
+ ]
+}

@@ -99,15 +99,14 @@ func test_the_whole_climb_from_gate_to_helicopter() -> void:
 	assert_gt(g.rules.heli_left, 0.0, "after %d waves the helicopter is on its way" % waves)
 	assert_true(g.mission_view.heli)
 	await seconds(0.2)
-	assert_true(g.helicopter != null, "it is seen coming")
+	assert_true(g.heli != null, "it is seen coming")
+	assert_lt(g.heli_flight.lz.distance_to(m.data.raw.heli.at), 0.01, "to its spot beside the deck")
 	for i in 40:
 		g.rules.step(5.0)
 		_kill_all(g)
 		if g.rules.current().kind == "extract":
 			break
 	assert_eq(g.rules.current().kind, "extract", "down: up the tower to board it")
-	await seconds(0.2)
-	assert_lt(g.helicopter.position.distance_to(m.data.raw.heli.at), 1.0, "it hovers beside the deck")
 	me.pos = (m.mirante.deck as Vector3) + Vector3(1.5, 0.1, 1.5)
 	for i in 20:
 		g.rules.step(0.5)

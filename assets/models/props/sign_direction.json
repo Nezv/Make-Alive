@@ -1,0 +1,40 @@
+{
+ "name": "sign_direction",
+ "family": "signs_street",
+ "size": [
+  1.0663173072565584,
+  2.99,
+  0.11032255589023782
+ ],
+ "min": [
+  -0.057999999999999996,
+  0.0,
+  -0.05516127794511891
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  278,
+  206,
+  62
+ ],
+ "emission": false,
+ "close": [
+  0.5,
+  2.5,
+  0.0
+ ]
+}

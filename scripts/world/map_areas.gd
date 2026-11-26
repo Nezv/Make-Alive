@@ -92,3 +92,91 @@ static func mirante(map: CityMap) -> Dictionary:
 			{ "id": "board", "kind": "extract", "zone": "deck", "seconds": 5.0, "text": "Up the tower: board the helicopter" },
 		],
 	}
+
+
+## The Hospital Dona Helena (EXTRACTION, up): start under the ambulance bay on Rua Blumenau, get
+## round the tower to the yard behind (a checkpoint, the triage tent), hold it through three waves
+## while the helicopter comes, then up the fire stair, ten floors, to board it on the roof.
+static func hospital(map: CityMap) -> Dictionary:
+	var lot: Transform3D = map.hospital.frame
+	var pad: Vector3 = map.hospital.pad
+	var free := func(local: Vector3) -> Vector3:
+		var p := map.nav.nearest_free(lot * local)
+		p.y = map.ground_y(p) + 0.1
+		return p
+	var spawns := []
+	for row in 2: # two rows of four in the drop-off lane, facing the street
+		for i in 4:
+			spawns.append({ "at": free.call(Vector3(-33.6 + i * 2.4, 0, -15.0 - row * 1.6)), "yaw": -PI * 0.5 })
+	var yard := lot * Vector3(-31, 4, 34)
+	return {
+		"name": "hospital",
+		"player_spawns": spawns,
+		"zombie_closets": [
+			{ "id": "back_west", "at": free.call(Vector3(-70, 0, 40)), "radius": 3.0 },
+			{ "id": "back_east", "at": free.call(Vector3(-6, 0, 42)), "radius": 3.0 },
+			{ "id": "blumenau_north", "at": map.nav.nearest_free(CityData.to_world(Vector2(767, 335))), "radius": 3.0 },
+			{ "id": "blumenau_south", "at": map.nav.nearest_free(CityData.to_world(Vector2(760, 466))), "radius": 3.0 },
+		],
+		"zones": [
+			# 44 m along the back of the tower, 20 m out from it (the lot is turned: x and z swap).
+			{ "id": "yard", "kind": "checkpoint", "box": [yard, Vector3(20, 8, 44)],
+				"look": { "at": lot * Vector3(-40, 0, 31), "yaw": -PI * 0.5, "kind": "tent" } },
+			{ "id": "roof", "kind": "extraction", "box": [pad + Vector3(0, 1.5, 0), Vector3(HospitalSet.PAD_HALF * 2.0, 3.0, HospitalSet.PAD_HALF * 2.0)] },
+		],
+		# Settling onto the helipad, nose to the street.
+		"heli": { "at": pad + Vector3(0, 0.82, 0), "yaw": -PI * 0.5, "floor": pad.y + 0.12 },
+		"objectives": [
+			{ "id": "yard", "kind": "reach", "zone": "yard", "text": "Get round the tower to the yard behind" },
+			{ "id": "hold", "kind": "survive", "zone": "yard", "text": "Hold the yard until the helicopter is on the roof", "heli": 60.0,
+				"waves": [
+					{ "size": 10, "types": { "walker": 0.7, "runner": 0.3 }, "closets": ["blumenau_north", "blumenau_south"] },
+					{ "size": 14, "gap": 12.0, "types": { "walker": 0.55, "runner": 0.35, "leaper": 0.1 }, "closets": ["back_west", "back_east"] },
+					{ "size": 18, "gap": 12.0, "types": { "walker": 0.45, "runner": 0.4, "leaper": 0.15 } },
+				] },
+			{ "id": "board", "kind": "extract", "zone": "roof", "seconds": 5.0, "text": "Up the fire stair to the roof: board the helicopter" },
+		],
+	}
+
+
+## The Prefeitura mission on the city map, defending: start on the forecourt behind the sandbags
+## at the door, hold it through three waves coming down the avenue, round the ends of the building
+## from the yard behind it and out of the car park, the helicopter coming in during the last; then
+## everyone onto the round pad on the south lawn. Places come from the built map (`map.prefeitura`).
+static func prefeitura(map: CityMap) -> Dictionary:
+	var lot: Transform3D = map.prefeitura.frame
+	var pad: Vector3 = map.prefeitura.pad
+	var free := func(local: Vector3) -> Vector3:
+		var p := map.nav.nearest_free(lot * local)
+		p.y = map.ground_y(p) + 0.1
+		return p
+	var spawns := []
+	for row in 2: # two rows of four between the sandbags and the canopy, facing the avenue
+		for i in 4:
+			spawns.append({ "at": free.call(Vector3(-3.6 + i * 2.4, 0, -0.5 - row * 1.6)), "yaw": PI * 0.5 })
+	var forecourt := lot * Vector3(0, 4, -8)
+	return {
+		"name": "prefeitura",
+		"player_spawns": spawns,
+		"zombie_closets": [
+			{ "id": "yard_south", "at": free.call(Vector3(-30, 0, 44)), "radius": 3.0 },
+			{ "id": "yard_north", "at": free.call(Vector3(28, 0, 46)), "radius": 3.0 },
+			{ "id": "avenue_south", "at": map.nav.nearest_free(CityData.to_world(Vector2(1169, 268))), "radius": 3.0 },
+			{ "id": "avenue_north", "at": map.nav.nearest_free(CityData.to_world(Vector2(1156, 160))), "radius": 3.0 },
+		],
+		"zones": [
+			{ "id": "forecourt", "kind": "trigger", "box": [forecourt, Vector3(36, 8, 64)] }, # 64 m along the front, 36 m out from it
+			{ "id": "pad", "kind": "extraction", "box": [pad + Vector3(0, 1.5, 0), Vector3(PrefeituraSet.PAD_R * 1.8, 3.0, PrefeituraSet.PAD_R * 1.8)] },
+		],
+		# Settling onto the pad, nose to the avenue.
+		"heli": { "at": pad + Vector3(0, 0.7, 0), "yaw": PI * 0.5, "floor": pad.y },
+		"objectives": [
+			{ "id": "hold", "kind": "survive", "zone": "forecourt", "text": "Hold the Prefeitura until the helicopter comes", "heli": 60.0,
+				"waves": [
+					{ "size": 10, "types": { "walker": 0.7, "runner": 0.3 }, "closets": ["avenue_south", "avenue_north"] },
+					{ "size": 14, "gap": 12.0, "types": { "walker": 0.55, "runner": 0.35, "leaper": 0.1 }, "closets": ["yard_south", "yard_north"] },
+					{ "size": 18, "gap": 12.0, "types": { "walker": 0.45, "runner": 0.4, "leaper": 0.15 } },
+				] },
+			{ "id": "board", "kind": "extract", "zone": "pad", "seconds": 5.0, "text": "To the pad on the lawn: board the helicopter" },
+		],
+	}

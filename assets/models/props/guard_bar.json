@@ -1,0 +1,40 @@
+{
+ "name": "guard_bar",
+ "family": "street_small",
+ "size": [
+  0.12,
+  0.7570633909777091,
+  0.43230810839623346
+ ],
+ "min": [
+  -0.06,
+  0.0,
+  -0.43230810839623346
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  408,
+  144,
+  76
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.4,
+  -0.2
+ ]
+}
