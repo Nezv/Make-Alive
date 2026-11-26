@@ -42,6 +42,13 @@ var idle := false         ## a wanderer: stands about until a player comes close
 var route: Array = []     ## points of a horde route still to walk before it goes for a player (HordeDirector)
 var meal := Vector3.INF   ## a dead player's body it is going to (or feeding on); INF = none
 
+# Looks only, worked out on every peer from what it can see (never sent):
+var _slow_t := 0.0        ## a runner: how long it has been barely moving while chasing
+var _jammed := false      ## ...with another zombie right in front of it (it claws over them)
+var _jam_check := 0.0
+var _last_yaw := 0.0
+var _turn := 0.0          ## smoothed turning speed, rad/s
+
 
 static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, severed := 0) -> Zombie:
 	var z := Zombie.new()
@@ -354,7 +361,7 @@ func _face(dir: Vector3) -> void:
 
 func _anim_for_state() -> int:
 	match state:
-		State.ATTACK: return Humanoid.Anim.ATTACK
+		State.ATTACK: return Humanoid.Anim.LUNGE if type == Type.RUNNER else Humanoid.Anim.ATTACK
 		State.WINDUP: return Humanoid.Anim.WINDUP
 		State.LEAP: return Humanoid.Anim.LEAP
 		State.LAND: return Humanoid.Anim.LAND
@@ -362,7 +369,11 @@ func _anim_for_state() -> int:
 		State.FEED: return Humanoid.Anim.FEED
 	if is_crawling():
 		return Humanoid.Anim.CRAWL
-	return Humanoid.Anim.RUN if type == Type.RUNNER else Humanoid.Anim.WALK
+	if type != Type.RUNNER:
+		return Humanoid.Anim.WALK
+	if _slow_t > Config.RUNNER_STALL_TIME:
+		return Humanoid.Anim.SURGE if _jammed else Humanoid.Anim.IDLE
+	return Humanoid.Anim.SPRINT
 
 
 func _process(delta: float) -> void:
@@ -378,5 +389,41 @@ func _process(delta: float) -> void:
 			est_velocity = (position - _last_pos) / delta
 		_last_pos = position
 		ground_speed = Vector2(est_velocity.x, est_velocity.z).length()
+	if type == Type.RUNNER:
+		_runner_looks(delta, ground_speed)
 	rig.set_anim(_anim_for_state())
 	rig.update(delta, ground_speed)
+
+
+## What a runner's body is doing that the state doesn't say: turning (it banks into it),
+## stalled (stands twitching), or stalled with a zombie in its face (claws over it).
+func _runner_looks(delta: float, ground_speed: float) -> void:
+	if delta <= 0.0:
+		return
+	var yaw_rate := wrapf(rotation.y - _last_yaw, -PI, PI) / delta
+	_last_yaw = rotation.y
+	_turn = lerpf(_turn, yaw_rate, 1.0 - exp(-8.0 * delta))
+	rig.turn = _turn
+	if state != State.CHASE or ground_speed > Config.RUNNER_STALL_SPEED:
+		_slow_t = 0.0
+		_jammed = false
+		return
+	_slow_t += delta
+	_jam_check -= delta
+	if _jam_check > 0.0:
+		return
+	_jam_check = Config.RUNNER_JAM_CHECK
+	_jammed = false
+	var game := get_parent() as Game
+	if game == null:
+		return
+	var fwd := -global_transform.basis.z
+	for other: Zombie in game.zombies.values():
+		if other == self:
+			continue
+		var off := other.global_position - global_position
+		off.y = 0.0
+		var d := off.length()
+		if d > 0.05 and d < Config.RUNNER_JAM_RANGE and fwd.dot(off / d) > 0.5:
+			_jammed = true
+			return

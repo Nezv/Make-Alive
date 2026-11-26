@@ -286,6 +286,12 @@ const ZOMBIE_ATTACK_RANGE := 1.3
 const ZOMBIE_ATTACK_TIME := 0.7   # length of the swing
 const ZOMBIE_ATTACK_HIT_AT := 0.3 # moment in the swing the damage lands
 const ZOMBIE_DAMAGE := 12
+# Runner looks (every peer): below this ground speed while chasing for this long, a runner
+# stops sprinting; with another zombie within RUNNER_JAM_RANGE ahead it claws over them.
+const RUNNER_STALL_SPEED := 1.0
+const RUNNER_STALL_TIME := 0.25
+const RUNNER_JAM_RANGE := 1.2
+const RUNNER_JAM_CHECK := 0.2 # seconds between looks for a jam
 const ARMLESS_DAMAGE_MULT := 0.4  # no arms = it can only bite
 const CRAWL_SPEED_MULT := 0.35
 const STAGGER_TIME := 0.35
