@@ -42,6 +42,9 @@ const PAINT := Color("b8b8a8")
 const HILL_ROAD := "Rua Pastor Guilherme Rau"
 const KERB := Color("8a8983")        ## the flush concrete edging of the road up the hill
 const VERGE := Color("2e2b21")       ## packed earth and fallen leaves between the kerb and the trees
+const HILL_LANE := 2.2               ## the red brick walking lane on the right going up the hill
+const HILL_LINE := 0.14              ## the white line beside it, HILL_LINE_GAP in from the lane
+const HILL_LINE_GAP := 0.03
 const LEAVES := [Color("1c3320"), Color("23402a"), Color("182b1c"), Color("2a4a2c")]
 
 var nav: NavGrid
@@ -885,8 +888,7 @@ func _hill_road() -> void:
 		var at := gate * (bush[0] as Vector3)
 		at.y = ground_y(at)
 		Vegetation.plant(_trees, Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), at), bush[1], _rng)
-	# Lane, line, poles, cables and rails, from the gate to the summit.
-	var lane := 2.2
+	# Poles, cables and rails, from the gate to the summit (the lane and its line are paving).
 	var poles: Array = []
 	var rails := 0
 	d = gate_at - 10.0
@@ -894,12 +896,7 @@ func _hill_road() -> void:
 	while d < total - 4.0:
 		var e := minf(d + step, total - 4.0)
 		var a := hill_at(d)
-		var b := hill_at(e)
 		var ra := hill_right(d)
-		var rb := hill_right(e)
-		var off := width * 0.5 - lane * 0.5
-		_strip(a + ra * off, b + rb * off, ra, rb, lane, MiranteSet.BRICK, 0.06)
-		_strip(a + ra * (off - lane * 0.5 - 0.1), b + rb * (off - lane * 0.5 - 0.1), ra, rb, 0.14, PAINT, 0.07)
 		if d >= next_pole:
 			next_pole += 36.0
 			var at := a + ra * (width * 0.5 + 0.7)
@@ -1035,21 +1032,25 @@ static func _average(values: PackedFloat32Array, reach: int) -> PackedFloat32Arr
 	return out
 
 
-## The paving of the road up the hill from `from` to `to` metres along it: one smooth band of
-## pavers its full width and, with `edges`, a flush concrete kerb either side and a strip of
-## packed earth out to the trees, every edge a clean curve instead of the cells' staircase. Each
-## band hugs the levelled ground a little higher than the one under it, so none flickers through.
+## The paving of the road up the hill from `from` to `to` metres along it, one smooth band across:
+## pavers, the red brick lane on the right going up with a white line beside it and, with
+## `edges`, a flush concrete kerb either side and a strip of packed earth out to the trees. Every
+## edge is a clean curve instead of the cells' staircase, and the bands share their edges rather
+## than lie one over another, so none can show through the next.
 func _hill_paving(from: float, to: float, edges: bool) -> void:
 	var half := hill_width * 0.5
 	var kerb := half + Config.CITY_ROAD_KERB
 	var verge := kerb + Config.CITY_ROAD_VERGE
-	var offsets := [-verge, -kerb, -half, half, kerb, verge]
-	var colors := [VERGE, KERB, MiranteSet.PAVERS, KERB, VERGE]
-	var lifts := [0.03, 0.05, 0.04, 0.05, 0.03]
-	if not edges:
-		offsets = [-half, half]
-		colors = [MiranteSet.PAVERS]
-		lifts = [0.04]
+	var lane := half - HILL_LANE
+	var line := lane - HILL_LINE_GAP
+	var offsets := [-half, line - HILL_LINE, line, lane, half]
+	var colors := [MiranteSet.PAVERS, PAINT, MiranteSet.PAVERS, MiranteSet.BRICK]
+	if edges:
+		offsets = [-verge, -kerb] + offsets + [kerb, verge]
+		colors = [VERGE, KERB] + colors + [KERB, VERGE]
+	var lifts := []
+	for c: Color in colors:
+		lifts.append(0.03 if c == VERGE else 0.04)
 	var d := maxf(0.0, from)
 	var a := _cross_section(d, offsets)
 	while d < to - 0.01:
@@ -1179,16 +1180,6 @@ func _heading(line: PackedVector2Array, d: float) -> Vector2:
 func _right(line: PackedVector2Array, d: float) -> Vector2:
 	var h := _heading(line, d)
 	return Vector2(-h.y, h.x)
-
-
-## A strip of paint `w` wide over the ground from `a` to `b` (centre line), hugging the slope
-## `lift` metres above it (stacked layers each get their own, so none flickers through another).
-func _strip(a: Vector2, b: Vector2, ra: Vector2, rb: Vector2, w: float, color: Color, lift := 0.06) -> void:
-	var corners := [a - ra * w * 0.5, b - rb * w * 0.5, b + rb * w * 0.5, a + ra * w * 0.5]
-	var pts := []
-	for q: Vector2 in corners:
-		pts.append(Vector3(q.x, ground_y(Vector3(q.x, 0, q.y)) + lift, q.y))
-	_g.ground_quad(pts[0], pts[1], pts[2], pts[3], color)
 
 
 # --- Set pieces -------------------------------------------------------------------------------
