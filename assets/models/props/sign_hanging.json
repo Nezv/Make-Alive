@@ -1,0 +1,40 @@
+{
+ "name": "sign_hanging",
+ "family": "signs_shops",
+ "size": [
+  0.08,
+  0.671488779570971,
+  1.0068716455230986
+ ],
+ "min": [
+  -0.04,
+  -0.532,
+  -1.0068716455230986
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  928,
+  512,
+  344
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  -0.2,
+  -0.5
+ ]
+}

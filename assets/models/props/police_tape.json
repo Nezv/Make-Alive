@@ -1,0 +1,40 @@
+{
+ "name": "police_tape",
+ "family": "checkpoint",
+ "size": [
+  4.507996944614199,
+  1.0,
+  0.34
+ ],
+ "min": [
+  -2.17,
+  0.0,
+  -0.17
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  864,
+  496,
+  188
+ ],
+ "emission": true,
+ "close": [
+  1.9,
+  0.8,
+  0.0
+ ]
+}

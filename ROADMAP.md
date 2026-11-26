@@ -309,6 +309,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: stencilled lettering and lot numbers, chipped olive paint, the calibre stripe and brand-free print on the cartons, worn corners
 - [ ] States: shut, open (the lid hinge already animates), empty, broken open
 - [ ] Review: the corridor shot and the rack at 1 m
+- Under way: family `tools/models/props/containers.py`: `lootbox` (pressed steel chest, clasps, lid), `ammo_crate` (boards, cleats, rope handles, the rounds inside, lid) and `ammo_carton` (band, tape, print) have references and round 1, built. Left: rounds 2 and 3, the empty / broken states, swapping them into `lootbox.gd`, `ammo_crate.gd`, `ammo_box.gd` (the lootbox's lid hinges on its -Z edge today: turn the node).
 
 ### [ ] S153 · Carried things: medkit, bandage, pills, planks, backpack
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=carried`, `--host --map=corridor --wheel --shot-at=3`
@@ -323,6 +324,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 ---
 
 ## P03 · Missions
+- Under way: family `tools/models/props/carried.py`: `medkit`, `bandage`, `pills`, `planks`, `backpack` have round 1, built (references for the pills, the backpack and the bandage; the medkit and the planks still want photos). Left: rounds 2 and 3, the wheel's icons rendered from them, the heal holding the bandage, `backpack.gd` wearing the backpack.
 
 ### [x] S021 · Mission state and objectives
 > needs: S002, S003 | size: L | test: `tests/test_mission_rules.gd`
@@ -832,7 +834,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: rust and polish where tyres pass, leaves and silt in the drains, faded paint, patches and potholes as decals with depth
 - [ ] States: a missing cover (an open hole), a drain overflowing in rain (S110)
 - [ ] Review: the rack and a street strip at 1 m and 10 m
-- Under way: family `tools/models/props/road.py`: `manhole` (round cover in its square frame, after a Paris regard: rings, EAUX / ÉGOUTS cast round the ring, slot, the checker of studs baked by `road.Checker`, the shaft and rungs; the cover a part that lies pried off), `manhole_square` (radiating diamonds) and `valve_cover` (GAZ) have references and round 1, built. Left: the kerb drain (bouche d'égout; no square-on reference found yet), the gutter's dish and the raised crossing, rounds 2 and 3.
+- Under way: family `tools/models/props/road.py`: `manhole` (round cover in its square frame, after a Paris regard: rings, EAUX / ÉGOUTS cast round the ring, slot, the checker of studs baked by `road.Checker`, the shaft and rungs; the cover a part that lies pried off), `manhole_square` (radiating diamonds) and `valve_cover` (GAZ) have references and round 1, built. `gully_grate` (two slotted grates in a concrete surround) and `speed_hump` (a flat-topped hump with its painted teeth) have round 1 too. Left: the kerb drain's mouth in the kerb (bouche d'égout; no square-on reference found yet), the gutter's dish, rounds 2 and 3.
 
 ### [ ] S156 · Front walls, railings and gates
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=boundaries`
@@ -843,6 +845,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: stone and plaster with damp rising from the ground, flaking paint, rust on the railings, tags, moss
 - [ ] Modules that join along any lot line, with corners and ends; states: gate open, rammed, burnt
 - [ ] Review: a street front of ten lots at 10 m and the rack at 1 m
+- Under way: family `tools/models/props/boundaries.py`: `porte_cochere` (surround, reveal, leaves of panels opening into the court, chasse-roues), `railing_plinth` (a 2.40 m bay), `railing_pier`, `railing_gate` (two leaves) and `garden_wall` (a 3 m bay) have references and round 1, built. Left: corners and ends, the wicket door, the hill's villa walls, rounds 2 and 3, rammed and burnt states.
 
 ### [ ] S157 · Window kit
 > needs: S141 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=windows`
@@ -881,6 +884,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: faded paint, ghost signs of old trades on the blank walls, missing letters, rust running from the fixings
 - [ ] Seeded per building from its shop kind; states: lit, dead, flickering (S108), half fallen
 - [ ] Review: a street of signs by day and at night
+- Under way: family `tools/models/props/signs_shops.py`: `sign_tabac` (the carotte, TABAC on both faces, lit), `sign_pharmacy` (the green cross, lit, its cable) and `sign_hanging` (a wrought-iron bracket with scrolls, a board with a gilt key) have references and round 1, built. Left: the painted fascia words and the ghost signs on walls, more cut-outs (boot, grapes), seeding per shop, rounds 2 and 3.
 
 ### [ ] S161 · The timber-framed house
 > needs: S141, S157 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=half_timber`
@@ -926,6 +930,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: stone parapets with copings and the bays' benches, the piers' cutwaters, carved masks on the cornice, lanterns on the parapet, the footbridge's iron arches and wooden deck
 - [ ] Round 3 · surface: stains below the spouts, moss at the waterline, graffiti under the arches, rust on the ironwork
 - [ ] Review: each bridge from the quay and from the water at 10 m and 50 m
+- Under way: family `tools/models/props/bridges.py`: `bridge_stone` (three elliptical arches, archivolts, cutwaters rising into half-round bays with benches, cornice on corbels with masks, parapet, road and pavements; ashlar painted) and `bridge_foot` (one cast-iron span of five ribs with rings, oak deck, railings, lanterns) have round 1, built (the Pont Neuf's photos on the stone bridge's card; the footbridge's still to fetch: Commons refused requests). Left: the footbridge's photos, the demi-lunes' corbels, lanterns on the stone parapet, steps to the lower quay, rounds 2 and 3.
 
 ### [ ] S166 · Street lamps
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=lamps_street`
@@ -935,7 +940,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: dark green or black paint with chips, stickers on the posts, rust at the foot, insects in the glass
 - [ ] States: lit (warm, a little flicker in the old lanterns), dead, flickering (S108), bent by a crash, a lantern hanging askew
 - [ ] Review: each lamp at 1 m and 10 m, and lit at night
-- Under way: family `tools/models/props/lamps.py`: `lamp_post` (Marville's cast-iron candélabre: slab, pedestal with cartouches, bell, collar, leaves and flutes, capital, the shared lantern lit) and `wall_lantern` (the same lantern on a scrolled wall bracket) have references and round 1, built. Left: the réverbère on its rope (S167 hangs it), the modern mast of the outer roads, rounds 2 and 3, the lit / dead / flickering switch per instance (S046).
+- Under way: family `tools/models/props/lamps.py`: `lamp_post` (Marville's cast-iron candélabre: slab, pedestal with cartouches, bell, collar, leaves and flutes, capital, the shared lantern lit) and `wall_lantern` (the same lantern on a scrolled wall bracket) have references and round 1, built. `lamp_mast` (the modern mast: conical pole, arm, flat lit head) and `reverbere` (the 1800 lantern with its reflector, hook and rope stubs) have round 1 too. Left: rounds 2 and 3, the lit / dead / flickering switch per instance (S046).
 
 ### [ ] S167 · Lantern ropes and wires
 > needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=poles`
@@ -947,6 +952,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 4 · cables: catenaries with their sag, the lantern's weight pulling the span into a V, wires between poles along the hill road, a few broken and hanging down
 - [ ] States: a rope cut and its lantern smashed in the street, a leaning pole, sparks (S114)
 - [ ] Review: a street of three spans and a stretch of hill road at 10 m, and a wall box at 1 m
+- Under way: in `tools/models/props/lamps.py`: `reverbere` (the lantern on its hook, the rope's start each way) and `rope_box` (the locked wall box, pulley and rope) have round 1, built. `utility_pole` (crossarms, insulators, wires, stay) and `wall_insulators` (the bracket where the wires meet a house) too. Left: the spans as catenaries between anchors, seeded per street, rounds 2 to 4.
 
 ### [ ] S168 · Traffic lights
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=traffic_lights`
@@ -956,6 +962,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: faded paint, dirty lenses, stickers on the poles and cabinet
 - [ ] States: dead, blinking amber, a head hanging by its cable (swung by S115)
 - [ ] Review: a junction at 10 m and a head at 1 m, lit at night
+- Under way: family `tools/models/props/traffic.py`: `traffic_light` (short pole, head with visors, repeater, button box), `traffic_light_ped` (the red and green men lit) and `controller_cabinet` have references and round 1, built. Left: a cabinet photo, backplates, which lens is lit per instance (S046), rounds 2 and 3.
 
 ### [ ] S169 · Street signs
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=signs_street`
@@ -966,6 +973,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: retroreflective faces that catch headlights and the flashlight, faded red, chipped enamel, worn carving, stickers, rust bleeding from the bolts, bullet holes
 - [ ] Name plates and carvings take any of the invented street names; states: bent, knocked over, shot
 - [ ] Review: every sign at 1 m and 10 m, lit by the flashlight at night
+- Under way: family `tools/models/props/signs_street.py`: `street_plate` (blue enamel, green cast frame with rosettes, the arch; RUE PASTEUR / CENTRE painted), `sign_stop`, `sign_giveway`, `sign_no_entry` (aluminium plates with rolled edges, painted faces, rails, clamps, galvanised poles) have references and round 1, built; `sign_speed` (30), `sign_no_parking`, `sign_one_way`, `sign_crossing` and `sign_direction` (two white arrow plates) have round 1 too, built on the same plate and pole. Left: names per plate (text per instance), the carved corner-stone names, the bus stop's C6, rounds 2 and 3.
 
 ### [ ] S170 · Bus stop shelter
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=bus_stop`
@@ -975,6 +983,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: scratched glass, stickers, posters, grime
 - [ ] States: smashed glass, the poster light flickering
 - [ ] Review: at 1 m and 10 m, by day and night
+- Under way: family `tools/models/props/bus_stop.py`: `bus_shelter` (wing roof, legs, glass, lit poster case, bench, timetable, map, name blade) and `bus_stop_pole` (BUS sign, the stop's name, lines' plates, timetable) have references and round 1, built. Left: smashed glass (S113), rounds 2 and 3.
 
 ### [x] S171 · Colonne Morris
 > needs: S141 | size: S | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=ad_column`
@@ -993,6 +1002,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: front pages as a texture (no real titles), faded paint, rust
 - [ ] States: open, shut, looted (papers blowing, S115)
 - [ ] Review: at 1 m and 10 m
+- Under way: family `tools/models/props/kiosk.py`: `kiosk` (hexagon of framed faces, PRESSE panels, posters, cresting, attic, dome with ribs, finial; the shutter opening over the counter) has references and round 1, built. Left: the dome's scales, papers on clips, rounds 2 and 3.
 
 ### [ ] S173 · Small street furniture
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_small`
@@ -1001,6 +1011,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: slats and brackets, the bins' hoops and lids, the fountain's basin and button, the hydrant's caps and chains, the post box's slot and door
 - [ ] Round 3 · surface: worn paint, rust, stickers, litter in and round the bins
 - [ ] Review: everything at 1 m
+- Under way: family `tools/models/props/street_small.py`: `bench_double` (Davioud's double bench: cast end frames with rings and shield, green slats), `borne` (stone guard stone), `guard_bar` (cast-iron chasse-roue), `bin_hoop` (the bag bin), `bin_cage` (the rod basket), `bollard` (the potelet), `post_box` (the yellow wall box, no brand), `tree_grille`, `fountain_wall` (the cast-iron wall fountain of 1872), `bike_hoop` and `lawn_hoops` have round 1, built (references for all but the last two). Left: rounds 2 and 3.
 
 ### [ ] S174 · Plane tree
 > needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=plane_tree`
@@ -1010,6 +1021,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: the bark's patches of grey, olive and cream, the leaves' light and dark sides, autumn colour by preset
 - [ ] Three variants and a LOD chain down to a card at 200 m; the wind of S047 moves the crown
 - [ ] Review: a row of six along the quay
+- Under way: family `tools/models/props/trees.py`: `plane_tree` (seeded: buttressed trunk, fork, three levels of limbs, a dense crown of faceted clusters, the bark's patches painted) and `plane_pollard` (knuckles with tufts) have references and round 1, built, four LODs each. Left: the variants by seed, seed balls, a proper card at 200 m, autumn and wind, rounds 2 and 3.
 
 ### [ ] S175 · The old chestnut
 > needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=chestnut`
@@ -1018,6 +1030,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: burrs on the old trunk, branching, the hand-shaped leaves, the flower candles, the conkers on the ground
 - [ ] Round 3 · surface: furrowed bark, moss on the north side, the leaves' greens and their early brown
 - [ ] Review: young and old at 10 m and 50 m
+- Under way: `chestnut_old` (family `tools/models/props/trees.py`: thick short trunk, low dome crown, white candles, furrowed bark with moss) has references and round 1, built. Left: the young variant, burrs, conkers, rounds 2 and 3.
 
 ### [ ] S176 · Street trees
 > needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=street_trees`
@@ -1026,6 +1039,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: branching, the cherry's and paulownia's blossom, the petals' carpet on the ground (decals), stakes and guards
 - [ ] Round 3 · surface: bark, the leaves' colour variation, autumn and bare variants by preset
 - [ ] Review: each at 10 m and in a street
+- Under way: `street_lime` (family `tools/models/props/trees.py`: a young staked lime, narrow oval crown) has round 1, built. Left: elm, paulownia, cherry, the court fig, photos, rounds 2 and 3.
 
 ### [ ] S177 · Shrubs and flowers
 > needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=shrubs`
@@ -1034,6 +1048,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: flowers, branch structure, bed edges, ivy and wisteria following a wall
 - [ ] Round 3 · surface: the blooms' colours, dead leaves, overgrown versions
 - [ ] Review: a parterre and a window row at 1 m and 10 m
+- Under way: family `tools/models/props/shrubs.py`: `window_box` (geraniums in zinc on brackets), `yew_cone` (clipped, in its box-edged bed), `hedge_box` (a 1 m module) and `ivy_patch` (stems and leaf clusters on a wall) have round 1, built. Left: photos, roses, lilac, wisteria, trained limes, rounds 2 and 3.
 
 ### [ ] S178 · Forest wall
 > needs: S141 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=forest`
@@ -1052,6 +1067,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: rims (steel, alloy) with tyres whose tread and sidewall lettering show, hubcaps; headlamp and tail clusters with emission and indicators that blink for the hazard state; long white plates with a blue band at each end and seeded letters (an invented code and region number, no real one); door seams and handles cut as parts so doors open; seats, dash and steering wheel
 - [ ] Round 3 · surface: the state generator on the test car: dust, smashed (dents, cracked and shattered glass), burnt shell (no tyres, brown-black metal, soot), rolled; flat and missing wheels
 - [ ] Review: the test car in every state at 1 m and 10 m
+- Under way: family `tools/models/props/vehicle_kit.py`: `wheel_steel` (195/65 R15 with tread, steel rim, nuts), `plate_fr` (the long white plate, its bands and an invented code), `headlamp`, `tail_lamp` and `wing_mirror` have round 1, built. `wheel_alloy` (five spokes on the same tyre), `car_seat` and `dashboard` (binnacle, wheel, centre stack) too. Left: hubcaps, doors as parts on a test car, the state generator, rounds 2 and 3.
 
 ### [ ] S180 · Hatchback and estate
 > needs: S179 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=cars`
@@ -1094,6 +1110,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: zips, wheels, handles, straps, the trolley's wire mesh, the bear's seams
 - [ ] Round 3 · surface: dirt, rain stains, tears, blood on some
 - [ ] Review: a spill along a car at 1 m
+- Under way: family `tools/models/props/remains.py`: `trolley` (the tapered wire basket, handle, seat flap, chassis on casters), `plastic_chair` (the monobloc), `pram` (navy body, hood on ribs, C-springs, spoked wheels), `suitcase_hard`, `suitcase_soft`, `mattress` (quilted, piping, one end curled), `teddy_bear`, `rowboat` (an aluminium boat lofted from sections, thwarts, oars), `shoes` (trainers and a leather shoe), `water_pack` (six bottles, film, a loose and a crushed one) and `clothes_pile` (garments in folds, sleeves, a scarf) have references and round 1, built. Left: a mattress roped to a roof, rounds 2 and 3.
 
 ### [ ] S185 · Barricades and checkpoint gear
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=checkpoint`
@@ -1102,6 +1119,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: the barriers' feet and hooks, sandbag seams and ties, the wire's coils and barbs, the tape's sag, the sett barricade's pile with a cart wheel and a wardrobe in it
 - [ ] Round 3 · surface: stencils, spray paint, torn bags spilling sand, rust on the wire
 - [ ] Review: a checkpoint of each at 1 m and 10 m
+- Under way: family `tools/models/props/checkpoint.py`: `barrier_crowd` (the galvanised crowd barrier, hooks and eyes to chain), `barrier_concrete` (the New Jersey profile), `sandbag_wall` (a 1.2 m module, bags as pillows in stretcher and header courses), `wire_coil` (concertina on pickets), `traffic_cone`, `works_barrier` (red and white boards, flasher), `water_barrier` (the filled plastic module, caps, knuckles), `body_bag` (the body's shape under it, zip, handles), `police_tape` (tape on two stakes, twisting, its loose end), `tarp` (draped over a pile, eyelets, ropes) and `sett_barricade` (setts in courses on a banked core, a handcart, barrels, a door, a wardrobe and chairs thrown on) have references and round 1, built. Left: rounds 2 and 3.
 
 ### [ ] S186 · Posters, flyers and painted words
 > needs: S141 | size: S | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=decals`
@@ -1110,6 +1128,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: paint drips, layered and torn posters, tape holding the flyers
 - [ ] Round 3 · surface: rain fading, sun bleaching, paint over paint
 - [ ] Review: a wall of them at 1 m
+- Under way: family `tools/models/props/decals.py`: `decals` (a 4 m wall bay of sprayed words, flyers, the AVIS, an election poster and the DÉFENSE D'AFFICHER band, all paint by position) has round 1, built. Left: photos, rounds 2 and 3, sheets for shutters, cars and the road.
 
 ### [ ] S187 · The market fountain
 > needs: S141 | size: M | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=monument`
@@ -1119,6 +1138,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: stone weathering, green streaks under the spouts, graffiti and a quarantine notice taped on, still water with leaves
 - [ ] Round 4 · figure: the figure on top (a winged Victory) as a low-poly sculpture that reads from 10 m
 - [ ] Review: from the square's corners and at 1 m
+- Under way: family `tools/models/props/monument.py`: `market_fountain` (basin, tier with lion masks and jets, pedestal with its inscription and beasts, banded column, palm capital, globe, a blocked-out Victory) has references and round 1, built. Left: the railing, the masks and sphinxes, rounds 2 to 4 (the Victory's sculpture).
 
 ### [ ] S188 · The church
 > needs: S141 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=church`
@@ -1135,6 +1155,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: carved lettering and urns, the chapels' doors and stained glass, the iron crosses' scrolls and railings, the gate's bars and posts
 - [ ] Round 3 · surface: lichen, tilt and cracks, rust, broken chapel doors
 - [ ] Review: an alley at 1 m and the slope at 30 m
+- Under way: family `tools/models/props/cemetery.py`: `tomb_chapel` (a classical chapel with its name, cross and grilled door opening out), `tomb_cross` (cast iron on a pedestal with its plaque), `tomb_slab` (border, slab, headstone, railing), `obelisk`, `tomb_gothic` (steep roof, crockets, pinnacles on diagonal buttresses, pointed door opening out) and `cemetery_gate` (round-topped pylons with roundels and garlands as at Père-Lachaise, the lintel of wreaths, the name, wall bays, iron leaves) have round 1, built. `tomb_column` (the broken column with its drape) too. Left: the keeper's lodge, rows on the slope, rounds 2 and 3.
 
 ### [ ] S190 · Jardin public gate and pond
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=park`
@@ -1143,6 +1164,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: railings, signs, the basin's rim and jet, the bandstand's columns and roof, the chairs
 - [ ] Round 3 · surface: water plants, moss, rust, chairs tipped into the basin
 - [ ] Review: beside the references
+- Under way: family `tools/models/props/park.py`: `bandstand` (octagonal base, columns, railing, brackets, zinc roof, lantern) has references and round 1, built; so do `park_chair` (the iron garden chair), `park_basin` (a 6 m round basin, stone roll, the vasque) and `park_gate` (gilded leaves opening between stone piers with urns, the overthrow and crest). Left: the jet itself, gravel paths, a plain photo of a chair, rounds 2 and 3.
 
 ### [ ] S245 · From Joinville to the town
 > needs: S040 | size: M | test: `tests/test_city_map.gd` | see: `--host`, the menu
@@ -1172,6 +1194,20 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] `ground_y` and multi-floor zones work with `MapData`
 - Shells, floors, rooms, stairs and nav only: the facades come from the kits (S157 to S164) and from each POI's own elements.
 
+### [ ] S246 · House interiors: layout
+> needs: S043 | size: L | test: `tests/test_house_plan.gd` | see: `tools\houses.ps1`, `--house-rack`
+- Asked for after the plan was written: the town's ordinary houses get empty floors to walk (until now only the five POIs had interiors). Rooms and proportions only: the furniture is slots for S193's elements.
+- [x] `HousePlan` (`scripts/world/house_plan.gd`): the fixed frame from a house's data (bays of both facades, street door, stair cage against the party wall in the middle or on the court, refends, flues), the same on every floor; mirrored for a door on the right
+- [x] `HouseFloor`: per floor, seeded: corridor beside the stair (an entrée when wide, none in a narrow house), the allée and passage to the court on the ground floor, rooms cut between windows, partitions lined up with the walls behind and below, kinds (dwelling or shop floor), doors near corners with clear leaves, enfilades; a layout that breaks a rule is tried again
+- [x] Passages in the player's size (`Config.INTERIOR_*`): corridors 1.2 m, doors 0.9 m, rooms 2.2 m, a way 0.72 m wide between furniture to every door and a window
+- [x] `RoomDressing`: paint per room (palettes by kind, dado, boiseries, wallpaper, cornice, wear), lamps and switches, furniture slots per kind (fireplaces on the flues)
+- [x] `InteriorBuilder`: walls with door and window gaps, painted faces, slabs with the stair well, flights and rails, door leaves, lights, collision; `--house-rack`
+- [x] `tools\houses.ps1`: the sample house's three floors and eight others as JSON, drawn by `tools/house_plans.py`
+- [ ] Houses of `CityBlocks` laid out from their own footprint (non-rectangular corners, wings, back buildings), hôtels and post-war slabs
+- [ ] A house's street door opens (S191) and its floors are built only when a player comes near (budget per house)
+- [ ] Round 1 · plans: the sample's floors and the variants against plans of real Paris houses before Haussmann (references on a card first)
+- [ ] Review: the three floors walked at eye height in `--house-rack`
+
 ### [ ] S054 · Interior assembly kit
 > needs: S053, S191, S192, S193, S194, S195, S196 | size: M | rounds: 2 | test: `tests/test_interior_kit.gd` | see: `--interior-rack`
 - Assembly: rooms from data furnished with finished elements; nothing modelled here.
@@ -1192,6 +1228,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: panels, hinges, handles, kick plates, door closers, vision panels, push bars, locks, the shutter's slats and guides
 - [ ] Round 3 · surface: worn paint round the handles, scuffs at the foot, signs (SORTIE, PRIVÉ), blood handprints
 - [ ] States and parts: open, shut, locked (it rattles), splintered and broken in stages by the door's HP
+- Under way: family `tools/models/props/doors.py`: `door_wood` (architrave, lining, four raised panels both faces, butts, levers), `door_glass` (aluminium stiles, push bar, closer), `door_fire` (pressed frame, wired vision panel, panic bar, closer) and `door_plank` (the corridor's 2.0 x 2.6 ledged and braced door) have round 1, built, each leaf a part opening inward. `door_double` (half-glazed, two leaves) too. Left: photos, the roller shutter, swapping `door_plank` into `door.gd`, the broken states, rounds 2 and 3.
 - [ ] Review: each on the rack at 1 m, and the corridor's door in its four states
 
 ### [ ] S192 · Stairs, railings, ceilings and floors
@@ -1201,6 +1238,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: handrail brackets and ends, balusters, ceiling grids with tiles and light openings, skirting, floor joints
 - [ ] Round 3 · surface: worn nosings, chipped paint, missing and hanging ceiling tiles, stains
 - [ ] Review: a stairwell from bottom to top and a corridor ceiling at eye height
+- Under way: family `tools/models/props/stairs.py`: `stair_flight` (a half flight to its landing, granilite treads with nosings, tube handrail, flat-bar balustrade with its scroll) and `ceiling_grid` (a 2.4 m module: grid, tiles, one hanging, one gone, a stain, a louvre light) have round 1, built (no photos yet). Left: photos, glass and concrete balustrades, floors, the building pipeline's storey heights (S053), rounds 2 and 3.
 
 ### [ ] S193 · Office and public furniture
 > needs: S141 | size: L | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=office`
@@ -1210,6 +1248,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: laminate wear, coffee rings, stickers, papers on the desks
 - [ ] States: knocked over, ransacked, smashed
 - [ ] Review: an office corner at eye height
+- Under way: family `tools/models/props/office.py`: `desk` (laminate top, steel frame, pedestal with its top drawer pulling out), `office_chair`, `filing_cabinet` (four drawers, the top one pulling out on its files), `shelving` (archive boxes and binders seeded), `desk_computer` (monitor, keyboard, mouse, phone, tower), `beam_seating`, `vending_machine` (coils of goods, lit panel) and `water_cooler` have round 1, built (no photos yet: Commons refused requests). `reception_counter` too. Left: photos, the knocked-over and ransacked states, rounds 2 and 3.
 
 ### [ ] S194 · Light fittings and signs
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=fittings`
@@ -1219,6 +1258,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: dead insects in the diffusers, yellowed plastic, dust
 - [ ] States: lit, dead, flickering, hanging by one wire (the swing of S108)
 - [ ] Review: a ceiling at night with every state
+- Under way: family `tools/models/props/fittings.py`: `tube_light` (two-tube batten on chains, lit), `exit_sign` (the BAES with its lit green face), `extinguisher` (on its bracket) and `alarm_point` have round 1, built. `emergency_light` (the BAES d'ambiance) and `switch_socket` too; the louvre panel is in `ceiling_grid`. Left: the states (dead, flickering, hanging by one chain: S108), rounds 2 and 3.
 
 ### [ ] S195 · Elevator
 > needs: S141, S191 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=elevator`
@@ -1236,6 +1276,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: folded and crumpled papers, shards, packaging shapes
 - [ ] Round 3 · surface: print as texture (no real brands), stains, blood
 - [ ] Review: a floor of it at 1 m
+- Under way: family `tools/models/props/clutter.py`: `papers` (an office floor's sheets, folder, cup, phone, pen), `shards` (a window's glass on a floor) and `picture_frame` (fallen face to the wall, its glass out) have round 1, built. `food_litter` (packets, cans, a cup, a bag, a pizza box) too. Left: cables, photos, rounds 2 and 3.
 
 ### [ ] S055 · Barricades
 > needs: S014, S054, S153 | size: M | test: `tests/test_barricade.gd`
@@ -1264,6 +1305,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: I-section or tube members, gusset plates at the node, bolts, base plates, the trusses along the slab edges with their bracing
 - [ ] Round 3 · surface: chipped paint, rust at the bases, posters taped to the pedestals, pigeon mess
 - [ ] Review: at 1 m and from the platforms
+- Under way: family `tools/models/props/terminal_columns.py`: `column_tree` (pedestal, base plate, trunk, node, four arms to bearing plates under the slab) and `edge_truss` (a 7.2 m Warren bay, gussets and bolts) have round 1, built (no photos yet: the step wants photos first). Left: photos, the arms' sections, rounds 2 and 3.
 
 ### [ ] S199 · Bus station: the skylight
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=terminal_skylight`
@@ -1298,6 +1340,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: line numbers and destinations as lettering, the LED departure board, arrows, frames and hangers
 - [ ] Round 3 · surface: faded print, the LED board dead or showing a last message
 - [ ] Review: from the platforms at 5 m
+- Under way: family `tools/models/props/terminal_signs.py`: `departure_board` (DÉPARTS and six invented departures in lit amber: the pipeline's new `emit_where` lights only the letters), `quay_sign` (the letter in its disc, the lines) and `wayfinding_sign` (QUAIS A - F, SORTIE, TAXIS with arrows) have round 1, built (no photos yet). Left: photos, the letter per quay, more blades, the dead board, rounds 2 and 3.
 
 ### [ ] S203 · The city bus
 > needs: S179 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=bus`
@@ -1378,6 +1421,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: worn paint, skid marks, rust on the frame
 - [ ] Night: the edge lights (S108), the windsock's flood
 - [ ] Review: from the stair and from the helicopter's approach
+- Under way: `helipad` (family `tools/models/props/helipad.py`: the 16 m deck on its frame, H and touchdown ring painted, edge lights, netting, windsock, stair, hose box) has round 1, built (no photos yet). Left: photos, the stair's gate, the windsock's flood, rounds 2 and 3.
 
 ### [ ] S209 · Hospital: lobby and emergency room
 > needs: S193, S194 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=hospital_er`
@@ -1403,6 +1447,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: chrome and plastic wear, blood, labels
 - [ ] States: gurneys and wheelchairs piled up as a barricade
 - [ ] Review: everything at 1 m
+- Under way: family `tools/models/props/hospital.py`: `wheelchair` (folding chair, spoked wheels, push rims), `gurney` (trolley with raised head and side rails), `iv_stand` (five legs, hooks, a bag and line) and `oxygen_cylinder` (on its trolley, valve and gauge) have round 1, built (references for the wheelchair and the drip stands; the gurney and the cylinder want photos). `medicine_cabinet` (glazed doors as parts) and `sharps_bin` have round 1 too. Left: monitors on poles, photos, rounds 2 and 3.
 
 ### [ ] S212 · Hospital: generator room
 > needs: S141 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=generator`
@@ -1412,6 +1457,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 3 · surface: oil, warning signs, rust
 - [ ] States: dead, and running (shaking, exhaust smoke, the lights coming on)
 - [ ] Review: the room at eye height before and after the restart
+- Under way: family `tools/models/props/generator.py`: `genset` (skid, engine, radiator and guard, alternator, exhaust with bellows and silencer, control box), `fuel_tank` (GAZOLE, gauge, feed and valve) and `switchgear` (three cabinets, meters and lamps, the start lever as a part) have round 1, built (no photos yet). Left: photos, the running state (shaking, smoke, lamps), rounds 2 and 3.
 
 ### [ ] S058 · The hospital, outside
 > needs: S053, S048, S182, S228, S204, S205, S206, S207, S208 | size: L | rounds: 3 | test: `tests/test_poi_hospital.gd` | see: `--mission=hospital --shot-at=2`
@@ -1467,6 +1513,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: the clock face and hands, the open arches and the bell, the dome's ribs and lead, the flagstaffs
 - [ ] Round 3 · surface: the stone's colour variation, the lead gone grey-white with streaks below, a clock stopped at one time
 - [ ] Review: from the garden and from the quay
+- Under way: `campanile` (family `tools/models/props/campanile.py`: base with the clock stopped at 4:20, the open arcaded stage with its bell, entablature, lead dome à l'impériale with ribs, lantern, finial, flagstaffs) has round 1, built (no photos yet). Left: photos, rounds 2 and 3.
 
 ### [ ] S215 · Town hall: the office wing
 > needs: S141 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_frames`
@@ -1499,6 +1546,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: letters as geometry, the shield's charges in relief, the mural crown and the garlands round it
 - [ ] Round 3 · surface: worn gilding, dirty letters, one letter missing
 - [ ] Review: from the garden and at 1 m
+- Under way: family `tools/models/props/townhall.py`: `townhall_name` (HÔTEL DE VILLE in gilded raised letters, the motto on the frieze) and `town_arms` (invented: a tower and three stars, mural crown, branches, ribbon) have round 1, built (no photos yet). Left: photos, rounds 2 and 3.
 
 ### [ ] S219 · Town hall: main hall and council chamber
 > needs: S192, S193 | size: L | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=prefeitura_hall`
@@ -1571,6 +1619,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: joints, painted lines and markers, the memorial (a column with names), flagpoles and their bases, kerbs
 - [ ] Round 3 · surface: oil stains where vehicles stand, grass between the setts, faded paint
 - [ ] Review: from above
+- Under way: family `tools/models/props/barracks_court.py`: `war_memorial` (steps, die with AUX MORTS and invented names, column, bronze helmet and wreaths, bollards and chains) and `flagpoles` (three, a limp flag) have round 1, built (no photos yet). Left: photos, the court's setts and painted lines, the lawn's kerbs, rounds 2 and 3.
 
 ### [ ] S223 · Barracks: perimeter, gate and guard tower
 > needs: S141, S185 | size: M | asset: simple | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=batalhao_gate`
@@ -1587,6 +1636,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: the roof's trusses, the end walls' round windows and great doors, the court's lines, posts and nets
 - [ ] Round 3 · surface: moss on the roof, the court's paint faded
 - [ ] Review: from the cour d'honneur
+- Under way: family `tools/models/props/riding_hall.py`: `riding_hall` (the stone manège, eight round-headed windows a side, oculi, the great doors as parts, slate roof, ridge vent, iron trusses) and `sports_court` (lines painted, basketball and volleyball) have round 1, built (no photos yet). Left: photos, the interior, rounds 2 and 3.
 
 ### [ ] S225 · Army truck
 > needs: S179 | size: M | asset: complex | rounds: 3 | test: `tests/test_elements.gd` | see: `--prop-rack=army_truck`
@@ -1665,6 +1715,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Round 2 · structure: the binoculars' head and coin box, the panorama table's engraved plate, railing posts, the guinguette's arbour, tables and lamps, the masts' lattice and guy wires
 - [ ] Round 3 · surface: weathering
 - [ ] Review: the summit at eye height
+- Under way: family `tools/models/props/summit.py`: `coin_binoculars`, `panorama_table` (the bronze plate naming the town's places) and `antenna_mast` (guyed lattice, panels, dish, red lamps) have round 1, built (no photos yet). Left: photos, the summit's railings, the guinguette, rounds 2 and 3.
 
 ### [ ] S232 · Lookout: the park gate
 > needs: S141, S177 | size: L | asset: complex | rounds: 4 | test: `tests/test_elements.gd` | see: `--prop-rack=mirante_gate`

@@ -1,0 +1,40 @@
+{
+ "name": "controller_cabinet",
+ "family": "traffic",
+ "size": [
+  0.9,
+  1.47,
+  0.5
+ ],
+ "min": [
+  -0.45,
+  0.0,
+  -0.25
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  260,
+  188,
+  36
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  0.8,
+  -0.2
+ ]
+}

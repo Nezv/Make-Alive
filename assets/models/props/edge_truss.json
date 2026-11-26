@@ -1,0 +1,40 @@
+{
+ "name": "edge_truss",
+ "family": "terminal_columns",
+ "size": [
+  7.5200000000000005,
+  1.5499999999999998,
+  0.3
+ ],
+ "min": [
+  -3.7600000000000002,
+  5.05,
+  -0.15
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  932,
+  228,
+  144
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  5.9,
+  -0.2
+ ]
+}

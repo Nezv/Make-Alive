@@ -1,0 +1,40 @@
+{
+ "name": "bench_double",
+ "family": "street_small",
+ "size": [
+  1.9,
+  0.89,
+  1.0
+ ],
+ "min": [
+  -0.95,
+  0.0,
+  -0.5
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  2496,
+  744,
+  344
+ ],
+ "emission": false,
+ "close": [
+  0.78,
+  0.45,
+  0.0
+ ]
+}

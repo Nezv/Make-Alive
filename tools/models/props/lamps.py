@@ -204,7 +204,167 @@ def wall_lantern(lod):
     return {"body": Part(m)}
 
 
+# --- lamp_mast: the modern mast of the outer roads (S166) -------------------------------------------------
+MAST = dict(h=8.0, r=(0.085, 0.045), arm=1.6, head=(0.62, 0.11, 0.26))
+
+
+def mast_materials():
+    m = materials()
+    m.update({
+        "galv": Material((0.60, 0.61, 0.60), under=(0.52, 0.53, 0.52), bare=(0.42, 0.30, 0.20), chip=0.2, grain=0.10),
+        "head": Material((0.32, 0.34, 0.35), under=(0.4, 0.4, 0.4), bare=(0.42, 0.30, 0.20), chip=0.3, grain=0.04),
+        "lamp": Material((0.80, 0.78, 0.70), kind="glass", chip=0.0, rusts=False, grain=0.02, sheds=False, emit=(1.0, 0.72, 0.38)),
+        "rope": Material((0.42, 0.36, 0.26), kind="paper", chip=0.0, rusts=False, grain=0.2),
+        "reflector": Material((0.80, 0.78, 0.72), under=(0.5, 0.5, 0.5), bare=(0.5, 0.5, 0.5), chip=0.2, rusts=False, grain=0.03),
+    })
+    return m
+
+
+def lamp_mast(lod):
+    h, (r0, r1), arm = MAST["h"], MAST["r"], MAST["arm"]
+    hl, hh, hw = MAST["head"]
+    sides = [12, 8, 5][lod]
+    m = S.lathe([(0.0, r0 + 0.03), (0.02, r0 + 0.03), (0.04, r0), (h - 0.6, r1)], sides, tag="galv", caps=(False, False))
+    # the arm: up out of the pole's top and bending over the road (-Z)
+    path = [(0.0, h - 0.6, 0.0), (0.0, h - 0.1, -0.1), (0.0, h + 0.1, -arm * 0.6), (0.0, h + 0.05, -arm)]
+    m.merge(S.sweep(S.fillet(path, 0.3, 3) if lod == 0 else path, S.circle(1.0, sides), "galv", scale=lambda i: r1 * (1.0 - 0.15 * i / 3)))
+    # the head: a flat luminaire, its lit bowl underneath, tilted up a little
+    R = S.rotation((1, 0, 0), np.radians(-5))
+    head = S.bevel_box((0, 0, -hl / 2), (hw / 2, hh / 2, hl / 2), 0.03, "head") if lod < 2 else S.box((0, 0, -hl / 2), (hw / 2, hh / 2, hl / 2), "head")
+    head.merge(S.box((0, -hh / 2 - 0.004, -hl / 2 - 0.03), (hw / 2 - 0.04, 0.008, hl / 2 - 0.08), "lamp"))
+    m.merge(head.transformed(R, (0.0, h + 0.05, -arm + 0.05)))
+    if lod < 2:  # the door to its wiring near the foot
+        m.merge(S.box((0, 0.65, -r0 - 0.002), (0.04, 0.14, 0.004), "galv"))
+    return {"body": Part(m)}
+
+
+# --- reverbere: the lantern of about 1800, hung on its rope across the street (S167) -----------------------
+def reverbere(lod):
+    """A bigger lantern with its reflector over the flame, a hook on its top, the rope coming down to
+    the hook from both sides (the span itself is S167's; here 1.4 m of it each way). Its foot y = 0."""
+    m = Mesh()
+    gh, g0, g1 = 0.42, 0.20, 0.28
+    sides = [8, 6, 4][lod]
+    m.merge(_loft([(0.0, 0.04), (0.06, 0.15), (0.10, g0 + 0.015)], "iron", _sq))
+    g = Mesh()
+    g.loft([_sq(0.10, g0), _sq(0.10 + gh, g1)], "glass", caps=(False, False))
+    m.merge(g)
+    if lod < 2:
+        for sx, sz in ((1, -1), (1, 1), (-1, 1), (-1, -1)):
+            m.merge(_bar((sx * g0, 0.10, sz * g0), (sx * g1, 0.10 + gh, sz * g1), 0.02))
+    top = 0.10 + gh
+    m.merge(_loft([(top, g1 + 0.01), (top + 0.03, g1 + 0.04), (top + 0.22, 0.06), (top + 0.26, 0.06)], "iron", _sq))
+    # the reflector: a dish hung inside under the roof, over the flame
+    dish = S.lathe([(0.0, 0.0), (0.03, 0.09), (0.06, 0.15)], sides, tag="reflector", caps=(False, False))
+    dish.faces = [tuple(reversed(f)) for f in dish.faces]
+    m.merge(dish.transformed(np.diag([1.0, -1.0, 1.0]), (0, top - 0.01, 0)))
+    m.merge(S.lathe([(0.16, 0.035), (0.30, 0.03), (0.32, 0.0)], 8, tag="flame"))
+    # the hook and the rope rising both ways
+    hook_y = top + 0.36
+    m.merge(S.sweep([(0, top + 0.26, 0), (0, hook_y, 0), (0.05, hook_y + 0.04, 0)], S.circle(0.008, 5), "iron"))
+    if lod < 2:
+        for s in (1, -1):
+            m.merge(S.cable((0, hook_y + 0.04, 0), (s * 1.4, hook_y + 0.55, 0), 0.03, r=0.012, n=[8, 4][lod], sides=[5, 3][lod], tag="rope"))
+    return {"body": Part(m)}
+
+
+def rope_box(lod):
+    """The locked iron box on a house's wall where the réverbère's rope is tied off (wall z = 0, the
+    box's foot y = 0): a box with its door, hinges and lock, a pulley over it, the rope coming in."""
+    w, h, d = 0.24, 0.46, 0.12
+    m = Mesh()
+    m.merge(S.chamfer_box((0, h / 2, -d / 2), (w / 2, h / 2, d / 2), 0.008 if lod == 0 else 0.0, "iron", edges="front") if lod == 0 else
+            S.box((0, h / 2, -d / 2), (w / 2, h / 2, d / 2), "iron"))
+    if lod < 2:
+        m.merge(S.panel(w - 0.04, h - 0.06, t=0.006, border=0.02, kind="inset", depth=0.003, bevel=0.006, tag="iron", origin=(0, h / 2, -d)))
+        for y in (0.08, h - 0.08):
+            m.merge(S.box((-w / 2 + 0.01, y, -d - 0.01), (0.008, 0.035, 0.008), "fixing"))
+        m.merge(S.box((w / 2 - 0.04, h / 2, -d - 0.012), (0.015, 0.025, 0.006), "brass"))   # the lock
+        # the pulley on its bracket over the box, the rope down into the box's top
+        m.merge(S.box((0, h + 0.10, -0.04), (0.012, 0.10, 0.04), "iron"))
+        m.merge(S.along(S.lathe([(-0.012, 0.045), (0.012, 0.045)], [10, 6][lod], tag="iron"), (1, 0, 0), (0, h + 0.18, -0.09)))
+        m.merge(S.sweep([(0, h + 0.80, -0.30), (0, h + 0.22, -0.135), (0, h + 0.18, -0.135), (0, h - 0.01, -0.06)], S.circle(0.010, 4), "rope"))
+    return {"body": Part(m)}
+
+
+def wire_materials():
+    m = mast_materials()
+    m.update({
+        "pole": Material((0.34, 0.27, 0.19), kind="wood", chip=0.0, rusts=False, grain=0.25),
+        "porcelain": Material((0.86, 0.86, 0.84), kind="glass", chip=0.0, rusts=False, grain=0.02, sheds=False),
+        "wire": Material((0.18, 0.18, 0.18), chip=0.0, rusts=False, grain=0.03),
+    })
+    return m
+
+
+def _insulator(c, lod, up=(0, 1, 0)):
+    """A porcelain bell on its iron pin: three sheds."""
+    prof = [(0.0, 0.0), (0.0, 0.040), (0.015, 0.042), (0.035, 0.028), (0.045, 0.040), (0.065, 0.024), (0.075, 0.032), (0.11, 0.018), (0.12, 0.0)]
+    if lod:
+        prof = [(0.0, 0.0), (0.0, 0.040), (0.075, 0.032), (0.12, 0.0)]
+    return S.along(S.lathe(prof, [10, 6, 4][lod], tag="porcelain"), up, c)
+
+
+def utility_pole(lod):
+    """A wooden pole of the faubourgs carrying the wires: the pole charred and tarred at its foot, a
+    crossarm with four insulators and its two braces, a smaller arm under it, a step bolt here and
+    there, a stay wire to the ground, wires going off both ways."""
+    H = 8.5
+    m = Mesh()
+    m.merge(S.lathe([(0.0, 0.13), (1.2, 0.125), (H, 0.095), (H + 0.04, 0.0)], [10, 7, 5][lod], tag="pole"))
+    m.merge(S.lathe([(0.0, 0.135), (1.2, 0.13)], [10, 7, 5][lod], tag="wire", caps=(False, False)))         # the tar at its foot
+    for y, half, n in ((H - 0.35, 0.85, 4), (H - 1.25, 0.55, 2)):
+        m.merge(S.box((0, y, -0.14), (half, 0.05, 0.045), "pole"))
+        if lod < 2:
+            for s in (1, -1):
+                m.merge(S.sweep([(s * half * 0.7, y - 0.03, -0.14), (0, y - 0.55, -0.11)], [(-0.02, -0.006), (0.02, -0.006), (0.02, 0.006), (-0.02, 0.006)], "iron", up=(0, 0, 1)))
+        for k in range(n):
+            x = -half + 0.12 + k * (2 * half - 0.24) / max(1, n - 1)
+            m.merge(S.box((x, y + 0.08, -0.14), (0.008, 0.04, 0.008), "iron"))
+            m.merge(_insulator((x, y + 0.10, -0.14), lod))
+            # the wires off both ways along Z, sagging away out of the element
+            if lod < 2:
+                for s in (1, -1):
+                    m.merge(S.cable((x, y + 0.20, -0.14), (x, y - 0.25, -0.14 + s * 3.0), 0.05, r=0.005, n=[6, 3][lod], sides=3, tag="wire"))
+    if lod < 2:
+        for y in np.arange(2.5, H - 1.4, 0.45):  # the step bolts
+            s = 1 if int(y / 0.45) % 2 else -1
+            m.merge(S.sweep([(s * 0.10, y, 0.0), (s * 0.24, y, 0.0)], S.circle(0.009, 4), "iron"))
+        m.merge(S.cable((0, H - 1.6, 0.10), (0, 0.0, 3.0), 0.04, r=0.006, n=[6, 2][lod], sides=3, tag="wire"))     # the stay
+        m.merge(S.box((0, 0.10, 3.0), (0.10, 0.10, 0.10), "iron"))
+    return {"body": Part(m)}
+
+
+def wall_insulators(lod):
+    """Where the wires meet a house: an iron bracket on the wall with three insulators along it, the
+    wires coming in, drooping down to a porcelain tube through the wall."""
+    m = Mesh()
+    y = 0.0
+    m.merge(S.box((0, y, -0.01), (0.04, 0.10, 0.01), "iron"))
+    m.merge(S.sweep([(0, y, -0.02), (0, y + 0.02, -0.45)], [(-0.02, -0.004), (0.02, -0.004), (0.02, 0.004), (-0.02, 0.004)], "iron", up=(0, 1, 0)))
+    m.merge(S.sweep([(0, y - 0.18, -0.02), (0, y, -0.30)], S.circle(0.008, 4), "iron"))
+    for k, z in enumerate((-0.15, -0.28, -0.41)):
+        m.merge(_insulator((0.0, y + 0.03, z), lod))
+        if lod < 2:
+            m.merge(S.cable((0.0, y + 0.10, z), (-2.4 + 0.2 * k, y + 0.40, z - 1.2), 0.10, r=0.005, n=[8, 4][lod], sides=3, tag="wire"))
+            m.merge(S.cable((0.0, y + 0.08, z), (0.08 * (k - 1), y - 0.60, -0.02), 0.06, r=0.005, n=[6, 3][lod], sides=3, tag="wire"))
+    if lod < 2:
+        for k in range(3):
+            m.merge(S.along(S.lathe([(0.0, 0.015), (0.06, 0.015), (0.07, 0.025)], 6, tag="porcelain"), (0, 0, -1), (0.08 * (k - 1), y - 0.62, 0.0)))
+    return {"body": Part(m)}
+
+
 ELEMENTS = {
+    "utility_pole": {"build": utility_pole, "materials": wire_materials(), "states": ["clean", "abandoned", "damaged", "burnt"], "lods": 3,
+                     "edge_radius": 0.004, "close": (0.0, 8.1, -0.2)},
+    "wall_insulators": {"build": wall_insulators, "materials": wire_materials(), "states": ["clean", "abandoned", "damaged", "burnt"], "lods": 3,
+                        "edge_radius": 0.002, "close": (0.0, 0.0, -0.25)},
+    "lamp_mast": {"build": lamp_mast, "materials": mast_materials(), "states": ["clean", "abandoned", "damaged", "burnt"], "lods": 3,
+                  "edge_radius": 0.004, "close": (0.0, MAST["h"], -MAST["arm"])},
+    "reverbere": {"build": reverbere, "materials": mast_materials(), "states": ["clean", "abandoned", "damaged", "burnt"], "lods": 3,
+                  "edge_radius": 0.003, "close": (0.0, 0.4, 0.0)},
+    "rope_box": {"build": rope_box, "materials": mast_materials(), "states": ["clean", "abandoned", "damaged", "burnt"], "lods": 3,
+                 "edge_radius": 0.003, "close": (0.0, 0.4, -0.1)},
     "lamp_post": {
         "build": lamp_post,
         "materials": materials(),

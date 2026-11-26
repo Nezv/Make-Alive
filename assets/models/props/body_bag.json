@@ -1,0 +1,40 @@
+{
+ "name": "body_bag",
+ "family": "checkpoint",
+ "size": [
+  2.2,
+  0.22787225150260926,
+  0.81
+ ],
+ "min": [
+  -1.1,
+  0.0,
+  -0.405
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1336,
+  352,
+  80
+ ],
+ "emission": true,
+ "close": [
+  0.6,
+  0.15,
+  0.0
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "name": "coin_binoculars",
+ "family": "summit",
+ "size": [
+  0.65,
+  1.3903322173172945,
+  0.6824051099736654
+ ],
+ "min": [
+  -0.325,
+  0.0,
+  -0.363504610001463
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1252,
+  620,
+  280
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  1.25,
+  -0.1
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "name": "bus_shelter",
+ "family": "bus_stop",
+ "size": [
+  4.4,
+  2.8000000000000003,
+  1.75
+ ],
+ "min": [
+  -2.2,
+  0.0,
+  -1.0499999999999998
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  788,
+  484,
+  172
+ ],
+ "emission": true,
+ "close": [
+  -1.0,
+  1.2,
+  0.3
+ ]
+}

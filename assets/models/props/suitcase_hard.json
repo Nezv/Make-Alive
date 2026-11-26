@@ -1,0 +1,40 @@
+{
+ "name": "suitcase_hard",
+ "family": "remains",
+ "size": [
+  0.487,
+  0.787,
+  0.278
+ ],
+ "min": [
+  -0.233,
+  0.0,
+  -0.139
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  900,
+  308,
+  36
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.4,
+  -0.13
+ ]
+}

@@ -1,0 +1,70 @@
+{
+ "name": "railing_gate",
+ "family": "boundaries",
+ "size": [
+  3.05,
+  2.429357676971581,
+  0.4
+ ],
+ "min": [
+  -1.525,
+  0.0,
+  -0.2
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "leaf_l": {
+   "pivot": [
+    -1.5,
+    0.0,
+    0.0
+   ],
+   "rotate": [
+    [
+     0,
+     1,
+     0
+    ],
+    -95.0
+   ]
+  },
+  "leaf_r": {
+   "pivot": [
+    1.5,
+    0.0,
+    0.0
+   ],
+   "rotate": [
+    [
+     0,
+     1,
+     0
+    ],
+    95.0
+   ]
+  }
+ },
+ "tris": [
+  960,
+  896,
+  464
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.9,
+  0.0
+ ]
+}

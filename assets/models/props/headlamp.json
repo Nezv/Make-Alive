@@ -1,0 +1,40 @@
+{
+ "name": "headlamp",
+ "family": "vehicle_kit",
+ "size": [
+  0.34,
+  0.14,
+  0.127
+ ],
+ "min": [
+  -0.17,
+  -0.07,
+  -0.007
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  280,
+  208,
+  168
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  0.0,
+  0.0
+ ]
+}

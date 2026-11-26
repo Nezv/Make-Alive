@@ -1,0 +1,40 @@
+{
+ "name": "shelving",
+ "family": "office",
+ "size": [
+  1.0162493567397013,
+  2.0,
+  0.4
+ ],
+ "min": [
+  -0.5081246783698506,
+  0.0,
+  -0.2
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  704,
+  548,
+  140
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  1.0,
+  -0.2
+ ]
+}

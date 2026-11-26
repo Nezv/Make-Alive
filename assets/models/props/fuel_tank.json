@@ -1,0 +1,40 @@
+{
+ "name": "fuel_tank",
+ "family": "generator",
+ "size": [
+  1.6149999999999998,
+  1.6879499841000478,
+  0.8
+ ],
+ "min": [
+  -0.9149999999999999,
+  0.0,
+  -0.4
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  258,
+  194,
+  72
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  0.8,
+  -0.3
+ ]
+}
