@@ -158,8 +158,9 @@ func test_the_hill_road_is_climbable_all_the_way() -> void:
 
 func test_players_stand_on_the_hill_and_zombies_climb_it() -> void:
 	var g := await new_game("city", "mirante")
-	await seconds(0.6)
 	var p := g.local_player
+	p.teleport(g.map.poi_pos("mirante") + Vector3(0, 0.1, 0))
+	await seconds(0.6)
 	assert_near(p.global_position.y, g.map.ground_y(p.global_position), 0.3, "standing on the summit, not inside or above it")
 	assert_gt(p.global_position.y, 180.0)
 	# Up one stretch of the road: from a bend to the next one, ~60 m away and well above it.
@@ -195,7 +196,14 @@ func test_a_mission_starts_players_at_its_poi() -> void:
 	for id: String in POIS:
 		var m := _map()
 		m.mission = id
-		assert_lt(m.player_spawn().distance_to(m.poi_pos(id)), 3.0, "%s mission starts at %s" % [id, id])
+		if id == "mirante": # climbed from the gate at the foot of the hill (test_mission_mirante.gd)
+			assert_lt(m.player_spawn().distance_to(m.mirante.gate), 25.0, "the Mirante mission starts at the gate")
+		elif id == "hospital": # in the drop-off lane in front of the doors (test_mission_hospital.gd)
+			assert_lt(m.player_spawn().distance_to(m.hospital.door), 25.0, "the Hospital mission starts at its doors")
+		elif id == "prefeitura": # behind the sandbags at the door (test_mission_prefeitura.gd)
+			assert_lt(m.player_spawn().distance_to(m.prefeitura.door), 12.0, "the Prefeitura mission starts at its door")
+		else:
+			assert_lt(m.player_spawn().distance_to(m.poi_pos(id)), 3.0, "%s mission starts at %s" % [id, id])
 		assert_false(m.nav.is_blocked(m.player_spawn()))
 	_map().mission = ""
 	assert_lt(_map().player_spawn().distance_to(_map().poi_pos("terminal")), 3.0, "no mission: the bus terminal")
@@ -204,7 +212,7 @@ func test_a_mission_starts_players_at_its_poi() -> void:
 func test_game_passes_the_mission_to_the_map() -> void:
 	var g := await new_game("city", "mirante")
 	assert_eq(g.map.mission, "mirante")
-	assert_lt(g.local_player.global_position.distance_to(g.map.poi_pos("mirante")), 4.0, "player starts at the Mirante")
+	assert_lt(g.local_player.global_position.distance_to(g.map.player_spawn()), 4.0, "player starts at the Mirante mission's start")
 
 
 func test_it_stays_cheap_to_draw() -> void:

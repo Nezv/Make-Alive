@@ -369,6 +369,18 @@ const CITY_BLOCK_TRIANGLES := 1500000 # the whole town's walls and roofs
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
 
+# --- The look (Game._apply_tier_look; references/asset_quality.md) ---
+const LOOK_SSAO_RADIUS := 1.4      # metres: contact shadows where things meet the ground and each other
+const LOOK_SSAO_INTENSITY := 2.2
+const LOOK_SSAO_POWER := 1.6
+const LOOK_SSIL_INTENSITY := 0.8   # bounced light (high tier only)
+const LOOK_GLOW_INTENSITY := 0.9   # lamps, lit windows and signs bloom
+const LOOK_GLOW_BLOOM := 0.04
+const LOOK_GLOW_THRESHOLD := 0.9
+const LOOK_CONTRAST := 1.06
+const LOOK_SATURATION := 1.12
+const LOOK_LAMP_WARM := Color("ffc887")  # the colour of an old incandescent or sodium lamp
+
 # --- The test bot (scripts/bot.gd) ---
 const BOT_SIGHT := 25.0         # metres at which it notices and shoots a zombie
 const BOT_HOLD_DIST := 13.0     # a zombie closer than this: stop walking and shoot
@@ -382,7 +394,7 @@ const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than 
 # --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
 const BUDGET := {
 	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 11 }, # +1: the checkpoint's lamp
-	"city": { "meshes": 16, "surfaces": 16, "lights": 14, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # shapes: the whole of joinville.png is built until the performance pass decides what stays in detail
+	"city": { "meshes": 16, "surfaces": 16, "lights": 20, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # lights +3: the Mirante gate, guard hut and snack bar; +1 the Prefeitura door; +2 the Hospital wash and bay
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
 const PROTOCOL_VERSION := 6   # bump when anything on the wire changes: a client of another build is refused with a message
@@ -522,3 +534,4 @@ const OPEN_HORDE_EVERY := 25.0    # seconds between a horde night's waves
 const OPEN_HORDE_SIZE := 14       # zombies per wave on the first horde night (more on each after)
 const OPEN_NIGHT_HORDE_EVERY := 60.0 # seconds between hordes on an ordinary night
 const OPEN_NIGHT_HORDE_SIZE := 6
+

@@ -45,7 +45,6 @@ extends Node
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
 ##   --zombie-rack=1        stand one zombie of every outfit in front of you: =1 first half, =2 second half (add --back for their backs)
-<<<<<<< HEAD
 ##   --survivor-rack        other players as you see them: aiming, reloading on the run, shoving, throwing, healing, down
 ##   --body-rack            the generic model bodies (male, female) and their skeleton, still (also --back, --rack-anim)
 ##   --bite-rack=1          one outfit (--outfit=nurse, --male) plain and with every bite: =1 plain and bites 0-4, =2 bites 5-9
@@ -53,9 +52,7 @@ extends Node
 ##   --outfit-rack=1        the outfit models, each as a man and a woman: =1 civilian, worker, nurse; =2 doctor, cop, soldier; =3 the rest (also --back, --rack-anim)
 ##   --rack-anim=walk       the rack zombies hold that animation's pose (idle, walk, run, attack, windup, leap, stagger, crawl)
 ##   --rack-sever=arm       the rack zombies have lost that part (arm: the right one, leg: the left one, head), to look at stumps
-=======
 ##   --runner-rack          the frantic runner's moves side on, playing in place: three sprint gaits, the lunge, clawing over a jam, the idle
->>>>>>> origin/claude/project-thread-145ym5
 
 var menu: Menu
 var game: Game
@@ -137,11 +134,8 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.map_name = map_name
 	game.mission = mission
 	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") \
-<<<<<<< HEAD
-			or _args.has("body-rack") or _args.has("outfit-rack") or _args.has("bite-rack") or _args.has("survivor-rack") or not GameMap.NAMES.has(game.map_name):
-=======
+			or _args.has("body-rack") or _args.has("outfit-rack") or _args.has("bite-rack") or _args.has("survivor-rack") \
 			or _args.has("runner-rack") or not GameMap.NAMES.has(game.map_name):
->>>>>>> origin/claude/project-thread-145ym5
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
 	game.difficulty = _args.get("difficulty", "normal")
@@ -211,7 +205,6 @@ func _host(map_name := "city", mission := "") -> void:
 		_perf_warmup = 2.0
 	if _args.has("zombie-rack"):
 		_zombie_rack()
-<<<<<<< HEAD
 	if _args.has("body-rack"):
 		_body_rack()
 	if _args.has("survivor-rack"):
@@ -220,10 +213,8 @@ func _host(map_name := "city", mission := "") -> void:
 		_outfit_rack(int(_args["outfit-rack"]))
 	if _args.has("bite-rack"):
 		_bite_rack(int(_args["bite-rack"]), String(_args.get("outfit", "nurse")), not _args.has("male"))
-=======
 	if _args.has("runner-rack"):
 		_runner_rack()
->>>>>>> origin/claude/project-thread-145ym5
 	var ips := ", ".join(Net.local_ips())
 	print("[host] hosting on port %d. Friends join: %s" % [Config.PORT, ips])
 	game.hud.push_feed("Hosting. Friends join with IP: %s" % ips)
