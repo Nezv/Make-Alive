@@ -51,6 +51,8 @@ var boundary := PackedVector2Array() ## the map's edge, (x, z) in metres
 var building_count := 0
 var landmarks := {}
 var prop_counts := {}               ## set piece props by kind
+var mirante := {}                    ## where the Mirante's pieces stand (world): gate, gate_yaw, tower, deck, poles, rails
+var roadside_trees: Array = []       ## [{ at, kind }]: the real trees (Vegetation) lining the forest's roads
 
 var heights := PackedFloat32Array()  ## ground height at every cell corner, (gw + 1) x (gh + 1)
 var _raised := PackedByteArray()     # 1 where any corner of the cell is above 0
@@ -59,6 +61,7 @@ var _b := MeshKit.Builder.new()      # buildings, walls, POIs
 var _g := MeshKit.Builder.new()      # ground and paint
 var _trees := MeshKit.Builder.new()
 var _glow := MeshKit.Builder.new()   # lit windows and lamps
+var _red := MeshKit.Builder.new()    # aircraft warning lights on the radio masts
 var _body := StaticBody3D.new()
 var _rng := RandomNumberGenerator.new()
 
@@ -85,6 +88,7 @@ func _init(full := true) -> void:
 	if not full:
 		return
 	_scenery()
+	_hill_road()
 	_navigation()
 	_ground()
 	_hill_ground()
@@ -96,6 +100,7 @@ func _init(full := true) -> void:
 	root.add_child(_b.instance(null, false))
 	root.add_child(_trees.instance(null, false))
 	root.add_child(_glow.instance(MeshKit.emissive(Color("ffd9a0"), 2.5), false))
+	root.add_child(_red.instance(MeshKit.emissive(Color("ff2a1a"), 3.0), false))
 
 
 # --- GameMap ------------------------------------------------------------------------
@@ -431,7 +436,7 @@ func _hill_ground() -> void:
 			if _raised[i] == 0 or done[i] == 1:
 				continue
 			var t := grid[i]
-			var color: Color = ASPHALT if t == STREET else GROUND_COLORS.get(t, GROUND_COLORS[LOT])
+			var color: Color = MiranteSet.PAVERS if t == STREET else GROUND_COLORS.get(t, GROUND_COLORS[LOT])
 			_g.ground_quad(_corner(r, c), _corner(r, c + 1), _corner(r + 1, c + 1), _corner(r + 1, c), color)
 	# One height-map collider over the raised area, scaled up from 1 m to one cell.
 	var w := c1 - c0 + 2
@@ -735,18 +740,193 @@ func _batalhao(c: Vector3) -> void:
 	_b.box(Vector3(5.5, 0.3, 5.5), c + Vector3(56, 9.15, -64.5), Props.OLIVE_DARK)
 
 
-## Mirante: the lookout tower on top of Morro da Boa Vista, where the hill road ends.
+## Mirante: the lookout on the summit of Morro da Boa Vista, where the hill road ends: the
+## 14.5 m tower with its stairs and deck, the snack bar, the toilets, the guard hut and two radio
+## masts round the clearing. Each piece stands on the slope where it is (MiranteSet).
 func _mirante(c: Vector3) -> void:
-	var concrete := Props.CONCRETE
-	_solid(c + Vector3(14, 18, -12), Vector3(7, 36, 7), concrete)
-	_b.box(Vector3(17, 1.0, 17), c + Vector3(14, 36.5, -12), concrete.darkened(0.2)) # the deck
-	for side: Array in [[0.0, 8.4, 17.0, 0.2], [0.0, -8.4, 17.0, 0.2], [8.4, 0.0, 0.2, 17.0], [-8.4, 0.0, 0.2, 17.0]]:
-		_b.box(Vector3(side[2], 1.1, side[3]), c + Vector3(14 + side[0], 37.55, -12 + side[1]), Props.STEEL)
-	_b.box(Vector3(9, 0.5, 9), c + Vector3(14, 40.5, -12), concrete.darkened(0.2))
-	_b.box(Vector3(0.2, 8, 0.2), c + Vector3(14, 44.7, -12), Props.STEEL)
-	_glow.box(Vector3(0.5, 0.5, 0.5), c + Vector3(14, 48.9, -12), Color.WHITE)
-	_solid(c + Vector3(-4, 1.75, 18), Vector3(10, 3.5, 6), Color("8f8a80")) # kiosk
-	_label(CityData.POIS.mirante.name, c + Vector3(10.4, 6.0, -12), 110, Color("2a2a2a"), -90)
+	var tower := _on_ground(c + Vector3(14, 0, -12))
+	_put_free(MiranteSet.tower(_b, tower), tower)
+	_mark_built(Vector2(tower.origin.x, tower.origin.z), Vector2(MiranteSet.CORE_HALF, MiranteSet.CORE_HALF))
+	mirante.tower = tower.origin
+	mirante.deck = tower.origin + Vector3(0, MiranteSet.TOWER_DECK_Y, 0)
+	_label("MIRANTE", tower.origin + Vector3(0, MiranteSet.TOWER_DECK_Y + 1.6, MiranteSet.CORE_HALF + 0.12), 18, Color("2a2a2a"))
+	for piece: Array in [[Vector3(-14, 0, -12), 160.0, "snack_bar"], [Vector3(-13, 0, 10), 20.0, "toilets"], [Vector3(6, 0, 16), 180.0, "booth"]]:
+		var t := _on_ground(c + (piece[0] as Vector3), piece[1])
+		match piece[2]:
+			"snack_bar": _put(MiranteSet.snack_bar(_b, t), t)
+			"toilets": _put(MiranteSet.toilets(_b, t), t)
+			"booth": _put(Props.booth(_b, t), t)
+	for mast: Array in [[Vector3(-6, 0, -26), 26.0], [Vector3(26, 0, 6), 20.0]]:
+		var t := _on_ground(c + (mast[0] as Vector3))
+		_put(MiranteSet.radio_mast(_b, t, mast[1]), t)
+		_red.box(Vector3(0.36, 0.36, 0.36), t * MiranteSet.mast_top(mast[1]), Color.WHITE)
+
+
+## The way up the lookout, world points: from the ground by its south-west corner, up each
+## flight round the lift shaft, out onto the deck. Players (and the bot) walk it point to point.
+func tower_climb() -> Array:
+	var t: Vector3 = mirante.tower
+	var c := (MiranteSet.FLIGHT_IN + MiranteSet.FLIGHT_OUT) * 0.5
+	var rise := MiranteSet.TOWER_DECK_Y / 4.0
+	var out := [Vector3(t.x - c, ground_y(t), t.z + c + 3.0)]
+	var corners := [Vector2(-c, c), Vector2(c, c), Vector2(c, -c), Vector2(-c, -c), Vector2(-c, c)]
+	for i in corners.size():
+		var k: Vector2 = corners[i]
+		out.append(t + Vector3(k.x, rise * i, k.y))
+	out.append(t + Vector3(MiranteSet.TOWER_HALF - 1.2, MiranteSet.TOWER_DECK_Y, MiranteSet.TOWER_HALF - 1.2))
+	return out
+
+
+## A transform standing on the ground at `p` (x, z), turned `yaw_deg`.
+func _on_ground(p: Vector3, yaw_deg := 0.0) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)), Vector3(p.x, ground_y(p), p.z))
+
+
+## A prop's colliders without closing any cells (poles and rails in the forest, the tower's stairs).
+## A collider may carry its own basis as a third element.
+func _put_free(colliders: Array, t: Transform3D) -> void:
+	for c: Array in colliders:
+		var basis: Basis = c[2] if c.size() > 2 else Basis.IDENTITY
+		_collide(t * (c[0] as Vector3), c[1], t.basis * basis)
+
+
+## The road up Morro da Boa Vista from the gate at the forest's edge: grey pavers (drawn by
+## _hill_ground) with a red brick walking lane on the right going up and a white line beside it,
+## concrete power poles with sagging cables and a few lamps, guard rails round the outside of
+## the bends, and the gate itself where the road enters the forest.
+func _hill_road() -> void:
+	var line := PackedVector2Array()
+	var width := 0.0
+	for street: Array in CityData.STREETS:
+		if street[0] == "Rua Pastor Guilherme Rau":
+			line = _plan(street.slice(2))
+			width = street[1]
+	var forest := _plan(CityData.FOREST)
+	var total := 0.0
+	for i in line.size() - 1:
+		total += line[i].distance_to(line[i + 1])
+	var gate_at := -1.0
+	var step := 2.0
+	var d := 0.0
+	while d < total:
+		if Geometry2D.is_point_in_polygon(_along(line, d), forest):
+			gate_at = d + 6.0
+			break
+		d += step
+	if gate_at < 0.0:
+		return
+	# The gate: its sign faces the way you come from.
+	var g := _along(line, gate_at)
+	var dir := _heading(line, gate_at)
+	var yaw := atan2(dir.x, dir.y)
+	var gate := Transform3D(Basis(Vector3.UP, yaw), Vector3(g.x, ground_y(Vector3(g.x, 0, g.y)), g.y))
+	_put_free(MiranteSet.gate(_b, gate, width), gate)
+	mirante.gate = gate.origin
+	mirante.gate_yaw = yaw
+	_label("MORRO DA BOA VISTA", gate * (MiranteSet.GATE_SIGN_AT + Vector3(0, 0.15, -0.02)), 46, MiranteSet.SIGN_GREEN, rad_to_deg(yaw) + 180.0)
+	_label("ÁREA DE RELEVANTE INTERESSE ECOLÓGICO", gate * (MiranteSet.GATE_SIGN_AT + Vector3(0, -0.5, -0.02)), 17, MiranteSet.SIGN_GREEN, rad_to_deg(yaw) + 180.0)
+	# Flowers by the gate, as in the photo: hibiscus and bougainvillea, a purple ipê.
+	for bush: Array in [[Vector3(-width * 0.5 - 2.5, 0, -3), Vegetation.Kind.HIBISCUS], [Vector3(-width * 0.5 - 3.0, 0, 2), Vegetation.Kind.HIBISCUS],
+			[Vector3(width * 0.5 + 6.0, 0, -2), Vegetation.Kind.BOUGAINVILLEA], [Vector3(-width * 0.5 - 4.0, 0, 9), Vegetation.Kind.IPE_PURPLE],
+			[Vector3(width * 0.5 + 5.0, 0, 10), Vegetation.Kind.BOUGAINVILLEA]]:
+		var at := gate * (bush[0] as Vector3)
+		at.y = ground_y(at)
+		Vegetation.plant(_trees, Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), at), bush[1], _rng)
+	# Lane, line, poles, cables and rails, from the gate to the summit.
+	var lane := 2.2
+	var poles: Array = []
+	var rails := 0
+	d = gate_at - 10.0
+	var next_pole := gate_at + 12.0
+	while d < total - 4.0:
+		var e := minf(d + step, total - 4.0)
+		var a := _along(line, d)
+		var b := _along(line, e)
+		var ra := _right(line, d)
+		var rb := _right(line, e)
+		var off := width * 0.5 - lane * 0.5
+		_strip(a + ra * off, b + rb * off, ra, rb, lane, MiranteSet.BRICK)
+		_strip(a + ra * (off - lane * 0.5 - 0.1), b + rb * (off - lane * 0.5 - 0.1), ra, rb, 0.14, PAINT)
+		if d >= next_pole:
+			next_pole += 36.0
+			var at := a + ra * (width * 0.5 + 0.7)
+			var n := poles.size()
+			var t := Transform3D(Basis(Vector3.UP, atan2(ra.x, ra.y)), Vector3(at.x, ground_y(Vector3(at.x, 0, at.y)), at.y))
+			var lamp := n % 3 == 1
+			_put_free(MiranteSet.power_pole(_b, t, lamp, n % 5 == 2), t)
+			if lamp and _rng.randf() < 0.6: # a few still burn
+				_glow.box(Vector3(0.3, 0.06, 0.5), t * MiranteSet.LAMP_HEAD, Color.WHITE)
+			poles.append(t)
+		d = e
+	# Cables sag from pole to pole.
+	for i in poles.size() - 1:
+		var p: Transform3D = poles[i]
+		var q: Transform3D = poles[i + 1]
+		for w: Vector3 in MiranteSet.wire_points():
+			var a := p * w
+			var b := q * w
+			var mid := (a + b) * 0.5 + Vector3(0, -0.9 if w.y < 8.0 else -0.6, 0)
+			var thick := 0.1 if w.y < 8.0 else 0.04
+			for seg: Array in [[a, mid], [mid, b]]:
+				var s0: Vector3 = seg[0]
+				var s1: Vector3 = seg[1]
+				if s0.distance_to(s1) < 0.1:
+					continue
+				_b.box(Vector3(thick, thick, s0.distance_to(s1)), (s0 + s1) * 0.5, Props.DARK, Basis.looking_at((s1 - s0).normalized(), Vector3.UP))
+	# Guard rails round the outside of every sharp bend on the hill.
+	var walked := 0.0
+	for i in range(1, line.size() - 1):
+		walked += line[i - 1].distance_to(line[i])
+		if walked < gate_at:
+			continue
+		var din := (line[i] - line[i - 1]).normalized()
+		var dout := (line[i + 1] - line[i]).normalized()
+		var turn := din.angle_to(dout)
+		if absf(turn) < 0.35:
+			continue
+		var outer := -1.0 if turn > 0.0 else 1.0 # turning right (+ in this x, z plane): the outside is the left
+		var k := maxf(gate_at, walked - 14.0)
+		while k < minf(total - 6.0, walked + 14.0):
+			var a := _along(line, k) + _right(line, k) * outer * (width * 0.5 + 0.4)
+			var b := _along(line, k + 4.0) + _right(line, k + 4.0) * outer * (width * 0.5 + 0.4)
+			var pa := Vector3(a.x, ground_y(Vector3(a.x, 0, a.y)), a.y)
+			var pb := Vector3(b.x, ground_y(Vector3(b.x, 0, b.y)), b.y)
+			var t := Transform3D(Basis.looking_at((pb - pa).normalized(), Vector3.UP), pa)
+			_put_free(MiranteSet.guard_rail(_b, t, pa.distance_to(pb)), t)
+			rails += 1
+			k += 4.0
+	mirante.poles = poles.size()
+	mirante.rails = rails
+
+
+## The point `d` metres along a polyline.
+func _along(line: PackedVector2Array, d: float) -> Vector2:
+	for i in line.size() - 1:
+		var length := line[i].distance_to(line[i + 1])
+		if d <= length or i == line.size() - 2:
+			return line[i].lerp(line[i + 1], clampf(d / maxf(length, 0.001), 0.0, 1.0))
+		d -= length
+	return line[line.size() - 1]
+
+
+## The way a polyline runs `d` metres along it, (x, z), unit length.
+func _heading(line: PackedVector2Array, d: float) -> Vector2:
+	return (_along(line, d + 1.0) - _along(line, d - 1.0)).normalized()
+
+
+## The right-hand side going along a polyline at `d` (forward is -Z, so right is +X going north).
+func _right(line: PackedVector2Array, d: float) -> Vector2:
+	var h := _heading(line, d)
+	return Vector2(-h.y, h.x)
+
+
+## A strip of paint `w` wide over the ground from `a` to `b` (centre line), hugging the slope.
+func _strip(a: Vector2, b: Vector2, ra: Vector2, rb: Vector2, w: float, color: Color) -> void:
+	var corners := [a - ra * w * 0.5, b - rb * w * 0.5, b + rb * w * 0.5, a + ra * w * 0.5]
+	var pts := []
+	for q: Vector2 in corners:
+		pts.append(Vector3(q.x, ground_y(Vector3(q.x, 0, q.y)) + 0.06, q.y))
+	_g.ground_quad(pts[0], pts[1], pts[2], pts[3], color)
 
 
 # --- Set pieces -------------------------------------------------------------------------------
@@ -878,14 +1058,28 @@ func _street_dressing() -> void:
 			walked += length
 
 
-## Trees on the hill: thick along the road so it reads as a wall of forest, thinner behind.
+## Trees on the hill: real ones (Vegetation) along the road so it runs between trunks and
+## fronds, a thick wall of canopy boxes just behind them, thinner further in.
 func _forest() -> void:
 	for r in gh:
 		for c in gw:
 			if grid[r * gw + c] != FOREST:
 				continue
 			var roadside := _open(c - 1, r) or _open(c + 1, r) or _open(c, r - 1) or _open(c, r + 1)
-			if _rng.randf() > (0.85 if roadside else 0.08):
+			if roadside:
+				# Back from the kerb: towards the side of the cell away from the open ground.
+				var away := Vector2(int(_open(c - 1, r)) - int(_open(c + 1, r)), int(_open(c, r - 1)) - int(_open(c, r + 1)))
+				var at := Vector3(lo.x + (c + 0.5 + away.x * 0.35 + _rng.randf_range(-0.1, 0.1)) * cell, 0.0,
+					lo.y + (r + 0.5 + away.y * 0.35 + _rng.randf_range(-0.1, 0.1)) * cell)
+				if mirante.has("gate") and Vector2(at.x, at.z).distance_to(Vector2(mirante.gate.x, mirante.gate.z)) < 9.0:
+					continue # the portal and its hut stand here
+				at.y = ground_y(at)
+				var kind := Vegetation.forest_kind(_rng)
+				Vegetation.plant(_trees, Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), at), kind, _rng)
+				roadside_trees.append({ "at": at, "kind": kind })
+				continue
+			var second := _open(c - 2, r) or _open(c + 2, r) or _open(c, r - 2) or _open(c, r + 2)
+			if _rng.randf() > (0.7 if second else 0.08):
 				continue
 			var w := _rng.randf_range(3.5, 6.5)
 			var h := _rng.randf_range(7.0, 15.0)
