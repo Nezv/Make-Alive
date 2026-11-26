@@ -12,6 +12,8 @@ extends Node
 ##   --time-cycle           with several --shot-at: each shot after the first in the next preset (clear, overcast...)
 ##   --lightning            with a storm: each shot at a lightning strike
 ##   --review-light         the same as --time=overcast: an even light to judge forms and colours (shots)
+##   --house-plans=C:/dir   lay out the sample house (HousePlan.sample, --seed=N) and --variants=N others, save houses.json there and exit (tools\houses.ps1)
+##   --house-rack[=seed]    the sample house built in a neutral room, flown through: --floor=N shows floors up to N, --eye starts at the street door
 ##   --city-zoom=x,y,w      with --city-plan: also city_zoom.png, a close plan of w pixels of joinville.png from (x, y)
 ##   --join=192.168.1.7     join immediately
 ##   --name=Bob             player name
@@ -74,6 +76,15 @@ func _ready() -> void:
 		return
 	if _args.has("city-plan"):
 		_city_plan(_args["city-plan"])
+		return
+	if _args.has("house-plans"):
+		_house_plans(_args["house-plans"])
+		return
+	if _args.has("house-rack"):
+		var house := HouseRack.new()
+		add_child(house)
+		house.setup(_args)
+		_start_timers()
 		return
 	if _args.has("prop-rack"):
 		var rack := PropRack.new()
@@ -521,6 +532,41 @@ func _balance(path: String) -> void:
 
 
 ## Draw the city's plan and the streets over Joinville, then quit. Works headless.
+## --house-plans: the sample house and a spread of others, laid out and saved as JSON for
+## tools/house_plans.py to draw.
+func _house_plans(dir: String) -> void:
+	DirAccess.make_dir_recursive_absolute(dir)
+	var seed := int(_args.get("seed", "18000"))
+	var t := Time.get_ticks_msec()
+	var sample := HousePlan.new(HousePlan.sample(seed))
+	print("[houses] sample (seed %d) laid out in %d ms: %s" % [seed, Time.get_ticks_msec() - t, "ok" if sample.ok else sample.problem])
+	var out := { "sample": sample.to_dict(), "variants": [] }
+	for f: Dictionary in sample.floors:
+		print("[houses]   floor %d: %d spaces, %d doors, %d tries%s" % [f.level, f.spaces.size(), f.doors.size(), f.tries,
+			"" if f.ok else "  FAILED: " + String(f.problem)])
+		for why: String in f.rejected:
+			print("[houses]     rejected: ", why)
+	var n := int(_args.get("variants", "8"))
+	for i in n:
+		var spec := HousePlan.sample(seed + 101 * (i + 1))
+		spec.bays = [2, 3, 3, 4, 4, 5, 3, 2][i % 8]
+		spec.back_bays = spec.bays
+		spec.width = spec.bays * [2.4, 2.5, 2.6, 2.35, 2.7, 2.45, 2.8, 2.6][i % 8]
+		spec.depth = [9.5, 11.0, 13.5, 12.0, 14.0, 10.5, 12.5, 11.5][i % 8]
+		spec.storey = [3.0, 3.2, 3.4, 2.95, 3.1, 3.3, 3.25, 2.9][i % 8]
+		spec.door = "left" if i % 2 == 0 else "right"
+		spec.shop = i % 3 != 2
+		var h := HousePlan.new(spec)
+		print("[houses] variant %d: %d bays, %.1f x %.1f m: %s" % [i, spec.bays, spec.width, spec.depth, "ok" if h.ok else h.problem])
+		out.variants.append(h.to_dict())
+	var path := dir.path_join("houses.json")
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(JSON.stringify(out, "	"))
+	file.close()
+	print("[houses] saved ", path)
+	get_tree().quit()
+
+
 func _city_plan(dir: String) -> void:
 	var t := Time.get_ticks_msec()
 	var city := CityMap.new(false)
