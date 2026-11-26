@@ -50,6 +50,24 @@ $prefCams = [ordered]@{
 }
 foreach ($k in $prefCams.Keys) { $shots[$k] = $pref + "--shot-cam=$($prefCams[$k])" }
 
+# The Hospital Dona Helena from every side (references/hospital_elements.md): the street front,
+# two air views, the top, the ambulance bay, the old wing, the roof and its pad, the fire stair,
+# the yard behind, Rua Blumenau.
+$hosp = @('--host', '--mission=hospital', '--no-hordes')
+$hospCams = [ordered]@{
+    'hosp_front'      = '-598.4,6.0,-253.5,90.0,15.0'
+    'hosp_air'        = '-568.4,60.0,-182.5,55.7,-19.7'
+    'hosp_air_south'  = '-588.4,55.0,-322.5,129.4,-20.2'
+    'hosp_top'        = '-658.4,170.0,-232.5,90.0,-89.0'
+    'hosp_bay'        = '-634.4,1.8,-246.5,64.4,4.0'
+    'hosp_wing'       = '-612.4,3.0,-203.5,90.0,12.0'
+    'hosp_roof'       = '-680.4,40.0,-210.5,-14.5,-12.0'
+    'hosp_stair'      = '-718.4,4.0,-246.5,-90.0,25.0'
+    'hosp_yard'       = '-733.4,30.0,-253.5,-90.0,-25.0'
+    'hosp_street'     = '-611.4,3.0,-312.5,180.0,2.0'
+}
+foreach ($k in $hospCams.Keys) { $shots[$k] = $hosp + "--shot-cam=$($hospCams[$k])" }
+
 $made = @()
 foreach ($name in $shots.Keys) {
     if ($Filter -and $name -notlike "*$Filter*") { continue }

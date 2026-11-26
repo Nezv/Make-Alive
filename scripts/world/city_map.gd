@@ -51,6 +51,7 @@ var boundary := PackedVector2Array() ## the map's edge, (x, z) in metres
 var building_count := 0
 var landmarks := {}
 var prop_counts := {}               ## set piece props by kind
+var hospital := {}                   ## the Hospital's lot frame (-Z to Rua Blumenau), door, yard, stair frame, climb (world points), pad
 var prefeitura := {}                 ## the Prefeitura's lot frame (-Z to the avenue), its door and its pad (world)
 var mirante := {}                    ## where the Mirante's pieces stand (world): gate, gate_yaw, tower, deck, poles, rails
 var roadside_trees: Array = []       ## [{ at, kind }]: the real trees (Vegetation) lining the forest's roads
@@ -155,10 +156,12 @@ func zombie_spawn_point(avoid: Array) -> Vector3:
 	return last
 
 
-## The Mirante and the Prefeitura have their own objectives, built from where their pieces ended up.
+## The Mirante, the Hospital and the Prefeitura have their own objectives, built from where their pieces ended up.
 func _mission_changed() -> void:
 	if mission == "mirante" and mirante.has("gate") and nav != null:
 		use_data(MapAreas.mirante(self))
+	elif mission == "hospital" and hospital.has("pad") and nav != null:
+		use_data(MapAreas.hospital(self))
 	elif mission == "prefeitura" and prefeitura.has("pad") and nav != null:
 		use_data(MapAreas.prefeitura(self))
 	else:
@@ -679,27 +682,86 @@ func _pois() -> void:
 		_lamp(poi_pos(id) + Vector3(0, 6, 0))
 
 
-## Dona Helena: eight-floor ward block with a helipad on the roof (the extraction point), a
-## lower wing, and the ambulance bay facing Rua Blumenau.
+## Hospital Dona Helena, facing east over its ambulance bay to Rua Blumenau (HospitalSet): the
+## white ward tower in three bodies washed in blue light with the lit sign on the middle one, the
+## bay canopy along the front, the old wing with its dark fins and the green-banded annex on the
+## street, the little old house kept between, the yard behind with the oxygen tank, and the steel
+## fire stair up the back to the helipad on the roof. Triage was set up under the bay and lost.
+## `hospital` keeps the lot's frame (-Z faces the street) and where the mission's places are.
 func _hospital(c: Vector3) -> void:
-	var white := Color("b9bcbd")
-	var h := 8 * Config.CITY_FLOOR_H
-	_solid(c + Vector3(-26, h * 0.5, -4), Vector3(32, h, 96), white)
-	_solid(c + Vector3(9, 6.4, -50), Vector3(34, 12.8, 22), white.darkened(0.12))
-	for f in range(1, 8): # window bands
-		_b.box(Vector3(0.12, 1.3, 92), c + Vector3(-9.95, f * Config.CITY_FLOOR_H + 1.7, -4), Props.GLASS)
-	_b.box(Vector3(0.14, 5.0, 1.5), c + Vector3(-9.9, h - 4.5, 30), Props.RED) # red cross
-	_b.box(Vector3(0.14, 1.5, 5.0), c + Vector3(-9.9, h - 4.5, 30), Props.RED)
-	_b.box(Vector3(16, 0.3, 16), c + Vector3(-26, h + 0.15, -20), Color("3a3c40")) # helipad
-	_b.box(Vector3(1.2, 0.34, 8), c + Vector3(-29, h + 0.17, -20), PAINT)
-	_b.box(Vector3(1.2, 0.34, 8), c + Vector3(-23, h + 0.17, -20), PAINT)
-	_b.box(Vector3(6, 0.34, 1.2), c + Vector3(-26, h + 0.17, -20), PAINT)
-	_b.box(Vector3(14, 0.4, 14), c + Vector3(-2.5, 4.4, 0), Props.RED.darkened(0.3)) # ambulance bay canopy
-	for x in [-8.5, 3.5]:
-		for z in [-6.0, 6.0]:
-			_b.box(Vector3(0.4, 4.2, 0.4), c + Vector3(x, 2.1, z), white)
-			_collide(c + Vector3(x, 2.1, z), Vector3(0.4, 4.2, 0.4))
-	_label(CityData.POIS.hospital.name, c + Vector3(-9.8, h - 9.0, -4), 160, Color("7a1212"), 90)
+	var lot := Transform3D(Basis(Vector3.UP, -PI * 0.5), c)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 18600512
+	hospital.frame = lot
+	_put(HospitalSet.tower(_b, _glow, lot), lot)
+	_put(HospitalSet.roof_colliders(), lot)
+	_put_free(HospitalSet.bay_columns(), lot)
+	var stair := lot * Transform3D(Basis.IDENTITY, Vector3(HospitalSet.STAIR_X, 0, HospitalSet.TOWER_BACK))
+	_put_free(HospitalSet.fire_stair(_b, stair), stair)
+	hospital.stair = stair
+	hospital.climb = HospitalSet.stair_points().map(func(p: Vector3) -> Vector3: return stair * p)
+	hospital.pad = lot * HospitalSet.PAD_AT
+	hospital.door = lot * Vector3((HospitalSet.B.x + HospitalSet.B.y) * 0.5, 0, HospitalSet.TOWER_FRONT - HospitalSet.B_OUT - 1.0)
+	hospital.yard = lot * Vector3(-31, 0, 34)
+	var face := rad_to_deg(-PI * 0.5) + 180.0
+	_label(CityData.POIS.hospital.name, lot * HospitalSet.SIGN_AT, 90, HospitalSet.SIGN_BLUE, face, false)
+	_label("PRONTO ATENDIMENTO", lot * HospitalSet.BAY_SIGN_AT, 40, Color.WHITE, face, false)
+	_lamp(lot * HospitalSet.WASH_AT, 2.5, 30.0, HospitalSet.WASH)
+	_lamp(lot * Vector3(-31, 3.6, -3), 1.6, 12.0, Config.LOOK_LAMP_WARM)
+	# The buildings on the street.
+	var wing := lot * Transform3D(Basis.IDENTITY, Vector3(19, 0, -32))
+	_put(HospitalSet.old_wing(_b, _glow, wing, 30.0, 14.0), wing)
+	var annex := lot * Transform3D(Basis.IDENTITY, Vector3(49, 0, -30))
+	_put(HospitalSet.annex(_b, _glow, annex, 26.0, 16.0), annex)
+	var house := lot * Transform3D(Basis.IDENTITY, Vector3(-65, 0, -28))
+	_put(HospitalSet.house(_b, house, 14.0, 10.0), house)
+	# The ground: the drop-off lane, paving under the bay and along the street, the yard behind.
+	var y := 0.035
+	_patch(lot, [-58.0, -38.0, 2.0, -10.0], y, PrefeituraSet.ASPHALT)
+	for k in 8: # the drop-off's bays
+		_patch(lot, [-54.0 + k * 6.0, -14.0, -53.88 + k * 6.0, -10.5], y + 0.01, PrefeituraSet.LINE)
+	_patch(lot, [-58.0, -10.0, -4.0, 4.0], y, PrefeituraSet.PAVING)
+	_patch(lot, [2.0, -38.0, 66.0, -32.0], y, PrefeituraSet.PAVING)
+	_patch(lot, [-74.0, -38.0, -58.0, -28.0], y, PrefeituraSet.PAVING)
+	_patch(lot, [-60.0, 24.0, 2.0, 44.0], y, PrefeituraSet.ASPHALT)
+	for k in 10:
+		_patch(lot, [-46.0 + k * 3.0, 39.0, -45.88 + k * 3.0, 44.0], y + 0.01, PrefeituraSet.LINE)
+	for x in [-72.0, -62.0, 8.0, 22.0, 36.0, 50.0, 62.0]:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(x, 0, -36.5))
+		_put_free(Vegetation.plant(_trees, t, Vegetation.Kind.BROADLEAF if int(x) % 3 != 0 else Vegetation.Kind.IPE_YELLOW, rng), t)
+	# The yard: the oxygen tank, the generator, bins by the back doors, staff cars.
+	var tank := lot * Transform3D(Basis.IDENTITY, Vector3(-53, 0, 36))
+	_put(HospitalSet.oxygen_tank(_b, tank), tank)
+	var gen := lot * Transform3D(Basis(Vector3.UP, 0.1), Vector3(-4, 0, 34))
+	_put_free(HospitalSet.generator(_b, gen), gen)
+	for x in [-13.0, -11.6, -36.0]:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * 0.6), Vector3(x, 0, 26.0))
+		_put_free(RoadProps.bin(_b, t, true, rng), t)
+	for k in 3:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf_range(-0.1, 0.1)), Vector3(-41.0 + k * 6.0, 0, 41.6))
+		var paint: Color = RoadProps.PAINTS[rng.randi() % RoadProps.PAINTS.size()]
+		_put_free(RoadProps.hatchback(_b, t, paint, rng.randi_range(0, 1)), t)
+	# Triage under the bay, overrun: ambulances left with their doors open, a minibus dragged across
+	# the lane as a barricade, cots, body bags, wheelchairs, drip stands, blood to the doors.
+	for a: Array in [[-46.0, -18.0, 0.15], [-14.0, -22.0, -2.6]]:
+		var t := lot * Transform3D(Basis(Vector3.UP, a[2]), Vector3(a[0], 0, a[1]))
+		_put_free(Props.ambulance(_b, t), t)
+	var bus := lot * Transform3D(Basis(Vector3.UP, PI * 0.5 + 0.3), Vector3(-30, 0, -30))
+	_put_free(RoadProps.minibus(_b, bus), bus)
+	for k in 5:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf_range(-0.2, 0.2)), Vector3(-48.0 + k * 1.4, 0, -4.5))
+		_put_free(Props.cot(_b, t, k % 2 == 0), t)
+		if k % 2 == 1:
+			HospitalSet.drip_stand(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-48.0 + k * 1.4 + 0.6, 0, -5.8)))
+	for k in 4:
+		var t := lot * Transform3D(Basis(Vector3.UP, PI * 0.5 + rng.randf_range(-0.15, 0.15)), Vector3(-20.0 + k * 0.1, 0, -6.0 + k * 0.8))
+		_put_free(Props.bodybag(_b, t), t)
+	for w: Array in [[-27.0, -3.0, 0.4, false], [-24.5, -2.2, 2.2, true], [-10.0, -14.0, 1.0, true]]:
+		HospitalSet.wheelchair(_b, lot * Transform3D(Basis(Vector3.UP, w[2]), Vector3(w[0], 0, w[1])), w[3])
+	RoadProps.litter(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-34.0, 0.0, -2.0)), 6, rng, _glow)
+	RoadProps.litter(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-40.0, 0.0, 30.0)), 4, rng, _glow)
+	var ground_at := func(_p: Vector3) -> float: return c.y
+	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, PI), Vector3(-36.0, 0, -12.0)), 12.0, rng, ground_at)
 
 
 ## Terminal Central: four platform roofs on columns, a ticket hall and the buses that never left.

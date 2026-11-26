@@ -199,6 +199,8 @@ func test_a_mission_starts_players_at_its_poi() -> void:
 		m.mission = id
 		if id == "mirante": # climbed from the gate at the foot of the hill (test_mission_mirante.gd)
 			assert_lt(m.player_spawn().distance_to(m.mirante.gate), 25.0, "the Mirante mission starts at the gate")
+		elif id == "hospital": # in the drop-off lane in front of the doors (test_mission_hospital.gd)
+			assert_lt(m.player_spawn().distance_to(m.hospital.door), 25.0, "the Hospital mission starts at its doors")
 		elif id == "prefeitura": # behind the sandbags at the door (test_mission_prefeitura.gd)
 			assert_lt(m.player_spawn().distance_to(m.prefeitura.door), 12.0, "the Prefeitura mission starts at its door")
 		else:

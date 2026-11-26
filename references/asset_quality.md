@@ -134,7 +134,8 @@ not its own pass · [ ] not started.
 - [~] `scripts/world/road_props.gd`: everyday cars and street things (free part only)
 - [ ] `scripts/world/city_map.gd` `_buildings`: the city blocks are still plain boxes drawn with `box` (facades need plinths, floor bands, window grids with frames, shopfronts with awnings and signs, roof clutter)
 - [x] Prefeitura (`scripts/world/prefeitura_set.gd`): brick piers, upturned concrete bands with coping, drip grooves and rain streaks, framed glazing with mullions and transoms, pink plaster ground floor with framed windows and sills, blue space frames (front and back grids, X bracing, struts, node plates), brick buttresses (`frustum`), ribbed metal roof with a ridge cap, brick roof towers with bands, louvres and masts, condensers, a turbine vent, AC units, planters spilling over the first band, canopy on round columns with downlights, flags, lamp posts, the lawn sign in its space frame, flower beds, ramp rails, the pad with its ring, H and rim lights. List: `references/prefeitura_elements.md`
-- [ ] The three other POIs (hospital, terminal, batalhão): placeholders; element lists in `references/<poi>_elements.md`
+- [x] Hospital Dona Helena (`scripts/world/hospital_set.gd`): tower in three bodies, bay canopy, old wing with fins, annex, house, fire stair, helipad, triage scatter (`references/hospital_elements.md`)
+- [ ] The two other POIs (terminal, batalhão): placeholders; element lists in `references/<poi>_elements.md`
 - [ ] `scripts/world/scenery.gd`: shelter building, facades, checkpoint, gun pits, motor pool
 - [ ] `scripts/world/corridor_map.gd` (the test corridor)
 - [ ] Interactables: `door.gd`, `lootbox.gd`, `ammo_box.gd`, `ammo_crate.gd`, `weapon_pickup.gd`, `checkpoint_look.gd`
