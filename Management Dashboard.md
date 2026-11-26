@@ -839,12 +839,13 @@ Everything a match needs exists: the zombies move like the dead, the five maps a
 - [ ] 1.6.1.4 · Budget: draws and triangles of a placed set counted by `Budget`, `tests/test_placement.gd` holds a full area under `Config.BUDGET` #perf
 - [ ] 1.6.1.5 · `--place-rack` lays a sample of every family on a street to look at
 
-### [ ] 1.6.2 · Library triage
-> id: S248 | needs: S140 | size: S | tags: #map #art | test: `python tools/models/props.py --list` | see: `references/elements/library.md`
+### [x] 1.6.2 · Library triage
+> id: S248 | needs: S140 | size: S | tags: #map #art | test: `python tools/models/library.py --check` | see: `references/elements/library.md`
 
-- [ ] 1.6.2.1 · `references/elements/library.md`: every element by family, its round, whether its card has photos, its states, and which area uses it
-- [ ] 1.6.2.2 · Each marked ready to place, or the round it still needs (a draft at round 1 is placed and improved in place)
-- [ ] 1.6.2.3 · The elements each area needs and nobody has made yet, listed per area, so element steps are picked from that list first
+- [x] 1.6.2.1 · `references/elements/library.md`: every element by family, its round, whether its card has photos, its states, and which area uses it ✅
+- [x] 1.6.2.2 · Each marked ready to place, or the round it still needs (a draft at round 1 is placed and improved in place) ✅
+- [x] 1.6.2.3 · The elements each area needs and nobody has made yet, listed per area, so element steps are picked from that list first ✅
+- Done: `python tools/models/library.py` writes `references/elements/library.md` (`--check` fails on an element without a card, an area or a registry entry). The areas each element serves are its `AREAS` table, the missing elements per area its `MISSING` table: keep both in step.
 
 ### [ ] 1.6.3 · Area dressing from the library
 > id: S249 | needs: S051, S247, S248 | size: L | rounds: 2 | tags: #map #art | test: `tests/test_area_dressing.gd` | see: `--mission=<each> --shot-cam`
