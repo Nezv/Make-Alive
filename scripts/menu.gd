@@ -69,6 +69,9 @@ var mission_kind: Label
 var mission_brief: Label
 var mission_route: Label
 var start_button: Button
+var mode := ""                 ## GameModes: how the picked mission is played ("" = free play at its POI)
+var mode_buttons := {}         ## mode id -> Button
+var mode_brief: Label
 var free_play_button: Button
 var name_edit: LineEdit
 var ip_edit: LineEdit
@@ -162,6 +165,17 @@ func _draw_lines() -> void:
 				lines_layer.draw_polyline(lines[i], Color(RED, 0.16), w * 3.5, true)
 			else:
 				lines_layer.draw_polyline(lines[i], RED if major else RED.darkened(0.15), w, true)
+
+
+## Pick how the match is played (a mode button, or `--mode=` on the command line).
+func set_mode(id: String) -> void:
+	if not GameModes.valid(id):
+		return
+	mode = id
+	for k: String in mode_buttons:
+		(mode_buttons[k] as Button).set_pressed_no_signal(k == id)
+	if mode_brief:
+		mode_brief.text = "Walk the town, no objective." if id == "" else String(GameModes.INFO[id].brief)
 
 
 ## Pick a mission (a pin was clicked, or `--mission=` on the command line).
@@ -269,6 +283,28 @@ func _build_panel() -> void:
 	mission_route.modulate = Color(1, 1, 1, 0.55)
 	v.add_child(mission_route)
 
+	var modes := HBoxContainer.new()
+	modes.add_theme_constant_override("separation", 4)
+	var group := ButtonGroup.new()
+	for id: String in [""] + GameModes.ORDER:
+		var b := Button.new()
+		b.text = "FREE PLAY" if id == "" else String(GameModes.INFO[id].title)
+		b.toggle_mode = true
+		b.button_group = group
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 12)
+		b.pressed.connect(set_mode.bind(id))
+		WorldSounds.wire_button(b)
+		modes.add_child(b)
+		mode_buttons[id] = b
+	v.add_child(modes)
+	mode_brief = Label.new()
+	mode_brief.autowrap_mode = TextServer.AUTOWRAP_WORD
+	mode_brief.add_theme_font_size_override("font_size", 12)
+	mode_brief.modulate.a = 0.6
+	v.add_child(mode_brief)
+	set_mode(mode)
+
 	start_button = Button.new()
 	start_button.text = "START MISSION"
 	start_button.custom_minimum_size.y = 52
@@ -289,7 +325,7 @@ func _build_panel() -> void:
 	WorldSounds.wire_button(start_button)
 	v.add_child(start_button)
 	var note := Label.new()
-	note.text = "Objectives aren't built yet: a mission starts you at its POI on the city map."
+	note.text = "The mission's own objectives aren't built yet: the mode above sets what you do from its POI."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	note.add_theme_font_size_override("font_size", 12)
 	note.modulate.a = 0.4
