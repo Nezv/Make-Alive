@@ -44,17 +44,20 @@ Code: `scripts/world/mirante_set.gd` (the pieces), `scripts/world/vegetation.gd`
 
 ## Road scatter (what an emptied hill would have on it)
 
-None of this is built yet; it is the list for the props thread.
+Placed by `RoadScatter.HILL` (`scripts/world/road_scatter.gd`), models in `scripts/world/road_props.gd`.
+Edit HILL to move, add or drop any of them.
 
-- [ ] Abandoned cars on the road (the bus line's minibus, a taxi, a couple of hatchbacks), doors open
-- [ ] A car that slid off a bend into the guard rail
-- [ ] Fallen tree across part of the road, a snapped power pole with its cables on the ground
-- [ ] Bicycles dropped by the kerb (the road is a favourite climb for cyclists and runners)
-- [ ] Backpacks, water bottles, a dropped phone, a selfie stick, flip-flops on the brick lane
-- [ ] Police or Guarda Municipal motorbike at the gate, a patrol car across the road higher up
-- [ ] Traffic cones and a PARE board dragged up the road, a makeshift barricade of benches
-- [ ] Blood trails into the forest, a body bag or two at the hairpin
-- [ ] Rubbish bins knocked over, a bench at a viewpoint bend
+- [x] Abandoned cars on the road (the bus line's minibus, a taxi, three hatchbacks), doors open
+- [x] A car that slid off a bend into the guard rail (first sharp bend)
+- [x] Fallen tree across part of the road, a snapped power pole with its cables on the ground
+- [x] Bicycles dropped by the kerb (the road is a favourite climb for cyclists and runners)
+- [x] Backpacks, water bottles, a dropped phone (some still lit), a selfie stick, flip-flops on the brick lane
+- [x] Guarda Municipal motorbike at the gate, a patrol car across the road higher up (one lamp of its bar still lit)
+- [x] Traffic cones and a PARE board dragged up the road, a makeshift barricade of benches below the hairpin
+- [x] Blood trails into the forest, two body bags at the hairpin
+- [x] Rubbish bins knocked over, a bench at the viewpoint bend near the top
+- [ ] Sound or light on any of it (a car alarm, a hazard light blinking): none yet
+- [ ] Props that move when shot or shoved (all static and baked into the map's mesh)
 
 ## The summit
 

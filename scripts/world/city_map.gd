@@ -89,6 +89,8 @@ func _init(full := true) -> void:
 		return
 	_scenery()
 	_hill_road()
+	RoadScatter.hill_road(self)
+	RoadScatter.streets(self)
 	_navigation()
 	_ground()
 	_hill_ground()
