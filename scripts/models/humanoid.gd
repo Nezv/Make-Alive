@@ -16,11 +16,14 @@ extends Node3D
 ##   forearm_extras, thigh_extras, shin_extras (limb extras go on both sides)
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
-enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP }
+enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP,
+	SPRINT, LUNGE, SURGE }
+## SPRINT, LUNGE and SURGE are the frantic runner's: a flat-out sprint with flailing arms and
+## stumbles, a pounce-and-maul attack, and clawing over the backs of a jam it can't get through.
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
-	HIP_L, HIP_R, KNEE_L, KNEE_R, COUNT }
+	HIP_L, HIP_R, KNEE_L, KNEE_R, HIPS_Z, COUNT }
 
 const HIP_HEIGHT := 0.92
 const BLOOD := Color("7a0a0a")
@@ -53,6 +56,10 @@ var _tilt := 0.0
 var _arm_bias := 0.0
 var _seed := 0.0
 var _stagger_side := 1.0
+var frantic := false  ## a runner: twitchy idle, frenzied sprint (set from the style's "frantic")
+var turn := 0.0       ## how fast the body is turning (rad/s, + = left): sprinters bank into it
+var _gait := 0        ## which way a sprinter flails its arms (0..2), from its id
+var _sid := 0         ## the id the style was made for (stumbles are picked from it)
 
 
 static func create(style: Dictionary) -> Humanoid:
@@ -93,6 +100,11 @@ func _build(s: Dictionary) -> void:
 	var shoes: Color = s.get("shoes", Color("222222"))
 	_limp = s.get("limp", 0.0)
 	_seed = randf() * 10.0
+	frantic = s.get("frantic", false)
+	if s.has("seed"): # zombies: everything that makes this one move differently comes from its id
+		_sid = int(s.seed)
+		_seed = fposmod(float(_sid) * 1.618, 10.0)
+		_gait = absi(_sid * 7 + 3) % 3
 	_tilt = randf_range(-0.3, 0.3) if is_zombie else 0.0
 	_arm_bias = randf_range(-0.35, 0.35) if is_zombie else 0.0
 	phase = _seed
@@ -283,27 +295,36 @@ func _blend_rate() -> float:
 		Anim.STAGGER: return 24.0
 		Anim.LEAP: return 14.0
 		Anim.CRAWL: return 6.0
-	return 10.0
+		Anim.LUNGE: return 22.0
+		Anim.SPRINT: return 16.0
+		Anim.SURGE: return 14.0
+	return 16.0 if frantic else 10.0
 
 
 func _stride_amp() -> float:
-	return 0.8 if anim == Anim.RUN else 0.5
+	match anim:
+		Anim.RUN: return 0.8
+		Anim.SPRINT: return 0.9
+	return 0.5
 
 
 func _phase_rate(speed: float) -> float:
 	match anim:
-		Anim.WALK, Anim.RUN:
+		Anim.WALK, Anim.RUN, Anim.SPRINT:
 			# Match leg swing to ground speed so feet don't slide.
 			return maxf(1.5, PI * speed / (2.0 * HIP_HEIGHT * sin(_stride_amp())))
 		Anim.CRAWL:
 			return 2.0 + speed * 5.0
 		Anim.CROUCH:
 			return 2.0 + speed * 3.0
-	return 2.0
+		Anim.SURGE:
+			return 9.0
+	return 4.5 if frantic else 2.0
 
 
 func _apply() -> void:
 	hips.position.y = _cur[J.HIPS_Y]
+	hips.position.z = _cur[J.HIPS_Z]
 	hips.rotation = Vector3(-_cur[J.HIPS_PITCH], 0, _cur[J.HIPS_ROLL])
 	spine.rotation = Vector3(-_cur[J.SPINE_PITCH] + flinch.x, _cur[J.SPINE_YAW] + flinch.y, _cur[J.SPINE_ROLL])
 	neck.rotation = Vector3(-_cur[J.NECK_PITCH] + flinch.x * 0.6, _cur[J.NECK_YAW], _cur[J.NECK_ROLL])
@@ -335,7 +356,24 @@ func _write_goal(speed: float) -> void:
 	var c := cos(p)
 	match anim:
 		Anim.IDLE:
-			if is_zombie:
+			if is_zombie and frantic: # can't keep still: heaving, swaying, head snapping about
+				var heave := sin(p * 1.3)
+				_goal[J.SPINE_PITCH] = 0.45 + heave * 0.08 + _jerk(p, 2.1) * 0.06
+				_goal[J.SPINE_YAW] = _jerk(p, 0.9) * 0.25
+				_goal[J.SPINE_ROLL] = sin(p * 0.5 + _seed) * 0.1
+				_goal[J.NECK_PITCH] = -0.45 + heave * 0.1
+				_goal[J.NECK_YAW] = _jerk(p, 1.7) * 0.6
+				_goal[J.NECK_ROLL] = _tilt + _jerk(p, 2.6) * 0.3
+				_goal[J.SH_L_X] = 0.5 + _arm_bias + _jerk(p, 1.9) * 0.35
+				_goal[J.SH_R_X] = 0.4 - _arm_bias + _jerk(p, 2.3) * 0.35
+				_goal[J.SH_L_OUT] = 0.25
+				_goal[J.SH_R_OUT] = 0.25
+				_goal[J.EL_L] = 0.6 + _jerk(p, 3.1) * 0.3
+				_goal[J.EL_R] = 0.7 + _jerk(p, 2.7) * 0.3
+				_crouch(0.25 + heave * 0.04)
+				_goal[J.HIP_L] += sin(p * 0.8) * 0.1 # weight shifting foot to foot
+				_goal[J.HIP_R] -= sin(p * 0.8) * 0.1
+			elif is_zombie:
 				_goal[J.SPINE_PITCH] = 0.28 + sin(p * 0.7) * 0.05
 				_goal[J.SPINE_ROLL] = sin(p * 0.45 + _seed) * 0.08
 				_goal[J.NECK_ROLL] = _tilt + sin(p * 0.6) * 0.15
@@ -468,6 +506,15 @@ func _write_goal(speed: float) -> void:
 			_goal[J.KNEE_R] = -0.6
 			_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1
 
+		Anim.SPRINT:
+			_sprint(speed, p)
+
+		Anim.LUNGE:
+			_lunge(anim_t)
+
+		Anim.SURGE:
+			_surge(p)
+
 		Anim.CROUCH: # a survivor on their haunches, gun up; the legs shuffle when they move
 			var shuffle := s * 0.25 * clampf(speed / 1.5, 0.0, 1.0)
 			_goal[J.HIPS_Y] = HIP_HEIGHT - 0.4
@@ -512,7 +559,7 @@ func _write_goal(speed: float) -> void:
 	# Missing a leg: it can't stand, so every other state plays lying down. Attacks rear the
 	# chest up off the floor before the arms come down; staggers flop it flat.
 	if legs_lost() > 0 and anim != Anim.CRAWL:
-		var rear := 0.45 if anim == Anim.ATTACK and anim_t < 0.2 else 0.0
+		var rear := 0.45 if (anim == Anim.ATTACK or anim == Anim.LUNGE) and anim_t < 0.2 else 0.0
 		_goal[J.HIPS_Y] = 0.22 + rear * 0.15
 		_goal[J.HIPS_PITCH] = 1.38 - rear
 		_goal[J.HIPS_ROLL] = 0.0
@@ -522,6 +569,167 @@ func _write_goal(speed: float) -> void:
 		_goal[J.HIP_R] = -0.05
 		_goal[J.KNEE_L] = 0.0
 		_goal[J.KNEE_R] = 0.0
+		_goal[J.HIPS_Z] = 0.0
 		if anim == Anim.IDLE or anim == Anim.STAGGER:
 			_goal[J.SH_L_X] = 2.6
 			_goal[J.SH_R_X] = 2.6
+
+
+# --- The frantic runner ---------------------------------------------------------
+
+## A twitch: -1..1, mostly held, snapping from one side to the other. `k` is how often.
+## Two out-of-step waves, clipped, so it sits still for a moment then jerks; each zombie and
+## each joint (different `k`) twitch on their own clock.
+func _jerk(t: float, k: float) -> float:
+	var x := sin(t * k + _seed * 3.7) + sin(t * k * 1.73 + _seed * 1.3 + k)
+	return clampf(x * 1.6, -1.0, 1.0)
+
+
+## How hard this stride is a stumble, 0..1..0 over it. Every so many strides (picked from the
+## id and the stride's number, so every peer sees the same trip) the sprinter lurches forward.
+func _lurch(p: float) -> float:
+	var stride := int(floor(p / TAU))
+	if posmod(stride * 73 + _sid * 31, 11) != 0:
+		return 0.0
+	return sin(fposmod(p, TAU) * 0.5)
+
+
+## Flat out: thrown forward from the hips, high knees and heels kicked up, shoulders wrenching
+## round against the legs, arms flailing (one of three ways, by id), the head stabbing ahead
+## and snapping side to side, banking into turns, now and then tripping over its own feet.
+func _sprint(speed: float, p: float) -> void:
+	var s := sin(p)
+	var c := cos(p)
+	var amp := _stride_amp() * clampf(speed / 1.2, 0.0, 1.0)
+	var stiff := 1.0 - _limp * 0.4
+	var burst := clampf(1.0 - anim_t / 0.4, 0.0, 1.0) # the first steps out of a stand: dug in
+	var lurch := _lurch(p)
+	var bank := clampf(turn * 0.12, -0.45, 0.45)
+	# Legs: the forward thigh drives high, the trailing shin folds right up.
+	_goal[J.HIP_L] = s * amp + 0.2 * amp
+	_goal[J.HIP_R] = (-s * amp + 0.2 * amp) * stiff
+	_goal[J.KNEE_L] = -0.2 - maxf(0.0, c) * 2.3 * amp
+	_goal[J.KNEE_R] = (-0.2 - maxf(0.0, -c) * 2.3 * amp) * stiff
+	_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1 + absf(c) * 0.14 * amp - lurch * 0.1
+	_goal[J.HIPS_PITCH] = 0.22 + amp * 0.1 + burst * 0.15 + lurch * 0.15
+	_goal[J.HIPS_ROLL] = s * 0.09 + bank + maxf(0.0, -s) * _limp * 0.15
+	# Body: bobbing down on every footfall, the shoulders counter-twisting hard.
+	_goal[J.SPINE_PITCH] = 0.45 + amp * 0.25 + sin(p * 2.0) * 0.09 + burst * 0.25 + lurch * 0.35
+	_goal[J.SPINE_YAW] = -s * 0.38 + _jerk(p, 0.7) * 0.08
+	_goal[J.SPINE_ROLL] = -s * 0.1 + bank * 0.5
+	# Head: kept looking ahead past the lean, thrust out, snapping about.
+	var lean := _goal[J.HIPS_PITCH] + _goal[J.SPINE_PITCH]
+	_goal[J.NECK_PITCH] = -lean * 0.75 - 0.15 + _jerk(p, 1.9) * 0.12
+	_goal[J.NECK_YAW] = s * 0.2 + _jerk(p, 1.3) * 0.35
+	_goal[J.NECK_ROLL] = _tilt * 0.6 + _jerk(p, 2.4) * 0.25 - bank * 0.6
+	# Arms.
+	var fl := _jerk(p, 2.9) * 0.3
+	var fr := _jerk(p, 3.3) * 0.3
+	match _gait:
+		0: # reaching: both arms out for the kill, clawing in turn
+			_goal[J.SH_L_X] = 1.75 - s * 0.55 + fl
+			_goal[J.SH_R_X] = 1.75 + s * 0.55 + fr
+			_goal[J.SH_L_OUT] = 0.15 + absf(fl) * 0.4
+			_goal[J.SH_R_OUT] = 0.15 + absf(fr) * 0.4
+			_goal[J.EL_L] = 0.25 + maxf(0.0, s) * 0.9
+			_goal[J.EL_R] = 0.25 + maxf(0.0, -s) * 0.9
+		1: # thrashing: arms swung wide and loose, like they're being dragged along
+			_goal[J.SH_L_X] = 0.3 - s * 1.5 + fl
+			_goal[J.SH_R_X] = 0.3 + s * 1.5 + fr
+			_goal[J.SH_L_OUT] = 0.5 + c * 0.35
+			_goal[J.SH_R_OUT] = 0.5 - c * 0.35
+			_goal[J.EL_L] = 0.2 + maxf(0.0, -s) * 1.4
+			_goal[J.EL_R] = 0.2 + maxf(0.0, s) * 1.4
+		_: # lopsided: one arm grabbing ahead, the other flapping behind
+			_goal[J.SH_L_X] = 1.9 + s * 0.35 + fl
+			_goal[J.SH_R_X] = -0.2 + s * 1.3 + fr
+			_goal[J.SH_L_OUT] = 0.1
+			_goal[J.SH_R_OUT] = 0.55 + absf(fr) * 0.5
+			_goal[J.EL_L] = 0.3 + maxf(0.0, -s) * 0.6
+			_goal[J.EL_R] = 0.4 + maxf(0.0, s) * 1.2
+	if lurch > 0.0: # tripping: arms flung out ahead to catch itself
+		for j: int in [J.SH_L_X, J.SH_R_X]:
+			_goal[j] = lerpf(_goal[j], 2.2, lurch * 0.7)
+		_goal[J.SH_L_OUT] += lurch * 0.4
+		_goal[J.SH_R_OUT] += lurch * 0.4
+
+
+## The runner's attack (same timing as Config.ZOMBIE_ATTACK_TIME / HIT_AT as the walker's):
+## a coil, a pounce that throws the whole body and both hands at the target with the jaws out,
+## then a flurry of clawing and biting until the swing is over.
+func _lunge(t: float) -> void:
+	if t < 0.12: # coil
+		_crouch(0.45)
+		_goal[J.HIPS_PITCH] = 0.2
+		_goal[J.SPINE_PITCH] = 0.85
+		_goal[J.NECK_PITCH] = -0.85
+		_goal[J.SH_L_X] = 0.9
+		_goal[J.SH_R_X] = 0.8
+		_goal[J.SH_L_OUT] = 0.7
+		_goal[J.SH_R_OUT] = 0.7
+		_goal[J.EL_L] = 1.7
+		_goal[J.EL_R] = 1.7
+		_goal[J.HIPS_Z] = 0.1
+	elif t < 0.34: # pounce: lead leg out, trailing leg driving, hands and teeth first
+		_goal[J.HIP_L] = 0.95
+		_goal[J.KNEE_L] = -0.8
+		_goal[J.HIP_R] = -0.6
+		_goal[J.KNEE_R] = -0.25
+		_goal[J.HIPS_Y] = HIP_HEIGHT - 0.12
+		_goal[J.HIPS_PITCH] = 0.35
+		_goal[J.HIPS_Z] = -0.4
+		_goal[J.SPINE_PITCH] = 0.5
+		_goal[J.NECK_PITCH] = -0.75 + _jerk(t * 10.0, 3.0) * 0.1
+		_goal[J.SH_L_X] = 1.75
+		_goal[J.SH_R_X] = 1.6
+		_goal[J.SH_L_OUT] = -0.15 # hands in, grabbing
+		_goal[J.SH_R_OUT] = -0.15
+		_goal[J.EL_L] = 0.05
+		_goal[J.EL_R] = 0.1
+	else: # maul: clawing left-right-left, head jabbing in to bite
+		var claw := sin(t * 30.0)
+		_goal[J.HIP_L] = 0.7
+		_goal[J.KNEE_L] = -0.6
+		_goal[J.HIP_R] = -0.4
+		_goal[J.KNEE_R] = -0.3
+		_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1
+		_goal[J.HIPS_PITCH] = 0.25
+		_goal[J.HIPS_Z] = -0.3 * clampf((0.7 - t) / 0.2, 0.0, 1.0)
+		_goal[J.SPINE_PITCH] = 0.6 + sin(t * 22.0) * 0.12
+		_goal[J.SPINE_YAW] = claw * 0.25
+		_goal[J.NECK_PITCH] = -0.6 + sin(t * 26.0) * 0.25
+		_goal[J.NECK_YAW] = -claw * 0.3
+		_goal[J.SH_L_X] = 1.4 + claw * 0.7
+		_goal[J.SH_R_X] = 1.4 - claw * 0.7
+		_goal[J.SH_L_OUT] = 0.1
+		_goal[J.SH_R_OUT] = 0.1
+		_goal[J.EL_L] = 0.3 + maxf(0.0, -claw) * 1.1
+		_goal[J.EL_R] = 0.3 + maxf(0.0, claw) * 1.1
+
+
+## Jammed in behind others and going nowhere: up on its toes, legs scrabbling, hands clawing
+## at the backs and over the heads in front, trying to climb its way through.
+func _surge(p: float) -> void:
+	var s := sin(p)
+	var c := cos(p)
+	_goal[J.HIP_L] = 0.35 + s * 0.45
+	_goal[J.HIP_R] = 0.35 - s * 0.45
+	_goal[J.KNEE_L] = -0.3 - maxf(0.0, c) * 1.1
+	_goal[J.KNEE_R] = -0.3 - maxf(0.0, -c) * 1.1
+	_goal[J.HIPS_Y] = HIP_HEIGHT - 0.04 + absf(c) * 0.06
+	_goal[J.HIPS_PITCH] = 0.15
+	_goal[J.HIPS_Z] = -0.08 + absf(s) * 0.08 # shoving into the back in front
+	_goal[J.SPINE_PITCH] = 0.25 + absf(c) * 0.15
+	_goal[J.SPINE_YAW] = s * 0.25
+	_goal[J.SPINE_ROLL] = c * 0.12
+	_goal[J.NECK_PITCH] = -0.55 + _jerk(p, 0.6) * 0.15
+	_goal[J.NECK_YAW] = _jerk(p, 0.45) * 0.4
+	_goal[J.NECK_ROLL] = _tilt + _jerk(p, 0.8) * 0.2
+	# Arms reach up and over in turn and drag down, like climbing a pile.
+	var a := p * 1.0 + _seed
+	_goal[J.SH_L_X] = 2.45 + sin(a) * 0.55
+	_goal[J.SH_R_X] = 2.45 + sin(a + PI) * 0.55
+	_goal[J.SH_L_OUT] = 0.2 + _jerk(p, 0.9) * 0.15
+	_goal[J.SH_R_OUT] = 0.2 + _jerk(p, 1.1) * 0.15
+	_goal[J.EL_L] = 0.2 + maxf(0.0, -sin(a)) * 1.0
+	_goal[J.EL_R] = 0.2 + maxf(0.0, sin(a)) * 1.0

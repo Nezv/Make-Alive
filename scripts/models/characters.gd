@@ -62,6 +62,8 @@ static func zombie_style(id: int, type: int, outfit := -1) -> Dictionary:
 		outfit = outfit_for(id, type)
 	var s := {
 		"zombie": true,
+		"seed": id, # how it moves (gait, twitches, stumbles) comes from the id too
+		"frantic": type == Zombie.Type.RUNNER,
 		"skin": _pick(ZOMBIE_SKINS, id),
 		"shirt": _pick(CIVILIAN_SHIRTS, id * 7),
 		"pants": _pick(CIVILIAN_PANTS, id * 13),

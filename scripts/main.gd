@@ -31,6 +31,7 @@ extends Node
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
 ##   --zombie-rack=1        stand one zombie of every outfit in front of you: =1 first half, =2 second half (add --back for their backs)
+##   --runner-rack          the frantic runner's moves side on, playing in place: three sprint gaits, the lunge, clawing over a jam, the idle
 
 var menu: Menu
 var game: Game
@@ -40,6 +41,7 @@ var _perf_left := 0.0   # --perf: seconds still to measure
 var _perf_warmup := 0.0 # the first seconds are loading hitches, not the game
 var _perf_ms: Array[float] = []
 var _perf_draws: Array[int] = []
+var _rack_rigs: Array[Humanoid] = [] # --runner-rack: rigs animated in place
 
 
 func _ready() -> void:
@@ -86,7 +88,8 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.bot = _args.has("bot")
 	game.map_name = map_name
 	game.mission = mission
-	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
+	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") \
+			or _args.has("runner-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
 	game.difficulty = _args.get("difficulty", "normal")
@@ -139,6 +142,8 @@ func _host(map_name := "city", mission := "") -> void:
 		_perf_warmup = 2.0
 	if _args.has("zombie-rack"):
 		_zombie_rack()
+	if _args.has("runner-rack"):
+		_runner_rack()
 	var ips := ", ".join(Net.local_ips())
 	print("[host] hosting on port %d. Friends join: %s" % [Config.PORT, ips])
 	game.hud.push_feed("Hosting. Friends join with IP: %s" % ips)
@@ -170,6 +175,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	_animate_rack(delta)
 	if _perf_left <= 0.0:
 		return
 	if _perf_warmup > 0.0:
@@ -315,6 +321,54 @@ func _zombie_rack() -> void:
 	lamp.light_energy = 0.8
 	lamp.position = at + Vector3(0, 2.4, -1.0)
 	game.add_child(lamp)
+
+
+## Runners side on, each playing one of their moves in place (the lunge on a loop), labelled.
+func _runner_rack() -> void:
+	game.director.enabled = false
+	game.local_player.hide_view = true
+	var at := Vector3(21.0, 0.1, -2.2) # leg B of the corridor, past the door: the widest view
+	# [label, anim, id]: ids picked so the three sprinters show the three arm gaits
+	var rows := [["sprint: reaching", Humanoid.Anim.SPRINT, 3], ["sprint: thrashing", Humanoid.Anim.SPRINT, 1],
+		["sprint: lopsided", Humanoid.Anim.SPRINT, 2], ["lunge", Humanoid.Anim.LUNGE, 4],
+		["jammed: climbing", Humanoid.Anim.SURGE, 5], ["idle", Humanoid.Anim.IDLE, 6]]
+	for i in rows.size():
+		var row: Array = rows[i]
+		var rig := Characters.zombie(row[2], Zombie.Type.RUNNER)
+		game.add_child(rig)
+		rig.position = at + Vector3((i - (rows.size() - 1) / 2.0) * 1.7, 0.0, 0.0)
+		rig.rotation.y = -PI / 2.0 # facing +X: side on to the camera
+		rig.set_anim(row[1])
+		rig.update(0.5, 5.0)
+		_rack_rigs.append(rig)
+		var tag := Label3D.new()
+		tag.text = row[0]
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.no_depth_test = true
+		tag.font_size = 28
+		tag.pixel_size = 0.004
+		tag.outline_size = 10
+		tag.position = rig.position + Vector3(0, 2.05 - (i % 2) * 0.15, 0)
+		game.add_child(tag)
+	var cam := Camera3D.new()
+	cam.fov = 70
+	game.add_child(cam)
+	cam.global_transform = Transform3D(Basis.from_euler(Vector3(deg_to_rad(-4), 0, 0)), at + Vector3(0, 1.1, 5.0))
+	cam.make_current()
+	var lamp := OmniLight3D.new()
+	lamp.omni_range = 12.0
+	lamp.light_energy = 1.4
+	lamp.position = at + Vector3(0, 2.6, 2.0)
+	game.add_child(lamp)
+
+
+func _animate_rack(delta: float) -> void:
+	var steps := ceili(delta / (1.0 / 60.0)) # small steps, so a slow window still blends like the game
+	for rig in _rack_rigs:
+		for i in steps:
+			if rig.anim == Humanoid.Anim.LUNGE and rig.anim_t > Config.ZOMBIE_ATTACK_TIME:
+				rig.anim_t = 0.0
+			rig.update(delta / steps, 5.0 if rig.anim == Humanoid.Anim.SPRINT else 0.0)
 
 
 ## Print the balance sheet and save it as Markdown, then quit. Works headless (tools\balance.ps1).
