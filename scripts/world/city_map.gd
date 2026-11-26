@@ -1111,7 +1111,14 @@ func _forest() -> void:
 			var h := _rng.randf_range(7.0, 15.0)
 			var at := Vector3(lo.x + (c + _rng.randf_range(0.3, 0.7)) * cell, 0.0, lo.y + (r + _rng.randf_range(0.3, 0.7)) * cell)
 			at.y = ground_y(at) + h * 0.5 - 0.6
-			_trees.box(Vector3(w, h, w), at, LEAVES[_rng.randi() % LEAVES.size()], Basis(Vector3.UP, _rng.randf() * TAU))
+			# The deep forest: a tall lumpy crown down to the ground and a lighter tuft on top
+			# (the cheap stand-in for a whole tree, a few hundred of them; asset_quality.md).
+			var color: Color = LEAVES[_rng.randi() % LEAVES.size()]
+			var turn := Basis(Vector3.UP, _rng.randf() * TAU)
+			var key := r * gw + c
+			_trees.blob(Vector3(w * 0.55, h * 0.5, w * 0.55), at, Vegetation.leaf(color), key, 0.28, 4, 7, turn)
+			var lit: Color = Vegetation.LEAVES_LIT[key % Vegetation.LEAVES_LIT.size()]
+			_trees.blob(Vector3(w * 0.32, h * 0.16, w * 0.32), at + Vector3(w * 0.08, h * 0.38, -w * 0.06), Vegetation.leaf(lit.darkened(0.15)), key + 7, 0.25, 3, 6, turn)
 
 
 ## The wall where the map ends.
