@@ -94,6 +94,46 @@ static func mirante(map: CityMap) -> Dictionary:
 	}
 
 
+## The Terminal Central (RUN): start on the middle platform under the roof, out through the way in
+## onto Rua Nove de Março, north-east through the centre to a checkpoint halfway (the dead come
+## back there), then on to the Prefeitura and its pad on the south lawn to be lifted out.
+static func terminal(map: CityMap) -> Dictionary:
+	var lot: Transform3D = map.terminal.frame
+	var pad: Vector3 = map.prefeitura.pad
+	var free := func(world: Vector3) -> Vector3:
+		var p := map.nav.nearest_free(world)
+		p.y = map.ground_y(p) + 0.1
+		return p
+	var spawns := []
+	for row in 2: # two rows of four on the middle island, facing the way out
+		for i in 4:
+			var p: Vector3 = free.call(lot * Vector3(-3.6 + i * 2.4, 0, TerminalSet.ISLANDS[1] - 0.8 + row * 1.6))
+			p.y = lot.origin.y + TerminalSet.ISLAND_H + 0.1
+			spawns.append({ "at": p, "yaw": PI })
+	var gate: Vector3 = map.terminal.gate
+	var mid := GameModes.street_point(map, gate.lerp(pad, 0.5))
+	var to_out := Vector3(pad.x - mid.x, 0, pad.z - mid.z).normalized()
+	return {
+		"name": "terminal",
+		"respawn": "checkpoint",
+		"player_spawns": spawns,
+		"zombie_closets": [
+			{ "id": "west", "at": free.call(GameModes.street_point(map, CityData.to_world(Vector2(985, 520)))), "radius": 3.0 },
+			{ "id": "east", "at": free.call(GameModes.street_point(map, CityData.to_world(Vector2(1084, 540)))), "radius": 3.0 },
+			{ "id": "midway", "at": free.call(GameModes.street_point(map, mid + Vector3(40, 0, 40))), "radius": 3.0 },
+			{ "id": "avenue", "at": map.nav.nearest_free(CityData.to_world(Vector2(1169, 268))), "radius": 3.0 },
+		],
+		"zones": [
+			{ "id": "halfway", "kind": "checkpoint", "box": [mid + Vector3(0, 2.0, 0), Vector3(14, 8, 14)],
+				"look": { "at": mid + Vector3(3.0, 0, 3.0), "yaw": atan2(-to_out.x, -to_out.z), "kind": "tent" } },
+			{ "id": "pad", "kind": "extraction", "box": [pad + Vector3(0, 1.5, 0), Vector3(PrefeituraSet.PAD_R * 1.8, 3.0, PrefeituraSet.PAD_R * 1.8)] },
+		],
+		"objectives": [
+			{ "id": "halfway", "kind": "reach", "zone": "halfway", "text": "Out of the terminal and across the centre to the checkpoint" },
+			{ "id": "board", "kind": "extract", "zone": "pad", "seconds": 5.0, "text": "On to the Prefeitura: hold the pad on the south lawn" },
+		],
+	}
+
 ## The Hospital Dona Helena (EXTRACTION, up): start under the ambulance bay on Rua Blumenau, get
 ## round the tower to the yard behind (a checkpoint, the triage tent), hold it through three waves
 ## while the helicopter comes, then up the fire stair, ten floors, to board it on the roof.

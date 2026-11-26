@@ -401,7 +401,7 @@ const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than 
 # --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
 const BUDGET := {
 	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 11 }, # +1: the checkpoint's lamp
-	"city": { "meshes": 16, "surfaces": 16, "lights": 20, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # lights +3: the Mirante gate, guard hut and snack bar; +1 the Prefeitura door; +2 the Hospital wash and bay
+	"city": { "meshes": 16, "surfaces": 16, "lights": 22, "shadow_lights": 2, "shapes": 48000, "worst_view": 14 }, # lights +3: the Mirante gate, guard hut and snack bar; +1 the Prefeitura door; +2 the Hospital wash and bay; +2 the Terminal spine lamp and the burnt bus
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
 const PROTOCOL_VERSION := 6   # bump when anything on the wire changes: a client of another build is refused with a message

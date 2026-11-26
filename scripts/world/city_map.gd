@@ -72,6 +72,7 @@ var boundary := PackedVector2Array() ## the map's edge, (x, z) in metres
 var building_count := 0
 var landmarks := {}
 var prop_counts := {}               ## set piece props by kind
+var terminal := {}                   ## the terminal lot frame (-Z to the street), gate, platform (the middle island)
 var hospital := {}                   ## the Hospital's lot frame (-Z to Rua Blumenau), door, yard, stair frame, climb (world points), pad
 var prefeitura := {}                 ## the Prefeitura's lot frame (-Z to the avenue), its door and its pad (world)
 var mirante := {}                    ## where the Mirante's pieces stand (world): gate, gate_yaw, tower, deck, poles, rails
@@ -197,6 +198,8 @@ func zombie_spawn_point(avoid: Array) -> Vector3:
 func _mission_changed() -> void:
 	if mission == "mirante" and mirante.has("gate") and nav != null:
 		use_data(MapAreas.mirante(self))
+	elif mission == "terminal" and terminal.has("platform") and prefeitura.has("pad") and nav != null:
+		use_data(MapAreas.terminal(self))
 	elif mission == "hospital" and hospital.has("pad") and nav != null:
 		use_data(MapAreas.hospital(self))
 	elif mission == "prefeitura" and prefeitura.has("pad") and nav != null:
@@ -730,25 +733,59 @@ func _hospital(c: Vector3) -> void:
 	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, PI), Vector3(-36.0, 0, -12.0)), 12.0, rng, ground_at)
 
 
-## Terminal Central: four platform roofs on columns, a ticket hall and the buses that never left.
+## Terminal Central, opening south onto Rua Nove de Março (TerminalSet): three platform islands
+## under the heavy concrete roof slabs with the skylight lantern down the spine, the steel tree
+## columns, the ticket hall and the shops along the street with the sign over the way in, and the
+## yellow buses that never left: two nose to tail, one rammed into a column, one burnt out.
+## `terminal` keeps the lot's frame (-Z to the street) and where the mission's places are.
 func _terminal(c: Vector3) -> void:
-	var steel := Props.STEEL
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			var at := c + Vector3(sx * 27, 0, sz * 16)
-			_b.box(Vector3(34, 0.4, 8), at + Vector3(0, 4.8, 0), Color("8a2a22"))
-			for x in [-15.0, 0.0, 15.0]:
-				_b.box(Vector3(0.5, 4.6, 0.5), at + Vector3(x, 2.3, 0), steel)
-				_collide(at + Vector3(x, 2.3, 0), Vector3(0.5, 4.6, 0.5))
-			_g.flat(Vector2(34, 5), at + Vector3(0, 0.03, 0), Color("5a5b5e")) # platform
-	for bus: Array in [[27.0, -20.0, 90.0], [-27.0, 12.0, 90.0], [-24.0, -21.0, 78.0]]:
-		_put(Props.bus(_b, _t(c.x + bus[0], c.z + bus[1], bus[2])), _t(c.x + bus[0], c.z + bus[1], bus[2]))
-	_solid(c + Vector3(-34, 3.0, -31), Vector3(22, 6.0, 8), Color("8f8a80")) # ticket hall
-	for x in [-16.0, 16.0]: # the sign over the way in from Rua Nove de Março
-		_b.box(Vector3(0.6, 7.5, 0.6), c + Vector3(x, 3.75, 34), steel)
-		_collide(c + Vector3(x, 3.75, 34), Vector3(0.6, 7.5, 0.6))
-	_b.box(Vector3(33, 2.4, 0.4), c + Vector3(0, 6.6, 34), Color("1d2a52"))
-	_label(CityData.POIS.terminal.name, c + Vector3(0, 6.6, 34.25), 150, Color("e8e4d8"))
+	var lot := Transform3D(Basis(Vector3.UP, PI), c)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 18570309
+	terminal.frame = lot
+	terminal.gate = lot * Vector3(0, 0, TerminalSet.FRONT_Z - 2.0)
+	terminal.platform = lot * Vector3(0, TerminalSet.ISLAND_H, TerminalSet.ISLANDS[1])
+	var y := 0.03
+	_patch(lot, [-49.0, TerminalSet.FRONT_Z + TerminalSet.FRONT_D, 49.0, 36.0], y, TerminalSet.LANE)
+	_patch(lot, [-TerminalSet.GATE_HALF, -36.0, TerminalSet.GATE_HALF, TerminalSet.FRONT_Z + TerminalSet.FRONT_D], y, TerminalSet.LANE)
+	for k in 2: # the cobbled bus lanes between the islands, drains along the kerbs, bay lines
+		var z0: float = TerminalSet.ISLANDS[k] + TerminalSet.ISLAND_W * 0.5
+		var z1: float = TerminalSet.ISLANDS[k + 1] - TerminalSet.ISLAND_W * 0.5
+		_patch(lot, [-44.0, z0, 44.0, z1], y + 0.005, TerminalSet.SETTS)
+		for z in [z0 + 0.3, z1 - 0.3]:
+			_patch(lot, [-44.0, z - 0.12, 44.0, z + 0.12], y + 0.01, Color("1e2022"))
+		for b in 6:
+			var x := -36.0 + b * 14.4
+			_patch(lot, [x - 0.08, z0 + 0.4, x + 0.08, z0 + 3.0], y + 0.012, TerminalSet.KERB_YELLOW)
+	for z: float in TerminalSet.ISLANDS:
+		var it := lot * Transform3D(Basis.IDENTITY, Vector3(0, 0, z))
+		_put_free(TerminalSet.island(_b, _glow, it, TerminalSet.LENGTH, int(z)), it)
+		for x: float in TerminalSet.COLUMNS_X:
+			var ct := lot * Transform3D(Basis.IDENTITY, Vector3(x, TerminalSet.ISLAND_H, z))
+			_put_free(TerminalSet.tree_column(_b, ct), ct)
+	TerminalSet.roof(_b, _glow, lot)
+	_put(TerminalSet.front(_b, _glow, lot), lot)
+	_label(CityData.POIS.terminal.name, lot * TerminalSet.SIGN_AT, 120, TerminalSet.SIGN_TEXT, rad_to_deg(PI) + 180.0, false)
+	_lamp(lot * Vector3(0, TerminalSet.SOFFIT_Y - 0.6, TerminalSet.SPINE_Z), 1.4, 26.0, Color("dfe6ff"))
+	# The buses: where they stopped, where one crashed, where one burnt.
+	for bus: Array in [[-26.0, -11.5, PI * 0.5, true, true], [-12.0, -11.8, PI * 0.5, true, false],
+			[17.5, -2.6, PI * 0.5 + 0.32, true, true], [-20.0, 9.0, -PI * 0.5, false, true],
+			[26.0, 17.6, -PI * 0.5, true, true], [-31.0, 30.0, -PI * 0.5, false, false]]:
+		var t := lot * Transform3D(Basis(Vector3.UP, bus[2]), Vector3(bus[0], 0, bus[1]))
+		_put(TerminalSet.bus(_b, _glow, t, bus[3], bus[4]), t)
+	var burnt := lot * Transform3D(Basis(Vector3.UP, PI * 0.5 + 0.06), Vector3(31.0, 0, 30.5))
+	_put(TerminalSet.bus(_b, _glow, burnt, false, true, true), burnt)
+	TerminalSet.scorch(_b, _glow, burnt, rng)
+	_lamp(burnt * Vector3(0, 1.2, 0), 1.2, 9.0, Color("ff8a3a"))
+	# What people left: luggage on the islands and in the lanes, litter, blood to the hall's doors.
+	for p: Vector3 in [Vector3(-8, TerminalSet.ISLAND_H, -17), Vector3(6, 0, -6), Vector3(-30, TerminalSet.ISLAND_H, 3), Vector3(14, 0, 12)]:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p)
+		_put_free(Props.luggage(_b, t, 3 + rng.randi() % 3, rng), t)
+	for p: Vector3 in [Vector3(0, 0, -24), Vector3(-18, 0, -5), Vector3(20, 0, 26)]:
+		RoadProps.litter(_b, lot * Transform3D(Basis.IDENTITY, p), 5, rng, _glow)
+	var ground_at := func(_p: Vector3) -> float: return c.y
+	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, PI), Vector3(-20.0, 0, -20.0)), 9.0, rng, ground_at)
+	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, 1.2), Vector3(8.0, 0, 12.0)), 7.0, rng, ground_at)
 
 
 ## Prefeitura: the long four-storey block facing west over its lawn to Avenida Hermann August

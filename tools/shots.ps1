@@ -102,6 +102,22 @@ $hospCams = [ordered]@{
 }
 foreach ($k in $hospCams.Keys) { $shots[$k] = $hosp + "--shot-cam=$($hospCams[$k])" }
 
+# The Terminal Central (references/terminal_elements.md): the street front with its sign, two air
+# views, the top, along the middle platform, up into the skylight lantern, the burnt bus at the
+# back, Rua Nove de Março, the open back end.
+$term = @('--host', '--mission=terminal', '--no-hordes')
+$termCams = [ordered]@{
+    'term_front'      = '0.0,5.0,70.0,0.0,5.0'
+    'term_air'        = '60.0,50.0,80.0,36.9,-25.0'
+    'term_top'        = '0.0,150.0,0.0,0.0,-89.0'
+    'term_platform'   = '-30.0,1.8,-3.0,-90.0,2.0'
+    'term_lantern'    = '0.0,2.0,-15.0,180.0,30.0'
+    'term_buses'      = '-20.0,3.0,-15.0,35.4,-5.0'
+    'term_street'     = '40.0,2.0,45.0,90.0,0.0'
+    'term_back'       = '0.0,20.0,-60.0,180.0,-15.0'
+}
+foreach ($k in $termCams.Keys) { $shots[$k] = $term + "--shot-cam=$($termCams[$k])" }
+
 $made = @()
 foreach ($name in $shots.Keys) {
     if ($Filter -and $name -notlike "*$Filter*") { continue }
