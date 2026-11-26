@@ -99,7 +99,7 @@ def sound_notes():
 
 def stats():
     try:
-        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "steps_map.py"), "--stats"],
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "dashboard.py"), "--stats"],
                              capture_output=True, text=True, cwd=ROOT, timeout=60).stdout
         return out.strip()
     except (OSError, subprocess.SubprocessError):

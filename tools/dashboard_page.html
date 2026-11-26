@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make Alive Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE work: a production board read by the people building the game
+   IDEA a survey map's legend: the plan as territory, each area a parcel filled as it is built
+   PICTURE the territory strip: one row per phase, one parcel per area sized by its items, inked as they are done
+   COLOUR land ground, ink, sea band, contour brown for started, magenta for what is ready or selected
+   TYPE Overpass 800 for figures and titles, Overpass for text
+   LAYOUT laptop: title and figures over the full-width strip, filters, then the tree; phone: the same stacked */
+:root{color-scheme:light dark;--bg:light-dark(#fbfbf2,#0d1c24);--ink:light-dark(#13242e,#e3ecef);--soft:light-dark(#4d5d66,#9fb2ba);--sea:light-dark(#bfe3ee,#12313d);--brown:light-dark(#a8551b,#e0965c);--mag:light-dark(#d6127e,#ff5aa8);--line:light-dark(#dcdccf,#24414d);--panel:light-dark(#ffffff,#112630);--todo:light-dark(#ecebdf,#1b3642)}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Overpass,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(24px,3.5vw,48px) max(4vw,16px)}
+.top{background:var(--sea)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-weight:800;font-size:clamp(32px,4.4vw,48px);line-height:1.05;letter-spacing:-.02em;margin:0 0 8px;text-wrap:balance}
+.finding{font-size:18px;margin:0 0 20px;max-width:70ch}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(9em,1fr));gap:12px 24px;margin:0 0 22px}
+.fig b{display:block;font-weight:800;font-size:clamp(28px,3.4vw,40px);line-height:1;font-variant-numeric:tabular-nums}
+.fig span{color:var(--soft);font-size:14px}
+.map{display:grid;gap:6px}
+.prow{display:grid;grid-template-columns:9.5em minmax(0,1fr);gap:10px;align-items:stretch}
+.pname{font-weight:800;font-size:14px;line-height:1.2;padding-top:6px}
+.pname small{display:block;font-weight:400;color:var(--soft)}
+.parcels{display:flex;flex-wrap:wrap;gap:3px;min-height:58px}
+.parcel{position:relative;flex:1 1 0;min-width:6.8em;min-height:58px;border:0;border-radius:3px;padding:5px 6px;text-align:left;font:600 12px/1.2 Overpass,sans-serif;color:var(--ink);cursor:pointer;overflow:hidden;background:var(--todo)}
+.parcel i{position:absolute;inset:0 auto 0 0;background:var(--ink);opacity:.9}
+.parcel em{position:absolute;inset:0 auto 0 0;background:var(--brown);opacity:.85}
+.parcel span{position:relative;display:block;mix-blend-mode:normal;padding:1px 3px;border-radius:2px;background:color-mix(in srgb,var(--bg) 82%,transparent);width:max-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.parcel u{position:absolute;left:0;bottom:0;height:5px;background:var(--mag)}
+.parcel:hover,.parcel:focus-visible{outline:2px solid var(--mag);outline-offset:1px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13px;color:var(--soft)}
+.legend b{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+.bar{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:10px max(4vw,16px)}
+.bar .wrap{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+input[type=search]{font:16px Overpass,sans-serif;padding:9px 12px;border:1px solid var(--soft);border-radius:6px;background:var(--panel);color:var(--ink);width:min(22em,100%);min-height:44px}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+button{font:600 14px Overpass,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-height:40px;cursor:pointer}
+button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--mag);outline-offset:2px}
+.tags{display:flex;flex-wrap:wrap;gap:4px;width:100%}
+.tags button{font-size:13px;padding:4px 9px;min-height:32px}
+.tags button small{color:var(--soft);font-weight:400;margin-left:3px}
+.tags button[aria-pressed=true] small{color:var(--bg)}
+.count{font-size:14px;color:var(--soft);margin-left:auto}
+main{padding:8px max(4vw,16px) 64px}
+.phase{margin-top:34px}
+.phase>h2{font-weight:800;font-size:28px;line-height:1.1;letter-spacing:-.01em;margin:0 0 4px}
+.phase>p{margin:0 0 12px;color:var(--soft);max-width:75ch}
+details.area{border-top:1px solid var(--line)}
+details.area>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:3.4em minmax(0,1fr) 11em;gap:4px 12px;padding:12px 0;align-items:start}
+details.area>summary::-webkit-details-marker{display:none}
+.anum{font-weight:800;font-variant-numeric:tabular-nums}
+.aname{font-weight:800;font-size:18px;line-height:1.25}
+.aq{display:block;font-weight:400;font-size:15px;color:var(--soft);margin-top:2px}
+.meter{height:10px;border-radius:5px;background:var(--todo);overflow:hidden;display:flex;margin-top:6px}
+.meter i{background:var(--ink)}
+.meter em{background:var(--brown)}
+.mwrap{display:block}
+.mtext{font-size:13px;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+.items{padding:0 0 14px 3.4em}
+details.item{border-left:3px solid var(--todo);margin:6px 0;background:var(--panel);border-radius:0 6px 6px 0}
+details.item.done{border-left-color:var(--ink)}
+details.item.started{border-left-color:var(--brown)}
+details.item.ready{border-left-color:var(--mag)}
+details.item>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:9px 12px}
+details.item>summary::-webkit-details-marker{display:none}
+.st{font-weight:800;width:1.2em;flex:none}
+.inum{font-variant-numeric:tabular-nums;color:var(--soft);font-size:14px;white-space:nowrap}
+.iname{font-weight:600;flex:1 1 14em}
+.meta{font-size:13px;color:var(--soft);white-space:nowrap}
+.chip{font-size:12px;color:var(--soft);white-space:nowrap}
+.ready-mark{font-size:12px;font-weight:800;color:var(--mag);white-space:nowrap}
+.body{padding:0 14px 12px 34px;font-size:15px}
+.data{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:2px 12px;font-size:14px;margin:0 0 8px}
+.data dt{color:var(--soft)}
+.data dd{margin:0;overflow-wrap:anywhere}
+ul.det{list-style:none;margin:6px 0 0;padding:0}
+ul.det>li{display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:2px 8px;padding:4px 0;border-top:1px dashed var(--line)}
+ul.det li.d{color:var(--soft)}
+ul.det li.d .dt{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--soft) 50%,transparent)}
+.dn{font-variant-numeric:tabular-nums;font-size:13px;color:var(--soft);white-space:nowrap}
+.dtags{font-size:12px;color:var(--brown);white-space:nowrap}
+ul.sub{margin:2px 0 0;padding-left:1.1em;font-size:14px}
+.note{font-size:14px;color:var(--soft);margin:2px 0}
+code{font-size:.9em;background:color-mix(in srgb,var(--sea) 60%,transparent);padding:0 3px;border-radius:3px;overflow-wrap:anywhere}
+mark{background:color-mix(in srgb,var(--mag) 25%,transparent);color:inherit}
+.empty{padding:40px 0;color:var(--soft)}
+@media(max-width:600px){.prow{grid-template-columns:1fr}.pname{padding:0}details.area>summary{grid-template-columns:2.8em minmax(0,1fr)}details.area>summary .mwrap{grid-column:2}.items{padding-left:0}.body{padding-left:14px}}
+@media(min-width:901px){.bar{position:sticky}}
+@media(max-width:900px){.bar{position:static}}
+</style>
+</head>
+<body>
+<header class="band top"><div class="wrap">
+<h1>Make Alive management dashboard</h1>
+<p class="finding" id="finding"></p>
+<div class="figs" id="figs"></div>
+<div class="map" id="map" aria-label="Every area by phase, sized by its items and filled as they are done"></div>
+<div class="legend"><span><b style="background:var(--ink)"></b>done</span><span><b style="background:var(--brown)"></b>started</span><span><b style="background:var(--todo);outline:1px solid var(--line)"></b>to do</span><span><b style="background:var(--mag)"></b>ready to start (needs met), the strip under a parcel</span></div>
+</div></header>
+<div class="bar"><div class="wrap">
+<input type="search" id="q" placeholder="Search items and details" aria-label="Search items and details">
+<div class="seg" id="status" role="group" aria-label="Status"></div>
+<button id="openall" type="button">Open all</button>
+<button id="closeall" type="button">Close all</button>
+<span class="count" id="count"></span>
+<div class="tags" id="tags" role="group" aria-label="Tags"></div>
+</div></div>
+<main><div class="wrap" id="tree"></div></main>
+<script>
+{
+const PLAN = /*PLAN*/null;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const items = [];
+for (const p of PLAN) for (const a of p.areas) for (const it of a.items) items.push([p, a, it]);
+const det = items.reduce((n, [, , it]) => n + it.details.length, 0);
+const detDone = items.reduce((n, [, , it]) => n + it.details.filter(d => d.done).length, 0);
+const nDone = items.filter(([, , it]) => it.status === "x").length;
+const nStarted = items.filter(([, , it]) => it.status === "~").length;
+const nReady = items.filter(([, , it]) => it.ready).length;
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+document.getElementById("finding").textContent =
+  `${nDone} of ${items.length} items are done and ${nStarted} are started. ${nReady} can be started now. Phase 1 is ${pct(PLAN[0].areas.flatMap(a => a.items).filter(i => i.status === "x").length, PLAN[0].areas.flatMap(a => a.items).length)}% built.`;
+document.getElementById("figs").innerHTML = [
+  [pct(nDone, items.length) + "%", "of items done"],
+  [`${detDone}/${det}`, "details done"],
+  [nStarted, "items started"],
+  [nReady, "ready to start"],
+].map(([b, s]) => `<div class="fig"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+const tally = list => ({ n: list.length, x: list.filter(i => i.status === "x").length, s: list.filter(i => i.status === "~").length, r: list.filter(i => i.ready).length });
+document.getElementById("map").innerHTML = PLAN.map(p => {
+  const t = tally(p.areas.flatMap(a => a.items));
+  return `<div class="prow"><div class="pname">${esc(p.num)}&ensp;${esc(p.name)}<small>${t.x} of ${t.n} done</small></div><div class="parcels">` +
+    p.areas.map(a => { const c = tally(a.items); return `<button class="parcel" type="button" style="flex-grow:${Math.max(c.n, 2)}" data-go="${esc(a.num)}" title="${esc(a.num + " " + a.name + ": " + c.x + " done, " + c.s + " started, " + c.n + " items")}"><i style="width:${pct(c.x, c.n)}%"></i><em style="left:${pct(c.x, c.n)}%;width:${pct(c.s, c.n)}%"></em><u style="width:${pct(c.r, c.n)}%"></u><span>${esc(a.num)} ${esc(a.name)}</span></button>`; }).join("") +
+    `</div></div>`;
+}).join("");
+const STATUSES = [["all", "All"], ["todo", "To do"], ["started", "Started"], ["done", "Done"], ["ready", "Ready now"]];
+const state = { q: "", status: "all", tag: "" };
+try { Object.assign(state, JSON.parse(localStorage.getItem("ma-dash") || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem("ma-dash", JSON.stringify(state)); } catch (e) {} };
+const seg = document.getElementById("status");
+seg.innerHTML = STATUSES.map(([k, l]) => `<button type="button" data-st="${k}">${l}</button>`).join("");
+const tagCount = {};
+for (const [, , it] of items) {
+  const all = new Set(it.tags.concat(it.details.flatMap(d => d.tags)));
+  for (const t of all) tagCount[t] = (tagCount[t] || 0) + 1;
+}
+const tagsEl = document.getElementById("tags");
+tagsEl.innerHTML = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<button type="button" data-tag="${esc(t)}">${esc(t)}<small>${n}</small></button>`).join("");
+const tagOf = (it, t) => it.tags.includes(t) || it.details.some(d => d.tags.includes(t));
+const kind = it => it.status === "x" ? "done" : it.status === "~" ? "started" : "todo";
+function matches(it) {
+  if (state.status === "ready" ? !it.ready : state.status !== "all" && kind(it) !== state.status) return false;
+  if (state.tag && !tagOf(it, state.tag)) return false;
+  if (state.q) {
+    const q = state.q.toLowerCase();
+    const hay = [it.name, it.id, it.num, it.from].concat(it.details.map(d => d.text), it.notes).join(" ").toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+const hl = s => {
+  let h = fmt(s);
+  if (state.q.length > 1) { const q = esc(state.q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); h = h.replace(new RegExp("(" + q + ")(?![^<]*>)", "gi"), "<mark>$1</mark>"); }
+  return h;
+};
+function itemHtml(it, open) {
+  const data = [["id", it.id + (it.from ? " (split from " + it.from + ")" : "")], ["needs", it.needs], ["size", it.size], ["asset", it.asset], ["rounds", it.rounds], ["tags", it.tags.join(" ")], ["test", it.test], ["see", it.see]]
+    .filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${fmt(v)}</dd>`).join("");
+  const dets = it.details.map(d => `<li class="${d.done ? "d" : ""}"><span class="dn">${d.done ? "✓ " : ""}${esc(d.num.split(".").pop())}</span><span><span class="dt">${hl(d.text)}</span> ${d.tags.length ? `<span class="dtags">${esc(d.tags.join(" "))}</span>` : ""}` +
+    (d.subs.length ? `<ul class="sub">${d.subs.map(s => `<li>${s.done ? "✓ " : ""}${fmt(s.text)}</li>`).join("")}</ul>` : "") +
+    d.notes.map(n => `<p class="note">${fmt(n)}</p>`).join("") + `</span></li>`).join("");
+  const mark = it.status === "x" ? "✓" : it.status === "~" ? "◐" : "○";
+  const k = kind(it) + (it.ready && it.status !== "x" ? " ready" : "");
+  return `<details class="item ${k}"${open ? " open" : ""}><summary><span class="st">${mark}</span><span class="inum">${esc(it.num)}</span><span class="iname">${hl(it.name)}</span>` +
+    (it.ready ? `<span class="ready-mark">ready</span>` : "") +
+    `<span class="meta">${esc(it.id)}${it.size ? " · " + esc(it.size) : ""} · ${it.details.filter(d => d.done).length}/${it.details.length}</span><span class="chip">${esc(it.tags.join(" "))}</span></summary>` +
+    `<div class="body"><dl class="data">${data}</dl>${it.notes.map(n => `<p class="note">${fmt(n)}</p>`).join("")}<ul class="det">${dets}</ul></div></details>`;
+}
+const tree = document.getElementById("tree");
+const openAreas = new Set();
+function render() {
+  for (const b of seg.children) b.setAttribute("aria-pressed", b.dataset.st === state.status);
+  for (const b of tagsEl.children) b.setAttribute("aria-pressed", b.dataset.tag === state.tag);
+  const filtering = state.q || state.status !== "all" || state.tag;
+  let shown = 0;
+  tree.innerHTML = PLAN.map(p => {
+    const areas = p.areas.map(a => {
+      const its = a.items.filter(matches);
+      if (!its.length) return "";
+      shown += its.length;
+      const c = tally(a.items);
+      const open = openAreas.has(a.num) || (filtering && its.length < 40);
+      return `<details class="area" id="a${esc(a.num)}" data-a="${esc(a.num)}"${open ? " open" : ""}><summary><span class="anum">${esc(a.num)}</span><span class="aname">${esc(a.name)}<span class="aq">${esc(a.q)}</span></span>` +
+        `<span class="mwrap"><span class="mtext">${c.x} done · ${c.s} started · ${c.n} items</span><span class="meter"><i style="width:${pct(c.x, c.n)}%"></i><em style="width:${pct(c.s, c.n)}%"></em></span></span></summary>` +
+        `<div class="items">${open ? its.map(it => itemHtml(it, filtering && (state.q || state.tag) && its.length <= 3)).join("") : ""}</div></details>`;
+    }).join("");
+    if (!areas) return "";
+    const t = tally(p.areas.flatMap(a => a.items));
+    return `<section class="phase"><h2>${esc(p.num)}&ensp;${esc(p.name)}</h2><p>${esc(p.meaning)} ${t.x} of ${t.n} items done.</p>${areas}</section>`;
+  }).join("") || `<p class="empty">Nothing matches. Clear the search or pick another tag.</p>`;
+  document.getElementById("count").textContent = `${shown} of ${items.length} items shown`;
+}
+tree.addEventListener("toggle", e => {
+  const d = e.target;
+  if (!d.classList || !d.classList.contains("area")) return;
+  const a = d.dataset.a;
+  if (d.open) {
+    openAreas.add(a);
+    const box = d.querySelector(".items");
+    if (!box.children.length) {
+      const area = PLAN.flatMap(p => p.areas).find(x => x.num === a);
+      box.innerHTML = area.items.filter(matches).map(it => itemHtml(it, false)).join("");
+    }
+  } else openAreas.delete(a);
+}, true);
+seg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.status = b.dataset.st; save(); render(); });
+tagsEl.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.tag = state.tag === b.dataset.tag ? "" : b.dataset.tag; save(); render(); });
+const q = document.getElementById("q");
+q.value = state.q;
+let timer = 0;
+q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { state.q = q.value.trim(); save(); render(); }, 150); });
+document.getElementById("openall").addEventListener("click", () => { for (const p of PLAN) for (const a of p.areas) openAreas.add(a.num); render(); });
+document.getElementById("closeall").addEventListener("click", () => { openAreas.clear(); render(); });
+document.getElementById("map").addEventListener("click", e => {
+  const b = e.target.closest(".parcel"); if (!b) return;
+  state.q = ""; state.status = "all"; state.tag = ""; q.value = ""; save();
+  openAreas.add(b.dataset.go); render();
+  const el = document.getElementById("a" + b.dataset.go); if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+});
+render();
+}
+</script>
+</body>
+</html>
