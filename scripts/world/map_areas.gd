@@ -38,3 +38,57 @@ const CORRIDOR := {
 		{ "id": "get_out", "kind": "extract", "zone": "exit", "seconds": 5.0, "text": "Reach the far end and hold it" },
 	],
 }
+
+
+## The Mirante mission on the city map, climbing up: from the gate at the foot of Morro da Boa
+## Vista, up the road through the forest (a checkpoint at the hairpin), hold the summit until the
+## helicopter comes, then up the lookout tower to board it beside the deck. The places come from
+## the built map (its ground heights, its gate and tower: `map.mirante`), so this is a function.
+static func mirante(map: CityMap) -> Dictionary:
+	var gate := Transform3D(Basis(Vector3.UP, map.mirante.gate_yaw), map.mirante.gate)
+	var deck: Vector3 = map.mirante.deck
+	var top := map.poi_pos("mirante")
+	var on_road := func(px: Vector2, lift := 0.1) -> Vector3:
+		var p := map.nav.nearest_free(CityData.to_world(px))
+		p.y = map.ground_y(p) + lift
+		return p
+	var spawns := []
+	for row in 2: # two rows of four on the road just outside the gate, facing up it
+		for i in 4:
+			var p := map.nav.nearest_free(gate * Vector3(-2.4 + i * 1.6, 0, -9.0 - row * 1.8))
+			p.y = map.ground_y(p) + 0.1
+			spawns.append({ "at": p, "yaw": map.mirante.gate_yaw + PI })
+	var hairpin: Vector3 = on_road.call(Vector2(1808, -90), 3.0)
+	var tent := CityData.to_world(Vector2(1806, -96))
+	tent.y = map.ground_y(tent)
+	var arrow: Vector3 = on_road.call(Vector2(1790, -63), 0.0)
+	var half := MiranteSet.TOWER_HALF - 0.2
+	return {
+		"name": "mirante",
+		"player_spawns": spawns,
+		"zombie_closets": [
+			{ "id": "road_below", "at": on_road.call(Vector2(1823, 33)), "radius": 3.0 },
+			{ "id": "road_bend", "at": on_road.call(Vector2(1818, -27)), "radius": 3.0 },
+			{ "id": "clearing_west", "at": on_road.call(Vector2(1854, 40)), "radius": 2.5 },
+			{ "id": "clearing_south", "at": on_road.call(Vector2(1866, 57)), "radius": 2.5 },
+		],
+		"zones": [
+			{ "id": "hairpin", "kind": "checkpoint", "box": [hairpin, Vector3(24, 12, 24)],
+				"look": { "at": tent, "yaw": 0.0, "kind": "tent" }, "arrow": { "at": arrow, "yaw": map.mirante.gate_yaw + PI } },
+			{ "id": "summit", "kind": "trigger", "box": [top + Vector3(0, 6, 0), Vector3(56, 24, 56)] },
+			{ "id": "deck", "kind": "extraction", "box": [deck + Vector3(0, 1.5, 0), Vector3(half * 2.0, 3.0, half * 2.0)] },
+		],
+		# Hanging level with the deck off its east side, the open door towards it.
+		"heli": { "at": deck + Vector3(MiranteSet.TOWER_HALF + 4.0, 1.0, 0), "yaw": 0.0, "floor": deck.y },
+		"objectives": [
+			{ "id": "hairpin", "kind": "reach", "zone": "hairpin", "text": "Climb the road to the hairpin" },
+			{ "id": "summit", "kind": "reach", "zone": "summit", "text": "Reach the Mirante at the top" },
+			{ "id": "hold", "kind": "survive", "zone": "summit", "text": "Hold the summit until the helicopter comes", "heli": 60.0,
+				"waves": [
+					{ "size": 8, "types": { "walker": 0.6, "runner": 0.3, "leaper": 0.1 }, "closets": ["road_below"] },
+					{ "size": 12, "gap": 12.0, "types": { "walker": 0.5, "runner": 0.35, "leaper": 0.15 } },
+					{ "size": 16, "gap": 12.0, "types": { "walker": 0.4, "runner": 0.4, "leaper": 0.2 } },
+				] },
+			{ "id": "board", "kind": "extract", "zone": "deck", "seconds": 5.0, "text": "Up the tower: board the helicopter" },
+		],
+	}

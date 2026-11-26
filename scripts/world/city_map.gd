@@ -105,12 +105,17 @@ func _init(full := true) -> void:
 
 # --- GameMap ------------------------------------------------------------------------
 
-## A mission starts at its POI; free play at the bus terminal.
+## A mission with data of its own (the Mirante) starts at its first spawn; another at its POI;
+## free play at the bus terminal.
 func player_spawn() -> Vector3:
+	if not spawns.is_empty():
+		return spawns[0].at
 	return poi_pos(mission if CityData.POIS.has(mission) else "terminal") + Vector3(0, 0.1, 0)
 
 
-func player_spawn_point(_slot := 0) -> Vector3:
+func player_spawn_point(slot := 0) -> Vector3:
+	if not spawns.is_empty():
+		return spawns[posmod(slot, spawns.size())].at
 	var p := player_spawn() + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0))
 	p.y = ground_y(p) + 0.1
 	return p
@@ -145,6 +150,18 @@ func zombie_spawn_point(avoid: Array) -> Vector3:
 	var last := nav.nearest_free(around + Vector3(Config.CITY_SPAWN_NEAR, 0, 0))
 	last.y = ground_y(last) + 0.1
 	return last
+
+
+## The Mirante has its own objectives, built from where its gate and tower ended up.
+func _mission_changed() -> void:
+	if mission == "mirante" and mirante.has("gate") and nav != null:
+		use_data(MapAreas.mirante(self))
+	else:
+		use_data({})
+
+
+func is_walkable(p: Vector3) -> bool:
+	return contains(p) and not nav.is_blocked(p)
 
 
 func is_direct(from: Vector3, to: Vector3) -> bool:

@@ -17,7 +17,10 @@ var outdoor := false         ## night sky and thin fog instead of a black, foggy
 var all_weapons := true      ## players carry every gun (test maps) or must find them
 var nav_refresh := 0.0       ## seconds a zombie keeps its last waypoint (0 = ask every tick)
 var spots: Array = []        ## every WeaponPickup on the map, filled or not (Scenery makes them)
-var mission := ""            ## which mission is being played on this map ("" = free play); set right after create
+var mission := "":          ## which mission is being played on this map ("" = free play); set right after create
+	set(id):
+		mission = id
+		_mission_changed()
 var infinite_ammo := true    ## test maps never run dry; off, players live on `starting_ammo()` and what they find
 var data := MapData.new()    ## this area as data (map_areas.gd): spawns, closets, zones, objectives
 var zones := {}              ## data.zones: id -> { id, kind, box | polygon, y }
@@ -34,6 +37,11 @@ static func create(map_name: String) -> GameMap:
 
 func player_spawn() -> Vector3:
 	return Vector3.ZERO
+
+
+## A map whose data depends on the mission reads it here (the city: the Mirante's objectives).
+func _mission_changed() -> void:
+	pass
 
 
 ## Read this map's data dictionary (see map_data.gd for the format).

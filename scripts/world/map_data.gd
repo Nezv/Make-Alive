@@ -313,6 +313,9 @@ func check(map: GameMap) -> Array:
 			stand.call(points[i], "route from '%s', point %d" % [r.closet, i])
 	for id: String in zones:
 		var c := zone_center(id)
+		var z: Dictionary = zones[id]
+		if z.has("box") and (z.box[0] as Vector3).y - (z.box[1] as Vector3).y * 0.5 > map.ground_y(c) + 1.0:
+			continue # up on something (a tower's deck): not stood on from the ground
 		stand.call(Vector3(c.x, map.ground_y(c), c.z), "zone '%s'" % id)
 	for list_name: String in INTERACTABLE_LISTS:
 		var list: Array = raw.get(list_name, [])

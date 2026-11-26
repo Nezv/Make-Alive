@@ -338,7 +338,11 @@ func _update_extraction() -> void:
 		extraction = null
 	if want and extraction == null:
 		var c := map.data.zone_center(zone)
-		extraction = ExtractionZone.create(map.data, zone, fx, map.ground_y(c))
+		var floor_y := map.ground_y(c)
+		var def: Dictionary = map.data.zones[zone]
+		if def.has("box"): # a zone up on something (the Mirante's deck) is drawn on it
+			floor_y = maxf(floor_y, (def.box[0] as Vector3).y - (def.box[1] as Vector3).y * 0.5)
+		extraction = ExtractionZone.create(map.data, zone, fx, floor_y)
 		world.add_child(extraction)
 
 
