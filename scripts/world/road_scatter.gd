@@ -70,7 +70,7 @@ const HILL := [
 ]
 const HILL_LITTER_EVERY := 9.0    ## metres between chances of something dropped on the brick lane
 const HILL_LITTER_CHANCE := 0.3
-const HILL_SHARP_BEND := 0.35     ## radians: a bend sharper than this has a guard rail (as _hill_road)
+const HILL_SHARP_BEND := 0.35     ## radians: a bend sharper than this has a guard rail (CityMap._hill_road uses _bends too)
 ## Places the hill's props keep clear of (CityData pixels, as MapAreas.mirante has them): the
 ## checkpoint's tent at the hairpin and the zombie closets on the road. Only solid props mind.
 const HILL_KEEP_CLEAR := [Vector2(1806, -96), Vector2(1818, -27), Vector2(1823, 33)]
@@ -90,18 +90,14 @@ const STREETS_POI := 45.0         ## nor this close to a POI
 static func hill_road(map: CityMap) -> void:
 	if not map.mirante.has("gate"):
 		return
-	var line := PackedVector2Array()
-	var width := 0.0
-	for street: Array in CityData.STREETS:
-		if street[0] == "Rua Pastor Guilherme Rau":
-			line = map._plan(street.slice(2))
-			width = street[1]
-	var total := _length(line)
+	var line := map.hill_line
+	var width := map.hill_width
+	var total := map.hill_length
 	var gate: Vector3 = map.mirante.gate
 	var start := _distance_along(line, Vector2(gate.x, gate.z))
 	var climb := total - 4.0 - start
 	var hairpin := _distance_along(line, _flat(CityData.to_world(Vector2(1808, -90))))
-	var bends := _bends(line, start)
+	var bends := _bends(map.hill_corners, line, start)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 19870416
 	for e: Dictionary in HILL:
@@ -127,8 +123,8 @@ static func hill_road(map: CityMap) -> void:
 		d += float(e.get("ahead", 0.0))
 		if d < start - 12.0 or d > total - 4.0:
 			continue
-		var p := map._along(line, d) + map._right(line, d) * side * width * 0.5
-		var h := map._heading(line, d)
+		var p := map.hill_at(d) + map.hill_right(d) * side * width * 0.5
+		var h := map.hill_heading(d)
 		var face := Vector2(h.x, h.y).rotated(-deg_to_rad(yaw))
 		if _solid_kind(e.kind) and _near_keep_clear(p):
 			continue
@@ -140,8 +136,8 @@ static func hill_road(map: CityMap) -> void:
 		k += HILL_LITTER_EVERY
 		if rng.randf() > HILL_LITTER_CHANCE:
 			continue
-		var p := map._along(line, k) + map._right(line, k) * (width * 0.5 - 1.1 + rng.randf_range(-0.5, 0.5))
-		var t := _seat(map, p, map._heading(line, k).rotated(rng.randf() * TAU), 0.5)
+		var p := map.hill_at(k) + map.hill_right(k) * (width * 0.5 - 1.1 + rng.randf_range(-0.5, 0.5))
+		var t := _seat(map, p, map.hill_heading(k).rotated(rng.randf() * TAU), 0.5)
 		var kind := ["litter", "litter", "flip_flops", "bottle", "backpack", "phone"][rng.randi() % 6] as String
 		_draw(map, { "kind": kind, "count": rng.randi_range(1, 3) }, t, rng, false)
 
@@ -320,17 +316,17 @@ static func _distance_along(line: PackedVector2Array, p: Vector2) -> float:
 	return best_d
 
 
-## The sharp bends past `from`: [distance along, side of the outside (-1 left, 1 right)].
-static func _bends(line: PackedVector2Array, from: float) -> Array:
+## The sharp bends past `from` metres along `line` (the smoothed road), found at the `corners`
+## it was smoothed through: [distance along line, side of the outside (-1 left, 1 right)].
+static func _bends(corners: PackedVector2Array, line: PackedVector2Array, from: float) -> Array:
 	var out := []
-	var walked := 0.0
-	for i in range(1, line.size() - 1):
-		walked += line[i - 1].distance_to(line[i])
-		if walked < from:
+	for i in range(1, corners.size() - 1):
+		var turn := (corners[i] - corners[i - 1]).normalized().angle_to((corners[i + 1] - corners[i]).normalized())
+		if absf(turn) < HILL_SHARP_BEND:
 			continue
-		var turn := (line[i] - line[i - 1]).normalized().angle_to((line[i + 1] - line[i]).normalized())
-		if absf(turn) >= HILL_SHARP_BEND:
-			out.append([walked, -1.0 if turn > 0.0 else 1.0])
+		var walked := _distance_along(line, corners[i])
+		if walked >= from:
+			out.append([walked, -1.0 if turn > 0.0 else 1.0]) # turning right (+ here): the outside is the left
 	return out
 
 
