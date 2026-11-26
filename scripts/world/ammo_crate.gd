@@ -39,7 +39,9 @@ func _init() -> void:
 	for x in [-0.3, 0.3]: # latches
 		lb.box(Vector3(0.07, 0.09, 0.03), Vector3(x, 0.0, SIZE.z + 0.015), Color("2a2c30"))
 	lid.add_child(lb.instance())
-	add_child(_click_body(Vector3(SIZE.x, h + 0.08, SIZE.z), Vector3(0, (h + 0.08) / 2.0, 0)))
+	var crate_body := _click_body(Vector3(SIZE.x, h + 0.08, SIZE.z), Vector3(0, (h + 0.08) / 2.0, 0))
+	Surface.tag(crate_body, Surface.Kind.METAL)
+	add_child(crate_body)
 
 
 func prompt() -> String:

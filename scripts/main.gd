@@ -3,11 +3,19 @@ extends Node
 ##
 ## Command-line options (after `--`), handy for testing:
 ##   --host                 host immediately
+##   --mode=extraction      host: how the city match is played (extraction, defense, open_world; GameModes), else free play
 ##   --map=corridor         host on the test corridor instead of the city (the default)
 ##   --mission=mirante      a city mission (terminal, hospital, prefeitura, batalhao, mirante): with --host start it,
 ##                          without it just pick it on the menu map (for screenshots of the menu)
 ##   --balance=C:/x.md      print the balance sheet (guns against zombie types), save it there and exit
-##   --city-plan=C:/dir     save city_plan.png and city_on_reference.png (what part of Joinville the city map covers) and exit
+##   --city-plan=C:/dir     save city_plan.png, city_core.png and city_on_reference.png (the street plan over Joinville) and exit
+##   --time=night           host: the sky preset (clear or day, overcast, dusk, night, storm; TimeOfDay), else the mission's
+##   --time-cycle           with several --shot-at: each shot after the first in the next preset (clear, overcast...)
+##   --lightning            with a storm: each shot at a lightning strike
+##   --review-light         the same as --time=overcast: an even light to judge forms and colours (shots)
+##   --house-plans=C:/dir   lay out the sample house (HousePlan.sample, --seed=N) and --variants=N others, save houses.json there and exit (tools\houses.ps1)
+##   --house-rack[=seed]    the sample house built in a neutral room, flown through: --floor=N shows floors up to N, --eye starts at the street door
+##   --city-zoom=x,y,w      with --city-plan: also city_zoom.png, a close plan of w pixels of joinville.png from (x, y)
 ##   --join=192.168.1.7     join immediately
 ##   --name=Bob             player name
 ##   --bot                  local player wanders and shoots by itself
@@ -23,14 +31,27 @@ extends Node
 ##   --weapon=4             start holding gun 1-9 (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov)
 ##   --difficulty=hard      host: easy, normal (default), hard or nightmare (see scripts/difficulty.gd)
 ##   --limited-ammo         host: reloads take from a reserve (the map's starting_ammo) even on a test map
-##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload or shove
+##   --pose=aim             hold a gun pose for screenshots: aim, sprint, reload, shove, inspect, heal (hurt, bleeding, a medkit going on) or downed
 ##   --poi-cam              with --mission: look at the mission's place from above the street in front of it
 ##   --cam=x,y,z,yaw,pitch  (or --shot-cam=) look at the map from a fixed camera (degrees), e.g. --cam=0,45,50,0,-50 for an overview
+##   --heli[=S]             host: the helicopter lands 16 m ahead of you in S seconds (8)
+##   --feed                 host: you die in front of three zombies (the body, the zombies feeding, the death camera)
+##   --wheel                host: carry a little of everything and hold the item wheel up (pointer on the bandage)
+##   --director             host: show the horde director's pace (state, stress, heat) on the HUD
 ##   --noise                host: draw an expanding ring wherever something made noise, out to where it is heard
+##   --prop-rack=hydrant    one element (scripts/models/elements.gd) alone in a neutral lit room; with --state=burnt,
+##                          --part=open, --view=0..10, and --review=C:/dir to shoot the review views and quit (tools/models/review.py)
 ##   --zones                draw the map data: zones, zombie closets (red), horde routes (orange), spawns (white)
 ##   --fx-rack              every effect of the effects kit looping in a row in front of you, labelled
 ##   --gun-rack             hang all nine gun models in front of you, side on
 ##   --zombie-rack=1        stand one zombie of every outfit in front of you: =1 first half, =2 second half (add --back for their backs)
+##   --survivor-rack        other players as you see them: aiming, reloading on the run, shoving, throwing, healing, down
+##   --body-rack            the generic model bodies (male, female) and their skeleton, still (also --back, --rack-anim)
+##   --bite-rack=1          one outfit (--outfit=nurse, --male) plain and with every bite: =1 plain and bites 0-4, =2 bites 5-9
+##   --bite=N               with --outfit-rack: every model wears bite N (0-9, see Characters.BITES)
+##   --outfit-rack=1        the outfit models, each as a man and a woman: =1 civilian, worker, nurse; =2 doctor, cop, soldier; =3 the rest (also --back, --rack-anim)
+##   --rack-anim=walk       the rack zombies hold that animation's pose (idle, walk, run, attack, windup, leap, stagger, crawl)
+##   --rack-sever=arm       the rack zombies have lost that part (arm: the right one, leg: the left one, head), to look at stumps
 
 var menu: Menu
 var game: Game
@@ -57,6 +78,23 @@ func _ready() -> void:
 	if _args.has("city-plan"):
 		_city_plan(_args["city-plan"])
 		return
+	if _args.has("house-plans"):
+		_house_plans(_args["house-plans"])
+		return
+	if _args.has("house-rack"):
+		var house := HouseRack.new()
+		add_child(house)
+		house.setup(_args)
+		_start_timers()
+		return
+	if _args.has("prop-rack"):
+		var rack := PropRack.new()
+		add_child(rack)
+		if rack.setup(_args["prop-rack"], _args) and _args.has("review"):
+			get_window().size = Vector2i(600, 800)
+			rack.review(_args.review)
+		_start_timers()
+		return
 
 	menu = Menu.new()
 	menu.host_pressed.connect(func(): _host("corridor"))
@@ -69,16 +107,23 @@ func _ready() -> void:
 	menu.open()
 	if _args.has("mission"):
 		menu.select(_args.mission)
+	if _args.has("mode"):
+		menu.set_mode(_args.mode)
 
+	_start_timers()
+	if _args.has("host"):
+		_host("city" if _args.has("mission") else _args.get("map", "city"), _args.get("mission", ""))
+	elif _args.has("join"):
+		_join(_args.join)
+
+
+## --screenshot and --quit-after.
+func _start_timers() -> void:
 	if _args.has("screenshot"):
 		for t in str(_args.get("shot-at", "5")).split(","): # e.g. --shot-at=2,4,6 saves x_0.png, x_1.png...
 			get_tree().create_timer(float(t)).timeout.connect(_screenshot)
 	if _args.has("quit-after"):
 		get_tree().create_timer(float(_args["quit-after"])).timeout.connect(_quit_with_summary)
-	if _args.has("host"):
-		_host("city" if _args.has("mission") else _args.get("map", "city"), _args.get("mission", ""))
-	elif _args.has("join"):
-		_join(_args.join)
 
 
 func _new_game(map_name := "city", mission := "") -> Game:
@@ -86,16 +131,24 @@ func _new_game(map_name := "city", mission := "") -> Game:
 	game.bot = _args.has("bot")
 	game.map_name = map_name
 	game.mission = mission
-	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") or not GameMap.NAMES.has(game.map_name):
+	if _args.has("demo") or _args.has("fx-rack") or _args.has("gun-rack") or _args.has("zombie-rack") \
+			or _args.has("body-rack") or _args.has("outfit-rack") or _args.has("bite-rack") or _args.has("survivor-rack") or not GameMap.NAMES.has(game.map_name):
 		game.map_name = "corridor" # the debug line-ups are laid out for the corridor
 	game.limited_ammo = _args.has("limited-ammo")
 	game.difficulty = _args.get("difficulty", "normal")
+	game.mode = menu.mode if menu else String(_args.get("mode", ""))
+	if not GameModes.valid(game.mode) or game.map_name != "city":
+		game.mode = ""
+	game.sky_choice = _args.get("time", "overcast" if _args.has("review-light") else "")
 	game.bot_fires = not _args.has("no-fire")
 	game.bot_aim = _args.get("bot-aim", "chest")
 	game.leave_requested.connect(func(): _to_menu())
+	game.join_refused.connect(func(message: String): _to_menu(message))
 	game.retry_requested.connect(func():
-		var again := [game.map_name, game.mission]
+		var again := [game.map_name, game.mission, game.mode]
 		_to_menu()
+		if menu:
+			menu.mode = again[2]
 		_host(again[0], again[1]))
 	add_child(game)
 	menu.close()
@@ -125,6 +178,16 @@ func _host(map_name := "city", mission := "") -> void:
 		_fx_rack()
 	if _args.has("noise"):
 		game.show_noise()
+	if _args.has("wheel"):
+		_wheel()
+	if _args.has("feed"):
+		_feed()
+	if _args.has("heli"):
+		game.director.enabled = false
+		var at := game.local_player.global_position + Vector3(0, 0, -16)
+		game.call_heli(Vector3(at.x, game.map.ground_y(at), at.z), float(_args.get("heli", "8")) if str(_args.get("heli", "")).is_valid_float() else 8.0)
+	if _args.has("director"):
+		game.director_overlay = true
 	if _args.has("zones"):
 		game.add_child(game.map.data.debug_node())
 	if _args.has("cam") or _args.has("shot-cam"):
@@ -139,6 +202,14 @@ func _host(map_name := "city", mission := "") -> void:
 		_perf_warmup = 2.0
 	if _args.has("zombie-rack"):
 		_zombie_rack()
+	if _args.has("body-rack"):
+		_body_rack()
+	if _args.has("survivor-rack"):
+		_survivor_rack()
+	if _args.has("outfit-rack"):
+		_outfit_rack(int(_args["outfit-rack"]))
+	if _args.has("bite-rack"):
+		_bite_rack(int(_args["bite-rack"]), String(_args.get("outfit", "nurse")), not _args.has("male"))
 	var ips := ", ".join(Net.local_ips())
 	print("[host] hosting on port %d. Friends join: %s" % [Config.PORT, ips])
 	game.hud.push_feed("Hosting. Friends join with IP: %s" % ips)
@@ -211,6 +282,33 @@ func _demo() -> void:
 		game.spawn_zombie(types[i], Vector3(-2.2 + (i % 4) * 1.4, 0.1, 8.0 + (i / 4) * 5.0 + (i % 2) * 1.5))
 
 
+## You die in front of three zombies with nobody to come back for you: the body, the zombies feeding.
+func _feed() -> void:
+	game.director.enabled = false
+	game.rules.respawn = false
+	game._add_player(7, "Stand-in") # alive far off, so the mission is not over
+	game.players[7].pos = game.local_player.global_position + Vector3(0, 0, -80)
+	var at := game.local_player.global_position
+	print("[feed] body at ", at)
+	for i in 3:
+		game.spawn_zombie(Zombie.Type.WALKER, at + Vector3(-1.5 + i * 1.5, 0.1, -6.0 - i))
+	get_tree().create_timer(0.3).timeout.connect(func():
+		if game:
+			game.kill_player(1))
+
+
+## A little of everything in the pack and the item wheel up, for looking at it.
+func _wheel() -> void:
+	game.give_item(1, Inventory.BANDAGE, 3)
+	game.give_item(1, Inventory.PLANK, 4)
+	game.give_item(1, Inventory.FRAG, 2)
+	game.give_item(1, Inventory.LURE, 1)
+	game.give_key(1, &"generator")
+	var p := game.local_player
+	p.open_wheel()
+	p.wheel.offset = Vector2(Config.WHEEL_RADIUS, -Config.WHEEL_RADIUS * 0.6)
+
+
 ## Hold a first-person gun pose so a screenshot can show it.
 func _pose(pose: String) -> void:
 	var p := game.local_player
@@ -221,6 +319,26 @@ func _pose(pose: String) -> void:
 		get_tree().create_timer(maxf(0.5, at_s - 0.17)).timeout.connect(func():
 			if game:
 				game.local_player.view.shove())
+	if pose == "heal": # badly hurt, two wounds open, a second into a medkit when the first screenshot is taken
+		var at_h := float(str(_args.get("shot-at", "5")).split(",")[0])
+		get_tree().create_timer(maxf(0.5, at_h - 1.0)).timeout.connect(func():
+			if game:
+				game.give_item(1, Inventory.MEDKIT)
+				game.damage_player(1, 75)
+				(game.players[1].status as PlayerStatus).bleed = 2
+				game.use_item(1, Inventory.MEDKIT))
+	if pose == "downed": # a stand-in teammate keeps you from dying, then you go down
+		game._add_player(7, "Stand-in")
+		get_tree().create_timer(0.5).timeout.connect(func():
+			if game:
+				game.damage_player(1, 9999)
+				(game.players[1].status as PlayerStatus).down_left = Config.DOWNED_TIME * 0.2
+				game.local_player.status.down_left = Config.DOWNED_TIME * 0.2)
+	if pose == "inspect": # half way through looking the gun over when the first screenshot is taken
+		var at_i := float(str(_args.get("shot-at", "5")).split(",")[0])
+		get_tree().create_timer(maxf(0.5, at_i - Config.INSPECT_TIME * 0.45)).timeout.connect(func():
+			if game:
+				game.local_player.view.inspect())
 	if pose == "reload": # be 40% through a reload when the first screenshot is taken
 		var at := float(str(_args.get("shot-at", "5")).split(",")[0])
 		var t: float = p.weapons.def().reload
@@ -263,6 +381,16 @@ func _fx_rack() -> void:
 		tag.outline_size = 10
 		tag.position = _fx_rack_spot(at, kind, n) + Vector3(0, 1.6, 0)
 		game.add_child(tag)
+	for surface in Surface.Kind.size(): # a second row: a bullet into every surface
+		var tag := Label3D.new()
+		tag.text = Surface.NAMES[surface]
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.no_depth_test = true
+		tag.font_size = 32
+		tag.pixel_size = 0.004
+		tag.outline_size = 10
+		tag.position = _impact_rack_spot(at, surface) + Vector3(0, 0.55, 0)
+		game.add_child(tag)
 	var timer := Timer.new()
 	timer.wait_time = 2.0
 	timer.autostart = true
@@ -275,10 +403,18 @@ func _fx_rack_spot(at: Vector3, kind: int, n: int) -> Vector3:
 	return at + Vector3((kind - (n - 1) / 2.0) * 0.7, 0.0, -5.0)
 
 
+func _impact_rack_spot(at: Vector3, surface: int) -> Vector3:
+	return at + Vector3((surface - (Surface.Kind.size() - 1) / 2.0) * 0.6, 0.6, -3.2)
+
+
 func _fx_rack_play() -> void:
 	var at := game.local_player.global_position
+	for surface in Surface.Kind.size():
+		game.play_fx(Fx.Kind.IMPACT, _impact_rack_spot(at, surface), Vector3(0, 0.3, 1).normalized(), surface)
 	var n := Fx.Kind.size()
 	for kind in n:
+		if kind == Fx.Kind.IMPACT:
+			continue
 		var on_floor: bool = kind in [Fx.Kind.BLAST, Fx.Kind.SPLASH]
 		var spot := _fx_rack_spot(at, kind, n)
 		var decal: bool = kind in [Fx.Kind.HOLE, Fx.Kind.CRACK]
@@ -287,22 +423,96 @@ func _fx_rack_play() -> void:
 
 ## Still zombies, one per outfit, half of them at a time so none hides another. Models only: no AI.
 func _zombie_rack() -> void:
+	var n := Characters.Outfit.size()
+	var per_row := (n + 1) / 2
+	var row := []
+	for o in n:
+		if o / per_row == int(_args["zombie-rack"]) - 1:
+			row.append([Characters.zombie(100 + o * 7, Zombie.Type.WALKER, o), Characters.OUTFIT_NAMES[o]])
+	_rack(row, per_row)
+
+
+## Other players as you see them, each doing something: aiming up, reloading on the run, shoving,
+## throwing, healing, down.
+func _survivor_rack() -> void:
 	game.director.enabled = false
 	game.local_player.hide_view = true
 	var at := game.local_player.global_position
-	var n := Characters.Outfit.size()
-	var per_row := (n + 1) / 2
-	for o in n:
-		if o / per_row != int(_args["zombie-rack"]) - 1:
-			continue
-		var rig := Characters.zombie(100 + o * 7, Zombie.Type.WALKER, o)
+	var poses := [["aim, looking up", PlayerWire.ACTION_AIM, 6.0 * 0.0, 0.45], ["reload, running", PlayerWire.ACTION_RELOAD, 6.5, 0.0],
+		["shove", PlayerWire.ACTION_SHOVE, 0.0, 0.0], ["throw", PlayerWire.ACTION_THROW, 0.0, 0.0],
+		["heal", PlayerWire.ACTION_HEAL, 0.0, 0.0], ["down", PlayerWire.ACTION_DOWNED, 0.0, 0.0]]
+	for i in poses.size():
+		var r := RemotePlayer.create(50 + i, poses[i][0])
+		game.add_child(r)
+		r.set_weapon(Weapons.AK47)
+		r.position = at + Vector3((i - (poses.size() - 1) / 2.0) * 1.1, 0.1, -3.6)
+		r.rotation.y = PI * 0.8
+		r.set_action(poses[i][1])
+		r.look_pitch = poses[i][3]
+		r.set_process(false) # held still, no snapshots
+		var frames := 22 if poses[i][1] == PlayerWire.ACTION_THROW else 40
+		for k in frames:
+			r.animate(1.0 / 60.0, poses[i][2])
+	var lamp := OmniLight3D.new()
+	lamp.omni_range = 10.0
+	lamp.light_energy = 0.8
+	lamp.position = at + Vector3(0, 2.4, -1.0)
+	game.add_child(lamp)
+
+
+## The generic bodies of tools/models/body.py and their skeleton, still.
+func _body_rack() -> void:
+	var row := []
+	for m: Array in [["male body", CharacterModel.BODY_M], ["female body", CharacterModel.BODY_F],
+			["skeleton", CharacterModel.SKELETON]]:
+		row.append([Humanoid.create_model(CharacterModel.load_model(m[1]), {"zombie": true}), m[0]])
+	_rack(row, row.size())
+
+
+## One outfit on one body (--outfit=nurse, --male for the man) plain and with every bite, half of
+## them at a time (group 1: plain and bites 0-4, group 2: bites 5-9), labelled with the bite's name.
+func _bite_rack(group: int, outfit_name: String, female: bool) -> void:
+	var row := []
+	var first := -1 if group == 1 else 5
+	for bite in range(first, first + 6 if group == 1 else first + 5):
+		var model := CharacterModel.outfit(outfit_name, female, bite)
+		row.append([Humanoid.create_model(model, {"zombie": true}), "plain" if bite < 0 else Characters.BITES[bite].name])
+	_rack(row, row.size(), 0.8)
+
+
+## Three outfits of tools/models/outfits.py (group 1, 2 or 3), each worn by the male and the
+## female body, side by side.
+func _outfit_rack(group: int) -> void:
+	var row := []
+	for o in range((group - 1) * 3, mini(group * 3, Characters.FEMALE_SHARE.size())):
+		for female: bool in [false, true]:
+			var model := CharacterModel.outfit(Characters.OUTFIT_NAMES[o], female, int(_args.get("bite", -1)))
+			var label := "%s %s" % [Characters.OUTFIT_NAMES[o], "f" if female else "m"]
+			row.append([Humanoid.create_model(model, {"zombie": true}), label])
+	_rack(row, row.size(), 0.8)
+
+
+## Rigs ([rig, label] each) in a row in front of you, facing you (--back: away), holding the
+## pose of --rack-anim, labelled, under a lamp.
+func _rack(row: Array, per_row: int, spacing := 0.95) -> void:
+	game.director.enabled = false
+	game.local_player.hide_view = true
+	var at := game.local_player.global_position
+	for i in row.size():
+		var rig: Humanoid = row[i][0]
 		game.add_child(rig)
-		rig.position = at + Vector3((o % per_row - (per_row - 1) / 2.0) * 0.95, 0.1, -3.2)
+		rig.position = at + Vector3((i - (per_row - 1) / 2.0) * spacing, 0.1, -3.2)
 		rig.rotation.y = 0.0 if _args.has("back") else PI
-		rig.set_anim(Humanoid.Anim.IDLE)
-		rig.update(0.5, 0.0)
+		var lost: int = {"arm": Humanoid.Part.ARM_R, "leg": Humanoid.Part.LEG_L, "head": Humanoid.Part.HEAD}.get(
+			String(_args.get("rack-sever", "")), -1)
+		if lost >= 0:
+			Humanoid.discard(rig.sever(lost))
+		var anim_name := String(_args.get("rack-anim", "idle")).to_upper()
+		rig.set_anim(Humanoid.Anim.get(anim_name, Humanoid.Anim.IDLE))
+		for k in 30: # long enough for the pose to settle (0.5 s)
+			rig.update(1.0 / 60.0, 1.2 if anim_name in ["WALK", "RUN", "CRAWL"] else 0.0)
 		var tag := Label3D.new()
-		tag.text = Characters.OUTFIT_NAMES[o]
+		tag.text = row[i][1]
 		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		tag.no_depth_test = true
 		tag.font_size = 40
@@ -329,17 +539,58 @@ func _balance(path: String) -> void:
 	get_tree().quit()
 
 
-## Draw which part of Joinville the city map covers, then quit. Works headless.
+## Draw the city's plan and the streets over Joinville, then quit. Works headless.
+## --house-plans: the sample house and a spread of others, laid out and saved as JSON for
+## tools/house_plans.py to draw.
+func _house_plans(dir: String) -> void:
+	DirAccess.make_dir_recursive_absolute(dir)
+	var seed := int(_args.get("seed", "18000"))
+	var t := Time.get_ticks_msec()
+	var sample := HousePlan.new(HousePlan.sample(seed))
+	print("[houses] sample (seed %d) laid out in %d ms: %s" % [seed, Time.get_ticks_msec() - t, "ok" if sample.ok else sample.problem])
+	var out := { "sample": sample.to_dict(), "variants": [] }
+	for f: Dictionary in sample.floors:
+		print("[houses]   floor %d: %d spaces, %d doors, %d tries%s" % [f.level, f.spaces.size(), f.doors.size(), f.tries,
+			"" if f.ok else "  FAILED: " + String(f.problem)])
+		for why: String in f.rejected:
+			print("[houses]     rejected: ", why)
+	var n := int(_args.get("variants", "8"))
+	for i in n:
+		var spec := HousePlan.sample(seed + 101 * (i + 1))
+		spec.bays = [2, 3, 3, 4, 4, 5, 3, 2][i % 8]
+		spec.back_bays = spec.bays
+		spec.width = spec.bays * [2.4, 2.5, 2.6, 2.35, 2.7, 2.45, 2.8, 2.6][i % 8]
+		spec.depth = [9.5, 11.0, 13.5, 12.0, 14.0, 10.5, 12.5, 11.5][i % 8]
+		spec.storey = [3.0, 3.2, 3.4, 2.95, 3.1, 3.3, 3.25, 2.9][i % 8]
+		spec.door = "left" if i % 2 == 0 else "right"
+		spec.shop = i % 3 != 2
+		var h := HousePlan.new(spec)
+		print("[houses] variant %d: %d bays, %.1f x %.1f m: %s" % [i, spec.bays, spec.width, spec.depth, "ok" if h.ok else h.problem])
+		out.variants.append(h.to_dict())
+	var path := dir.path_join("houses.json")
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(JSON.stringify(out, "	"))
+	file.close()
+	print("[houses] saved ", path)
+	get_tree().quit()
+
+
 func _city_plan(dir: String) -> void:
 	var t := Time.get_ticks_msec()
-	var city := CityMap.new()
-	print("[city] built in %d ms: %.2f km2, %d x %d cells of %.0f m, %d buildings" % [
+	var city := CityMap.new(false)
+	print("[city] laid out in %d ms: %.2f km2, %d x %d cells of %.0f m, %d buildings" % [
 		Time.get_ticks_msec() - t, city.area_km2(), city.gw, city.gh, city.cell, city.building_count])
+	t = Time.get_ticks_msec()
 	city.plan_image().save_png(dir.path_join("city_plan.png"))
+	print("[city] plan drawn in %d ms" % (Time.get_ticks_msec() - t))
+	city.plan_image(8, city.core_rect()).save_png(dir.path_join("city_core.png"))
+	if _args.has("city-zoom"): # x,y,w in joinville.png pixels: a close plan of that square
+		var z: PackedFloat64Array = (_args["city-zoom"] as String).split_floats(",")
+		city.plan_image(16, Rect2(CityData.to_plan(Vector2(z[0], z[1])), Vector2(z[2], z[2]) * CityData.M_PER_PX)).save_png(dir.path_join("city_zoom.png"))
 	var over := city.reference_overlay()
 	if over != null:
 		over.save_png(dir.path_join("city_on_reference.png"))
-	print("[city] saved city_plan.png and city_on_reference.png in ", dir)
+	print("[city] saved city_plan.png, city_core.png and city_on_reference.png in ", dir)
 	city.root.free()
 	get_tree().quit()
 
@@ -351,7 +602,7 @@ func _debug_camera(spec: String) -> void:
 		return
 	var cam := Camera3D.new()
 	cam.fov = 70
-	cam.far = maxf(400.0, v[1] * 6.0) # high overview cameras need to see the ground
+	cam.far = maxf(Config.VIEW_FAR, v[1] * 6.0) # the town's skyline reaches far; high overviews need to see the ground
 	game.add_child(cam)
 	cam.global_transform = Transform3D(Basis.from_euler(Vector3(deg_to_rad(v[4]), deg_to_rad(v[3]), 0)), Vector3(v[0], v[1], v[2]))
 	cam.make_current()
@@ -359,12 +610,19 @@ func _debug_camera(spec: String) -> void:
 
 
 func _screenshot() -> void:
+	if _args.has("lightning") and game and game.sky_dome and game.sky_dome.preset_name == "storm":
+		var fwd := -get_viewport().get_camera_3d().global_basis.z
+		game.sky_dome.strike(atan2(fwd.x, -fwd.z)) # catch the storm at its brightest, in front
+		await get_tree().process_frame
+		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var path: String = _args.screenshot
 	path = path.replace(".png", "_%d.png" % _shots)
 	_shots += 1
 	get_viewport().get_texture().get_image().save_png(path)
 	print("[screenshot] ", path)
+	if _args.has("time-cycle") and game and game.sky_dome: # the next preset for the next shot (the sky's review)
+		game.sky_dome.apply(TimeOfDay.NAMES[_shots % TimeOfDay.NAMES.size()])
 
 
 func _quit_with_summary() -> void:

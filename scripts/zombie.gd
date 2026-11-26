@@ -6,7 +6,7 @@ extends CharacterBody3D
 ## Both sides animate the same rig from the same `state`, so everyone sees the same moves.
 
 enum Type { WALKER, RUNNER, LEAPER }
-enum State { CHASE, ATTACK, WINDUP, LEAP, LAND, STAGGER }
+enum State { CHASE, ATTACK, WINDUP, LEAP, LAND, STAGGER, FEED }
 
 ## Per-type stats: [min speed, max speed, hit points]
 const STATS := {
@@ -38,6 +38,9 @@ var _waypoint_t := 0.0
 var push := Vector3.ZERO  ## a shove's knock-back, dying away
 var heard := Vector3.ZERO ## where the last noise it heard came from
 var heard_left := 0.0     ## seconds it still cares (0 = heard nothing)
+var idle := false         ## a wanderer: stands about until a player comes close, a noise or a hit wakes it
+var route: Array = []     ## points of a horde route still to walk before it goes for a player (HordeDirector)
+var meal := Vector3.INF   ## a dead player's body it is going to (or feeding on); INF = none
 
 
 static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, severed := 0) -> Zombie:
@@ -86,6 +89,7 @@ static func create(id: int, zombie_type: int, on_server: bool, pos: Vector3, sev
 func shove(away: Vector3) -> void:
 	if state == State.LEAP:
 		return
+	idle = false
 	push = Vector3(away.x, 0, away.z)
 	if state == State.WINDUP or type == Type.LEAPER:
 		leap_cd = maxf(leap_cd, Config.SHOVE_LEAP_RESET)
@@ -97,8 +101,16 @@ func shove(away: Vector3) -> void:
 
 ## A noise reached it: it will go and look, unless a player is close enough to go for instead.
 func hear(spot: Vector3) -> void:
+	idle = false
 	heard = spot
 	heard_left = Config.NOISE_INVESTIGATE_TIME
+
+
+## A player died at `spot`: walk there and feed on the body for `Config.FEED_TIME`.
+func feed_at(spot: Vector3) -> void:
+	hear(spot)
+	heard_left = Config.FEED_TIME
+	meal = spot
 
 
 func investigating() -> bool:
@@ -129,6 +141,7 @@ func set_state(s: int) -> void:
 ## This only changes numbers; Game turns the result into blood, gibs and ragdolls on every peer.
 func take_hit(part: int, damage: int) -> Dictionary:
 	var result := { "killed": false, "severed": -1, "headshot": part == Humanoid.Part.HEAD }
+	idle = false
 	var body_damage := float(damage)
 	if part == Humanoid.Part.HEAD:
 		body_damage *= Config.HEAD_MULT
@@ -192,9 +205,26 @@ func host_step(delta: float, game: Game) -> void:
 		State.LAND:
 			if state_t >= 0.3:
 				set_state(State.CHASE)
+		State.FEED:
+			var someone_close := target_id != 0 and to_target.length() <= Config.ZOMBIE_NOTICE_RANGE
+			if someone_close or heard_left <= 0.0:
+				meal = Vector3.INF
+				heard_left = 0.0
+				set_state(State.CHASE)
+			else:
+				_face(meal - global_position)
 		State.CHASE:
-			if lured:
+			var player_close := target_id != 0 and to_target.length() <= Config.ZOMBIE_NOTICE_RANGE
+			if idle and (lured or player_close):
+				idle = false
+			if player_close:
+				route.clear() # it has someone to go for: it forgets the way it was told
+			if idle:
+				pass # standing about
+			elif lured:
 				move = _investigate(game)
+			elif not route.is_empty():
+				move = _follow_route(game)
 			elif target_id != 0:
 				move = _chase(game, target_id, target_pos, to_target)
 
@@ -232,6 +262,26 @@ func _chase(game: Game, target_id: int, target_pos: Vector3, to_target: Vector3)
 	return _steer_to(game, target_pos, direct, to_target)
 
 
+## Walk the horde's route: to each point in turn, then on to the players.
+func _follow_route(game: Game) -> Vector3:
+	var here := global_position
+	while not route.is_empty():
+		var to_point: Vector3 = route[0] - here
+		to_point.y = 0.0
+		if to_point.length() >= Config.ROUTE_ARRIVE:
+			break
+		route.remove_at(0)
+	if route.is_empty():
+		return Vector3.ZERO
+	var goal: Vector3 = route[0]
+	var to_goal := goal - here
+	to_goal.y = 0.0
+	var map := game.map
+	var costly := map.nav_refresh > 0.0
+	var direct := (not costly or to_goal.length() < Config.DIRECT_CHECK_RANGE) and map.is_direct(here, goal)
+	return _steer_to(game, goal, direct, to_goal)
+
+
 ## Walk to where the noise was and stand there looking for it.
 func _investigate(game: Game) -> Vector3:
 	var here := global_position
@@ -239,6 +289,8 @@ func _investigate(game: Game) -> Vector3:
 	to_spot.y = 0.0
 	var dist := to_spot.length()
 	if dist < Config.NOISE_ARRIVE:
+		if meal.is_finite() and meal.is_equal_approx(heard):
+			set_state(State.FEED) # down on the body
 		return Vector3.ZERO
 	var map := game.map
 	var door := map.door_in_the_way(here, heard)
@@ -307,6 +359,7 @@ func _anim_for_state() -> int:
 		State.LEAP: return Humanoid.Anim.LEAP
 		State.LAND: return Humanoid.Anim.LAND
 		State.STAGGER: return Humanoid.Anim.STAGGER
+		State.FEED: return Humanoid.Anim.FEED
 	if is_crawling():
 		return Humanoid.Anim.CRAWL
 	return Humanoid.Anim.RUN if type == Type.RUNNER else Humanoid.Anim.WALK

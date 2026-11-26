@@ -3,6 +3,10 @@ extends CharacterBody3D
 
 signal shoved(origin: Vector3, dir: Vector3) ## a shove went out: the game tells the host
 signal landed(height: float) ## the feet came down after falling this far (the host decides if it hurt)
+signal item_requested(item: StringName) ## an item of the inventory is to be used (the host decides if it can be)
+signal use_cancelled ## a sprint began while an item was being put on
+signal chat_requested ## the chat key: open the line to type in
+signal ping_requested(spot: Vector3) ## the ping key: mark where the view points
 ## The player you control: physics movement, mouse look, first-person camera and guns.
 ## Movement runs at the physics rate; the camera is placed every rendered frame from the
 ## interpolated body transform, so it's smooth at 144 Hz.
@@ -21,12 +25,32 @@ var _breath_t := 0.0
 var shove_left := 0.0 # > 0 while a shove is still being swung
 var loadout := Loadout.all() # the guns this player carries, by slot (the host keeps its own copy)
 var last_weapon := -1     # the gun held before this one (the last-weapon key goes back to it)
+var inventory := Inventory.new() # a copy of what the host says we carry: for the wheel and the HUD, never trusted
+var wheel := ItemWheel.new()     # the item wheel, while its key is held
+var status := PlayerStatus.new() # wounds and what is being put on, as the host says (a copy, for the HUD and the view)
+var spectator := Spectator.new() # who a dead player watches
+var spectate_candidates: Array = [] # the living they may watch (Game fills it)
+var spectate_following := false   # the camera has someone to follow...
+var spectate_focus := Vector3.ZERO # ...standing here...
+var spectate_yaw := 0.0            # ...facing this way
+var _spectate_cam := Vector3.INF   # where the camera is
+var _dead_t := 0.0
 var view: Viewmodel
+var down_pose := 0.0      # 0 standing .. 1 on the floor, downed (eases: see step_down_view)
+var arrive_left := 0.0    # > 0 while dropping off the truck bed after a respawn
+var typing := false       # the chat line is open: keys go to it, not to walking
+var throw_left := 0.0     # > 0 while a throw is being made (others see the arm go over)
+var seat: Node3D = null   # aboard the helicopter: the body rides here, nothing else moves it
+var wash_shake := 0.0     # metres the view trembles under the helicopter's downwash
 var aiming := false
 var sprinting := false
 var aim_blocked := false  # this right-click was spent on a door or lootbox
 var fire_buffer := 0.0    # > 0 for a moment after a click, so semi-auto clicks aren't lost
-var punch := Vector2.ZERO # recoil on top of where you're looking (climb, sideways); recovers
+var punch := Vector2.ZERO # recoil on top of where you're looking (climb, sideways); recovers on a spring
+var punch_vel := Vector2.ZERO
+var feel := CameraFeel.new() # bob, sway, tilt, FOV, shakes
+var strafe_input := 0.0
+var _mouse_accum := Vector2.ZERO
 var debug_aim := false    # tests and screenshots: hold the sights up / hold the sprint pose
 var debug_sprint := false
 var hide_view := false   # screenshots of the world without the gun in the way
@@ -52,7 +76,7 @@ func _ready() -> void:
 	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.fov = base_fov()
 	camera.near = 0.05
-	camera.far = 300
+	camera.far = Config.VIEW_FAR # the fog and the sky's backdrop hide where it ends
 	add_child(camera)
 	camera.make_current()
 	view = Viewmodel.new()
@@ -71,6 +95,8 @@ func set_loadout(carried: Loadout) -> void:
 
 
 func switch_weapon(id: int) -> void:
+	if status.downed and id != loadout.sidearm():
+		return # on the floor, only the pistol is within reach
 	var before := weapons.current
 	if loadout.has(id) and weapons.switch_to(id):
 		last_weapon = before
@@ -110,13 +136,85 @@ func receive_weapon(id: int, rounds := -1, dropped := -1) -> void:
 func kick_view(k: Vector2) -> void:
 	pitch = clampf(pitch + k.x * Config.RECOIL_STAYS, -1.5, 1.5)
 	yaw += k.y * Config.RECOIL_STAYS
-	punch += k * (1.0 - Config.RECOIL_STAYS)
+	punch_vel += k * (1.0 - Config.RECOIL_STAYS) * Config.RECOIL_IMPULSE # it climbs, then the spring brings it back
+
+
+## The recoil spring: up, back down a little past rest, settled.
+func step_recoil(delta: float) -> void:
+	punch_vel += (-punch * Config.RECOIL_K - punch_vel * Config.RECOIL_D) * delta
+	punch += punch_vel * delta
+
+
+## Hold the wheel key: the mouse moves its pointer instead of the view, until the key is let go.
+func open_wheel() -> void:
+	wheel.begin(inventory)
+
+
+## Let go of the wheel: a medical item is used, a throwable becomes the one the quick key throws.
+func close_wheel() -> void:
+	var item := wheel.finish()
+	match Inventory.kind_of(item):
+		Inventory.Kind.MEDICAL:
+			item_requested.emit(item)
+		Inventory.Kind.THROWABLE:
+			inventory.select_throwable(item)
+
+
+## Sprinting off while something is being put on cancels it (the host is told; the item stays in the pack).
+func check_use_cancel(running: bool) -> void:
+	if running and status.is_using():
+		status.cancel_use()
+		use_cancelled.emit()
+
+
+## The quick-heal key: the best heal carried. False if there is none.
+func try_quick_heal() -> bool:
+	var item := inventory.quick_heal()
+	if item == &"":
+		return false
+	item_requested.emit(item)
+	return true
+
+
+## The quick-throw key: the throwable that is ready. False if there is none.
+func try_quick_throw() -> bool:
+	var item := inventory.selected_throwable()
+	if item == &"":
+		return false
+	item_requested.emit(item)
+	throw_left = Config.THROW_ANIM_TIME
+	return true
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		handle_event(event)
+
+
+## What a key press or mouse move does (only while the mouse is captured; tests call this directly).
+func handle_event(event: InputEvent) -> void:
+	if not bot and event.is_action_pressed("chat"): # (the dead too)
+		chat_requested.emit()
+		return
+	if not bot and event.is_action_pressed("ping"):
+		ping_requested.emit(look_point())
+		return
+	if status.dead: # watching: fire goes to the next one, aim to the one before
+		if event.is_action_pressed("fire"):
+			spectator.cycle(spectate_candidates, 1)
+		elif event.is_action_pressed("aim"):
+			spectator.cycle(spectate_candidates, -1)
+		elif event is InputEventMouseMotion:
+			pass
+		return
+	if wheel.open: # nothing else works with the wheel up
+		if event.is_action_released("item_wheel"):
+			close_wheel()
+		elif event is InputEventMouseMotion:
+			wheel.push(event.relative)
 		return
 	if event is InputEventMouseMotion:
+		_mouse_accum += event.relative
 		var sens: float = Settings.get_value("mouse_sensitivity") * camera.fov / base_fov() # slower when zoomed in
 		yaw -= event.relative.x * sens
 		pitch = clampf(pitch - event.relative.y * sens * (-1.0 if Settings.get_value("invert_y") else 1.0), -1.5, 1.5)
@@ -132,6 +230,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		switch_last()
 	elif event.is_action_pressed("shove"):
 		try_shove()
+	elif event.is_action_pressed("inspect"):
+		view.inspect()
+	elif event.is_action_pressed("item_wheel"):
+		if not status.downed:
+			open_wheel()
+	elif event.is_action_pressed("quick_heal"):
+		try_quick_heal()
+	elif event.is_action_pressed("quick_throw"):
+		try_quick_throw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 		cycle_weapon(1)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -143,20 +250,45 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if seat != null and is_instance_valid(seat): # sat in the cabin: carried, not walking
+		global_position = seat.global_position - Vector3(0, move.eye_height(), 0)
+		velocity = Vector3.ZERO
+		move_speed = 0.0
+		firing = false
+		return
 	var input := Vector2.ZERO
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-	if captured and not bot:
+	if wheel.open and not captured:
+		wheel.finish() # the window lost the mouse (pause menu) with the wheel up: nothing is picked
+	if captured and not bot and not typing:
 		input = Input.get_vector("move_left", "move_right", "move_back", "move_forward")
-		firing = Input.is_action_pressed("fire")
+		firing = Input.is_action_pressed("fire") and not wheel.open
+	elif typing:
+		firing = false
 	elif not bot:
 		firing = false
+	strafe_input = input.x
 
+	if status.downed and loadout.sidearm() >= 0 and weapons.current != loadout.sidearm():
+		var before := weapons.current
+		if weapons.switch_to(loadout.sidearm()): # the pistol comes out by itself
+			last_weapon = before
+			view.show_weapon(weapons.current)
+	if status.dead: # a ghost: no walking about, no shooting
+		firing = false
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not is_on_floor():
+			velocity.y -= Config.GRAVITY * delta
+		move_and_slide()
+		move_speed = 0.0
+		return
 	var ready := not weapons.is_reloading() and weapons.draw_left <= 0.0
 	var toggle: bool = Settings.get_value("aim_toggle")
 	if not toggle or not ready or aim_blocked or not captured:
 		_aim_latched = false # reloading, swapping, using a door or leaving the window lowers the sights
 	var held := _aim_latched if toggle else Input.is_action_pressed("aim")
-	var want_aim := debug_aim or (captured and not bot and not aim_blocked and held)
+	var want_aim := debug_aim or (captured and not bot and not aim_blocked and held and not wheel.open)
 	aiming = want_aim and ready and not move.is_vaulting()
 	view.stow_goal = 1.0 if move.is_vaulting() else 0.0
 	if move.is_vaulting():
@@ -172,12 +304,15 @@ func _physics_process(delta: float) -> void:
 		running = bot_sprint and bot_move != Vector3.ZERO and not aiming
 	else:
 		running = running and move.can_sprint() and not wants_crouch # winded or crouched: a walk
+	if status.downed:
+		running = false
+	check_use_cancel(running and move_speed > 0.1)
 	sprinting = (running or debug_sprint) and not aiming
-	var speed := move.speed(weapons.current, running, aiming)
+	var speed := Config.DOWNED_SPEED if status.downed else move.speed(weapons.current, running, aiming)
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
 	var fall_speed := maxf(0.0, -velocity.y)
-	if captured and not bot and Input.is_action_just_pressed("jump") and move.can_jump():
+	if captured and not bot and Input.is_action_just_pressed("jump") and move.can_jump() and not status.downed:
 		velocity.y = Config.JUMP_VELOCITY # also just after walking off an edge (coyote time)
 		move.jump()
 	elif not is_on_floor():
@@ -198,7 +333,7 @@ func _physics_process(delta: float) -> void:
 ## Strike with the gun's stock or muzzle. False if a swing is still going, you are too tired, or
 ## your hands are busy.
 func try_shove() -> bool:
-	if shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
+	if status.downed or status.dead or shove_left > 0.0 or move.is_vaulting() or move.stamina < Config.SHOVE_STAMINA:
 		return false
 	shove_left = Config.SHOVE_TIME
 	move.stamina -= Config.SHOVE_STAMINA
@@ -214,6 +349,16 @@ func action_bits() -> int:
 		bits |= PlayerWire.ACTION_CROUCH
 	if move.is_vaulting() or move.air_time > 0.1:
 		bits |= PlayerWire.ACTION_AIR
+	if move.is_vaulting():
+		bits |= PlayerWire.ACTION_VAULT
+	if aiming:
+		bits |= PlayerWire.ACTION_AIM
+	if weapons.is_reloading():
+		bits |= PlayerWire.ACTION_RELOAD
+	if shove_left > 0.0:
+		bits |= PlayerWire.ACTION_SHOVE
+	if throw_left > 0.0:
+		bits |= PlayerWire.ACTION_THROW
 	return bits
 
 
@@ -281,16 +426,95 @@ func _vault_step(delta: float) -> void:
 	sprinting = false
 
 
+## The hands go to what is being put on (a revive is hands on someone else, not this).
+func update_heal_view() -> void:
+	var healing := status.is_using() and Inventory.valid(status.using)
+	view.heal_goal = 1.0 if healing else 0.0
+	view.heal_t = status.use_total - status.use_left if healing else 0.0
+
+
+## Where the view points: the first wall or floor along it, or a spot well ahead in the open.
+func look_point() -> Vector3:
+	var from := camera.global_position
+	var dir := -camera.global_transform.basis.z
+	var to := from + dir * Config.PING_REACH
+	if is_inside_tree():
+		var q := PhysicsRayQueryParameters3D.create(from, to, Config.LAYER_WORLD)
+		var hit := get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			return hit.position
+	return to
+
+
+## Coming back: the view starts up on a truck bed and drops to the ground over `Config.ARRIVE_TIME`.
+func arrive() -> void:
+	arrive_left = Config.ARRIVE_TIME
+
+
+func step_arrival(delta: float) -> void:
+	arrive_left = maxf(0.0, arrive_left - delta)
+
+
+## Going down drops the eyes to the floor and tilts the view (`Config.DOWNED_FALL_TIME`); getting up
+## brings them back (`GETUP_TIME`). 0 = standing, 1 = on the floor.
+func step_down_view(delta: float) -> void:
+	var goal := 1.0 if status.downed else 0.0
+	var time := Config.DOWNED_FALL_TIME if goal > down_pose else Config.GETUP_TIME
+	down_pose = move_toward(down_pose, goal, delta / time)
+
+
+## How high the eyes are above the feet now.
+func view_height() -> float:
+	var u := arrive_left / Config.ARRIVE_TIME # a fall: slow off the edge, fast at the bottom
+	return lerpf(move.eye_height(), Config.DOWNED_EYE, Viewmodel._ease(down_pose)) + Config.ARRIVE_DROP * (1.0 - (1.0 - u) * (1.0 - u))
+
+
+## How far the view is tilted sideways now.
+func view_roll() -> float:
+	return Config.DOWNED_ROLL * Viewmodel._ease(down_pose)
+
+
 func _process(delta: float) -> void:
-	var origin := get_global_transform_interpolated().origin + Vector3(0, move.eye_height(), 0)
+	step_down_view(delta)
+	step_arrival(delta)
+	var origin := get_global_transform_interpolated().origin + Vector3(0, view_height(), 0)
+	if seat != null and is_instance_valid(seat):
+		origin = seat.global_position
 	weapons.step(delta)
 	shove_left = maxf(0.0, shove_left - delta)
+	throw_left = maxf(0.0, throw_left - delta)
 	fire_buffer -= delta
-	punch = punch.lerp(Vector2.ZERO, 1.0 - exp(-Config.RECOIL_RECOVER * delta))
-	camera.global_transform = Transform3D(Basis.from_euler(Vector3(pitch + punch.x, yaw + punch.y, 0)), origin)
+	step_recoil(delta)
+	if status.dead:
+		_place_spectator_camera(origin, delta)
+		return
+	_spectate_cam = Vector3.INF
+	_dead_t = 0.0
+	feel.scale = Settings.get_value("camera_motion")
+	feel.rumble = wash_shake
+	feel.step(delta, move_speed, sprinting, strafe_input, _mouse_accum, 1.0 + (1.0 - float(Weapons.GUN_SPRINT[weapons.current])) * 4.0)
+	_mouse_accum = Vector2.ZERO
+	var view_basis := Basis.from_euler(Vector3(pitch + punch.x + feel.angles.x, yaw + punch.y + feel.angles.y, view_roll() + feel.angles.z))
+	camera.global_transform = Transform3D(view_basis, origin + view_basis * feel.offset)
+	view.feel_sway = feel.sway
+	update_heal_view()
 	view.update(delta, move_speed, aiming, sprinting, weapons)
 	var zoom: float = weapons.def().ads_fov
-	camera.fov = lerpf(base_fov(), minf(zoom, base_fov()), Viewmodel._ease(view.aim))
+	camera.fov = lerpf(base_fov() + feel.fov_add, minf(zoom, base_fov()), Viewmodel._ease(view.aim))
+
+
+## The camera of a dead player: behind and above whoever they watch, easing after them, or slowly
+## round their own body when nobody is left. `origin` is where their eyes were.
+func _place_spectator_camera(origin: Vector3, delta: float) -> void:
+	_dead_t += delta
+	var focus := spectate_focus if spectate_following else global_position
+	var goal := Spectator.camera_goal(spectate_focus, spectate_yaw) if spectate_following else Spectator.orbit_goal(global_position, _dead_t)
+	_spectate_cam = origin if _spectate_cam == Vector3.INF else Spectator.follow(_spectate_cam, goal, delta)
+	var look := focus + Vector3(0, 1.4, 0) - _spectate_cam
+	if look.length() > 0.01: # (straight down at the first frame, from the eyes: pick another way up)
+		var up := Vector3.UP if absf(look.normalized().y) < 0.99 else Vector3.FORWARD
+		camera.global_transform = Transform3D(Basis.IDENTITY, _spectate_cam).looking_at(focus + Vector3(0, 1.4, 0), up)
+	view.update(delta, 0.0, false, false, weapons)
 
 
 ## The field of view the player chose (Config.FOV unless they changed it).

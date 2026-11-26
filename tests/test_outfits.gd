@@ -43,15 +43,12 @@ func test_outfits_look_different_from_each_other() -> void:
 
 
 func test_uniforms_come_with_headgear_that_stays_on_the_head() -> void:
-	var bare := Humanoid.create({ "zombie": true })
-	add_child(bare)
-	var bare_tris := _tris(bare.segs.head.mesh)
-	bare.free()
 	for outfit: int in HATTED:
 		var rig := Characters.zombie(3, Zombie.Type.WALKER, outfit)
 		add_child(rig)
 		var n: String = Characters.OUTFIT_NAMES[outfit]
-		assert_gt(_tris(rig.segs.head.mesh), bare_tris + 11, n + " wears something on its head")
+		var bare: Mesh = CharacterModel.body(Characters.is_female(3, outfit)).parts.head
+		assert_gt(_tris(rig.segs.head.mesh), bare.get_faces().size() / 3 + 11, n + " wears something on its head")
 		var before := _tris(rig.segs.head.mesh)
 		var parts := rig.sever(Humanoid.Part.HEAD)
 		assert_eq(parts.size(), 1)

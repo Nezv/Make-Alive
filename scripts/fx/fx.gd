@@ -18,11 +18,33 @@ extends Node3D
 enum Layer { CHIP, GLOW, SMOKE }
 enum Mark { HOLE, SCORCH, CRACK, PUDDLE }
 ## What travels on the wire. Append only: the numbers are the protocol.
-enum Kind { DUST, SPARKS, FLASH, SMOKE, BLAST, HOLE, CRACK, SPLASH }
-const NAMES := ["dust", "sparks", "flash", "smoke", "blast", "hole", "crack", "splash"]
+enum Kind { DUST, SPARKS, FLASH, SMOKE, BLAST, HOLE, CRACK, SPLASH, ARRIVAL, TRACER, IMPACT }
+const NAMES := ["dust", "sparks", "flash", "smoke", "blast", "hole", "crack", "splash", "arrival", "tracer", "impact"]
+## IMPACT's `arg` is the Surface.Kind it hit; plus IMPACT_HOLE_ONLY for one pellet of a pattern (a hole, no
+## puff), plus IMPACT_PUFF_ONLY for the pattern's one puff (no hole).
+const IMPACT_HOLE_ONLY := 100
+const IMPACT_PUFF_ONLY := 200
+## The dust each surface throws up.
+const IMPACT_DUST := {
+	Surface.Kind.CONCRETE: Color(0.58, 0.56, 0.53, 0.5), Surface.Kind.ASPHALT: Color(0.25, 0.25, 0.26, 0.5),
+	Surface.Kind.BRICK: Color(0.62, 0.32, 0.24, 0.55), Surface.Kind.METAL: Color(0.5, 0.5, 0.52, 0.3),
+	Surface.Kind.WOOD: Color(0.62, 0.5, 0.34, 0.45), Surface.Kind.GLASS: Color(0.75, 0.85, 0.9, 0.3),
+	Surface.Kind.DIRT: Color(0.32, 0.25, 0.18, 0.6), Surface.Kind.GRASS: Color(0.3, 0.28, 0.18, 0.5),
+	Surface.Kind.WATER: Color(0.75, 0.82, 0.88, 0.55), Surface.Kind.FLESH: Color(0.5, 0.05, 0.05, 0.5),
+	Surface.Kind.TILE: Color(0.85, 0.85, 0.83, 0.45),
+}
+## The chips that fly off it.
+const IMPACT_CHIP := {
+	Surface.Kind.CONCRETE: Color("77736c"), Surface.Kind.ASPHALT: Color("2a2a2c"), Surface.Kind.BRICK: Color("8a3e2c"),
+	Surface.Kind.METAL: Color("9aa0a6"), Surface.Kind.WOOD: Color("b49a6a"), Surface.Kind.GLASS: Color("c8dce4"),
+	Surface.Kind.DIRT: Color("4a3a28"), Surface.Kind.GRASS: Color("4e7a2e"), Surface.Kind.WATER: Color("b8c8d2"),
+	Surface.Kind.FLESH: Color("6a0a0a"), Surface.Kind.TILE: Color("e8e6e0"),
+}
 
 ## Counters (tests read these; handy for debugging too).
-var stats := { "played": 0, "bursts": 0, "lights": 0, "decals": 0, "trails": 0 }
+var stats := { "played": 0, "bursts": 0, "lights": 0, "decals": 0, "trails": 0, "impacts": 0 }
+var last_decal := Transform3D() ## where the last mark went (tests)
+var last_kind := -1 ## the last effect played (tests)
 var ground := Callable() ## map.ground_y: where chips come to rest (unset: y = 0)
 
 var _count_mult := 1.0
@@ -244,6 +266,10 @@ func play(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 	if kind < 0 or kind >= Kind.size():
 		return
 	stats.played += 1
+	last_kind = kind
+	if kind == Kind.IMPACT:
+		_impact(int(arg), pos, dir)
+		return
 	var s := maxf(arg, 0.1)
 	match kind:
 		Kind.DUST: # a bullet in concrete: a grey cone, a few chips
@@ -281,6 +307,85 @@ func play(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 			burst(Layer.SMOKE, pos, Vector3.UP, 7, { "speed": 3.0 * s, "spread": 0.2, "life": 0.5, "size": 0.1 * s,
 				"size_end": 0.35 * s, "color": Color(0.75, 0.82, 0.88, 0.55), "gravity": 9.0 })
 			decal(Mark.PUDDLE, pos, Vector3.UP, 0.7 * s)
+		Kind.TRACER: # a bright streak along `dir` for `arg` metres (the door gun; S030 makes the real ones)
+			var n := clampi(int(arg / 2.0), 3, 24)
+			for k in n:
+				burst(Layer.GLOW, pos + dir.normalized() * arg * (k + 0.5) / n, dir, 1, { "speed": 0.0, "spread": 0.0,
+					"life": 0.07, "size": 0.06, "size_end": 0.03, "color": Color(1.0, 0.85, 0.45), "gravity": 0.0 })
+		Kind.ARRIVAL: # a survivor jumps down off a truck bed: a ring of dust kicked out round the feet
+			var feet := Vector3(pos.x, _floor(pos) + 0.05, pos.z)
+			for k in 8:
+				var out := Vector3(cos(k * TAU / 8.0), 0.15, sin(k * TAU / 8.0))
+				burst(Layer.SMOKE, feet, out, 1, { "speed": 1.8 * s, "spread": 0.25, "life": 0.9, "size": 0.15 * s,
+					"size_end": 0.6 * s, "color": Color(0.5, 0.48, 0.44, 0.45), "gravity": -0.2 })
+			burst(Layer.CHIP, feet, Vector3.UP, 6, { "speed": 2.0, "spread": 0.9, "size": 0.03, "color": Color("6f6a62") })
+
+
+## A bullet struck surface `code` (a Surface.Kind, maybe plus IMPACT_HOLE_ONLY / IMPACT_PUFF_ONLY) at
+## `pos` whose normal is `n`.
+func _impact(code: int, pos: Vector3, n: Vector3) -> void:
+	var surface := code % 100
+	var hole := code < IMPACT_PUFF_ONLY
+	var puff := code < IMPACT_HOLE_ONLY or code >= IMPACT_PUFF_ONLY
+	if surface == Surface.Kind.FLESH or surface < 0 or surface >= Surface.Kind.size():
+		return
+	n = n.normalized() if n.length_squared() > 0.0001 else Vector3.UP
+	var dust: Color = IMPACT_DUST[surface]
+	var chip: Color = IMPACT_CHIP[surface]
+	if puff:
+		stats.impacts += 1
+		if surface == Surface.Kind.GLASS:
+			Sfx.play("glass_crack", pos, 0.1)
+	match surface:
+		Surface.Kind.WATER: # a column and rings, no hole
+			if puff:
+				burst(Layer.SMOKE, pos, Vector3.UP, 7, { "speed": 3.2, "spread": 0.18, "life": 0.5, "size": 0.08,
+					"size_end": 0.3, "color": dust, "gravity": 9.0 })
+				last_decal = decal(Mark.PUDDLE, pos, Vector3.UP, 0.6)
+			return
+		Surface.Kind.METAL: # sparks that arc and bounce, a bright flash, sometimes a ricochet
+			if puff:
+				burst(Layer.GLOW, pos, n, 14, { "speed": 7.0, "spread": 0.6, "life": 0.4, "size": 0.03, "size_end": 0.01,
+					"color": Color(1.0, 0.82, 0.4), "color_end": Color(1.0, 0.35, 0.05, 0.0), "gravity": 14.0 })
+				light(pos + n * 0.1, Color(1.0, 0.8, 0.5), 1.6, 3.0, 0.05)
+				if _rng.randf() < 0.3:
+					var away := (n + Vector3(_rng.randf_range(-0.6, 0.6), _rng.randf_range(0.0, 0.5), _rng.randf_range(-0.6, 0.6))).normalized()
+					burst(Layer.GLOW, pos, away, 3, { "speed": 30.0, "spread": 0.05, "life": 0.08, "size": 0.025,
+						"color": Color(1.0, 0.9, 0.6), "gravity": 0.0 })
+		Surface.Kind.WOOD: # pale splinters
+			if puff:
+				burst(Layer.CHIP, pos, n, 8, { "speed": 4.0, "spread": 0.7, "size": 0.03, "color": chip })
+				burst(Layer.SMOKE, pos, n, 2, { "speed": 0.8, "spread": 0.5, "life": 0.5, "size": 0.06, "size_end": 0.25, "color": dust })
+		Surface.Kind.GLASS: # a star crack and a spray of shards
+			last_decal = decal(Mark.CRACK, pos, n, 0.35)
+			if puff:
+				burst(Layer.CHIP, pos, n, 10, { "speed": 3.0, "spread": 0.9, "size": 0.02, "color": chip })
+			return
+		Surface.Kind.DIRT, Surface.Kind.GRASS: # clods, a dark puff, blades of grass
+			if puff:
+				burst(Layer.CHIP, pos, n, 7, { "speed": 3.5, "spread": 0.5, "size": 0.04, "color": chip })
+				burst(Layer.SMOKE, pos, n, 3, { "speed": 1.4, "spread": 0.4, "life": 0.7, "size": 0.1, "size_end": 0.5, "color": dust })
+				if surface == Surface.Kind.GRASS:
+					burst(Layer.CHIP, pos, Vector3.UP, 5, { "speed": 2.0, "spread": 0.6, "size": 0.02, "color": Color("6a9a3a") })
+		Surface.Kind.TILE: # white shards and a little crack
+			if puff:
+				burst(Layer.CHIP, pos, n, 7, { "speed": 3.0, "spread": 0.7, "size": 0.025, "color": chip })
+				burst(Layer.SMOKE, pos, n, 2, { "speed": 1.0, "spread": 0.45, "life": 0.5, "size": 0.06, "size_end": 0.3, "color": dust })
+			if hole:
+				decal(Mark.CRACK, pos, n, 0.16)
+		_: # concrete, asphalt, brick: a cone of dust and chips (brick: bigger, redder)
+			if puff:
+				var big := 1.5 if surface == Surface.Kind.BRICK else 1.0
+				burst(Layer.SMOKE, pos, n, 5, { "speed": 1.6, "spread": 0.45, "life": 0.7, "size": 0.12,
+					"size_end": 0.55 * big, "color": dust })
+				burst(Layer.CHIP, pos, n, 6, { "speed": 3.5, "spread": 0.6, "size": 0.035 * big, "color": chip })
+	if hole:
+		var col := Color(0.12, 0.12, 0.12)
+		match surface:
+			Surface.Kind.WOOD: col = Color(0.55, 0.45, 0.3) # pale torn wood
+			Surface.Kind.METAL: col = Color(0.3, 0.32, 0.35) # a dent with a shine
+			Surface.Kind.DIRT, Surface.Kind.GRASS: col = Color(0.15, 0.11, 0.08)
+		last_decal = decal(Mark.HOLE, pos, n, 0.09 if surface != Surface.Kind.DIRT else 0.14, col)
 
 
 # --- Every frame ------------------------------------------------------------------

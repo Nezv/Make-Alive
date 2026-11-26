@@ -69,6 +69,9 @@ var mission_kind: Label
 var mission_brief: Label
 var mission_route: Label
 var start_button: Button
+var mode := ""                 ## GameModes: how the picked mission is played ("" = free play at its POI)
+var mode_buttons := {}         ## mode id -> Button
+var mode_brief: Label
 var free_play_button: Button
 var name_edit: LineEdit
 var ip_edit: LineEdit
@@ -112,6 +115,7 @@ func _ready() -> void:
 		var east: bool = poi.at.x > 1600.0 # far east, by the panel: name on the left of the pin
 		var pin := PoiPin.new(id, Missions.INFO[id].title, KINDS[Missions.INFO[id].kind], east)
 		pin.pressed.connect(select.bind(id))
+		WorldSounds.wire_button(pin)
 		map_area.add_child(pin)
 		pins[id] = pin
 	map_area.resized.connect(_relayout)
@@ -140,9 +144,9 @@ func _ready() -> void:
 ## Every street the game builds, as screen polylines (CityData.STREETS order).
 func street_lines() -> Array:
 	var out := []
-	for street: Array in CityData.STREETS:
+	for street: Dictionary in CityData.STREETS:
 		var line := PackedVector2Array()
-		for p: Vector2 in street.slice(2):
+		for p: Vector2 in street.pts:
 			line.append(px_point(p))
 		out.append(line)
 	return out
@@ -154,12 +158,24 @@ func _draw_lines() -> void:
 	var lines := street_lines()
 	for pass_i in 2: # a soft glow under, the line on top
 		for i in lines.size():
-			var width: float = CityData.STREETS[i][1]
-			var w := maxf(1.2, width * scale * (0.55 if width >= CityData.AVENUE else 0.4))
+			var width := CityData.width(CityData.STREETS[i])
+			var major := width >= 12.0
+			var w := maxf(1.0, width * scale * (0.5 if major else 0.4))
 			if pass_i == 0:
 				lines_layer.draw_polyline(lines[i], Color(RED, 0.16), w * 3.5, true)
 			else:
-				lines_layer.draw_polyline(lines[i], RED if width >= CityData.AVENUE else RED.darkened(0.15), w, true)
+				lines_layer.draw_polyline(lines[i], RED if major else RED.darkened(0.15), w, true)
+
+
+## Pick how the match is played (a mode button, or `--mode=` on the command line).
+func set_mode(id: String) -> void:
+	if not GameModes.valid(id):
+		return
+	mode = id
+	for k: String in mode_buttons:
+		(mode_buttons[k] as Button).set_pressed_no_signal(k == id)
+	if mode_brief:
+		mode_brief.text = "Walk the town, no objective." if id == "" else String(GameModes.INFO[id].brief)
 
 
 ## Pick a mission (a pin was clicked, or `--mission=` on the command line).
@@ -267,6 +283,28 @@ func _build_panel() -> void:
 	mission_route.modulate = Color(1, 1, 1, 0.55)
 	v.add_child(mission_route)
 
+	var modes := HBoxContainer.new()
+	modes.add_theme_constant_override("separation", 4)
+	var group := ButtonGroup.new()
+	for id: String in [""] + GameModes.ORDER:
+		var b := Button.new()
+		b.text = "FREE PLAY" if id == "" else String(GameModes.INFO[id].title)
+		b.toggle_mode = true
+		b.button_group = group
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 12)
+		b.pressed.connect(set_mode.bind(id))
+		WorldSounds.wire_button(b)
+		modes.add_child(b)
+		mode_buttons[id] = b
+	v.add_child(modes)
+	mode_brief = Label.new()
+	mode_brief.autowrap_mode = TextServer.AUTOWRAP_WORD
+	mode_brief.add_theme_font_size_override("font_size", 12)
+	mode_brief.modulate.a = 0.6
+	v.add_child(mode_brief)
+	set_mode(mode)
+
 	start_button = Button.new()
 	start_button.text = "START MISSION"
 	start_button.custom_minimum_size.y = 52
@@ -284,9 +322,10 @@ func _build_panel() -> void:
 		if selected != "":
 			_save_name()
 			mission_pressed.emit(selected))
+	WorldSounds.wire_button(start_button)
 	v.add_child(start_button)
 	var note := Label.new()
-	note.text = "Objectives aren't built yet: a mission starts you at its POI on the city map."
+	note.text = "The mission's own objectives aren't built yet: the mode above sets what you do from its POI."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	note.add_theme_font_size_override("font_size", 12)
 	note.modulate.a = 0.4
@@ -296,6 +335,7 @@ func _build_panel() -> void:
 	free_play_button = Button.new()
 	free_play_button.text = "Training corridor (free play)"
 	free_play_button.pressed.connect(func(): _save_name(); host_pressed.emit())
+	WorldSounds.wire_button(free_play_button)
 	v.add_child(free_play_button)
 
 	var row := HBoxContainer.new()
@@ -307,6 +347,7 @@ func _build_panel() -> void:
 	var join := Button.new()
 	join.text = "Join"
 	join.pressed.connect(func(): _join(ip_edit.text))
+	WorldSounds.wire_button(join)
 	row.add_child(join)
 	v.add_child(row)
 	var lan_title := Label.new()
@@ -327,12 +368,15 @@ func _build_panel() -> void:
 	var quit := Button.new()
 	quit.text = "Quit"
 	quit.pressed.connect(func(): get_tree().quit())
+	WorldSounds.wire_button(quit, true)
 	v.add_child(quit)
 
 
 func open(message := "") -> void:
 	visible = true
 	status.text = message
+	if message != "":
+		Sfx.play_ui("ui_error", -6.0) # back here because something went wrong (refused, lost the host)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Net.start_listening()
 
@@ -376,6 +420,7 @@ func _process(delta: float) -> void:
 		var b := Button.new()
 		b.text = "%s's game · %d players · %s" % [g.name, g.players, ip]
 		b.pressed.connect(func(): _join(ip))
+		WorldSounds.wire_button(b)
 		lan_list.add_child(b)
 
 
