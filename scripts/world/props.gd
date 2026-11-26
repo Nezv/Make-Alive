@@ -206,6 +206,49 @@ static func helicopter(b: MeshKit.Builder, t: Transform3D) -> Array:
 		[V(1.6, 0.4, 6.6), V(1.8, 0.8, 2.4)]]
 
 
+## The transport helicopter that comes for you: olive cabin with both sliding doors open, the
+## cockpit glass, engine housing, the long tail boom with its fin and stabiliser, and skids.
+## The rotors are separate (`rotor`) because they turn. Skids touch y = 0; the main rotor hub is
+## at HELI_HUB, the tail rotor's at HELI_TAIL_HUB.
+const HELI_HUB := Vector3(0, 3.75, -0.3)
+const HELI_TAIL_HUB := Vector3(0.45, 3.0, 9.7)
+static func transport_helicopter(b: MeshKit.Builder, t: Transform3D) -> Array:
+	bx(b, t, V(2.4, 1.9, 4.6), V(0, 1.55, 0), OLIVE)                         # cabin
+	bx(b, t, V(2.2, 1.0, 0.3), V(0, 0.75, 0), OLIVE_DARK)                    # belly
+	bx(b, t, V(2.2, 1.5, 2.0), V(0, 1.5, -3.2), OLIVE)                       # nose
+	bx(b, t, V(1.9, 0.9, 1.3), V(0, 1.05, -4.6), OLIVE_DARK)                 # chin
+	bx(b, t, V(2.0, 0.9, 0.08), V(0, 2.1, -4.15), GLASS, Basis(Vector3.RIGHT, -0.5)) # windscreen
+	for side in [-1.0, 1.0]:
+		bx(b, t, V(0.06, 0.8, 1.6), V(side * 1.12, 1.85, -3.1), GLASS)         # cockpit side windows
+		bx(b, t, V(0.06, 1.45, 1.9), V(side * 1.22, 1.45, 0.4), SOOT)          # open sliding door...
+		bx(b, t, V(0.08, 1.45, 1.9), V(side * 1.3, 1.45, 2.2), OLIVE_DARK)     # ...slid back
+		bx(b, t, V(0.1, 0.1, 5.2), V(side * 1.3, 0.06, -0.5), STEEL)           # skid
+		for z in [-1.8, 1.0]:
+			bx(b, t, V(0.1, 0.75, 0.1), V(side * 1.2, 0.42, z), STEEL, Basis(Vector3.FORWARD, side * 0.25))
+		bx(b, t, V(0.1, 0.1, 0.5), V(side * 1.3, 0.16, -3.2), STEEL, Basis(Vector3.RIGHT, -0.5)) # skid tip
+	bx(b, t, V(1.6, 0.8, 3.2), V(0, 2.85, 0.2), OLIVE_DARK)                  # engine housing
+	bx(b, t, V(0.5, 0.4, 0.5), V(0, 2.9, 1.9), SOOT)                         # exhaust
+	bx(b, t, V(0.24, 0.55, 0.24), HELI_HUB + V(0, -0.3, 0), STEEL)           # mast
+	bx(b, t, V(0.9, 0.9, 4.0), V(0, 2.2, 4.2), OLIVE)                        # tail boom
+	bx(b, t, V(0.6, 0.6, 3.4), V(0, 2.45, 7.7), OLIVE)
+	bx(b, t, V(0.15, 2.0, 1.3), V(0, 3.2, 9.6), OLIVE, Basis(Vector3.RIGHT, -0.3)) # fin
+	bx(b, t, V(3.0, 0.08, 0.8), V(0, 2.3, 8.8), OLIVE_DARK)                  # stabiliser
+	bx(b, t, V(0.9, 0.6, 0.06), V(0, 1.9, 2.32), WHITE)                      # a number on the back
+	return [[V(0, 1.5, -1.0), V(2.4, 2.4, 7.0)]]
+
+
+## Rotor blades round the hub, in the hub's own space: `count` blades `radius` long, flat (or,
+## with `upright`, turning about X for a tail rotor).
+static func rotor(b: MeshKit.Builder, radius: float, count: int, chord: float, upright := false) -> void:
+	for i in count:
+		var a := TAU * i / count
+		var rot := Basis(Vector3.UP, a) if not upright else Basis(Vector3.RIGHT, a)
+		var along := rot * V(0, 0, -radius * 0.5) if not upright else rot * V(0, radius * 0.5, 0)
+		var size := V(chord, 0.06, radius) if not upright else V(0.06, radius, chord)
+		b.box(size, along, DARK, rot)
+	b.box(V(0.5, 0.25, 0.5), Vector3.ZERO, STEEL)
+
+
 # --- Barricades -------------------------------------------------------------------
 
 ## A wall of sandbags `length` long (along X), `rows` bags high.

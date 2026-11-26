@@ -32,6 +32,7 @@ var local_player: LocalPlayer
 var hud: Hud
 var gore: Gore
 var fx: Fx
+var helicopter: Helicopter = null ## the one coming for everyone, when the map has a spot for it (cosmetic, local)
 var extraction: ExtractionZone = null ## the open way out's look, while its objective is up
 var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host, debug)
 var hooks: GameHooks
@@ -339,6 +340,38 @@ func _update_extraction() -> void:
 		var c := map.data.zone_center(zone)
 		extraction = ExtractionZone.create(map.data, zone, fx, map.ground_y(c))
 		world.add_child(extraction)
+
+
+## The helicopter of a map whose data has a `heli` spot: on its way in while the last wave's
+## helicopter clock runs, over its spot while the extraction runs, flying off once it is won.
+## Every peer works it out from `mission_view` alone; nothing about it is sent.
+func _update_helicopter(delta: float) -> void:
+	var spot: Dictionary = map.data.raw.get("heli", {}) if map != null else {}
+	if spot.is_empty():
+		return
+	var status: int = mission_view.get("status", MissionRules.Status.IDLE)
+	var kind: String = mission_view.get("kind", "")
+	var want := ""
+	if status == MissionRules.Status.RUNNING and kind == "survive" and mission_view.get("heli", false):
+		want = "arrive"
+	elif status == MissionRules.Status.RUNNING and kind == "extract":
+		want = "hover"
+	elif status == MissionRules.Status.WON and helicopter != null:
+		want = "depart"
+	if want == "":
+		if helicopter != null:
+			helicopter.queue_free()
+			helicopter = null
+		return
+	if helicopter == null:
+		var at: Vector3 = spot.at
+		helicopter = Helicopter.new()
+		helicopter.setup(Transform3D(Basis(Vector3.UP, spot.get("yaw", 0.0)), at), fx, spot.get("floor", at.y))
+		world.add_child(helicopter)
+	match want:
+		"arrive": helicopter.arrive(Config.HELI_FLIGHT - float(mission_view.get("left", 0.0)))
+		"hover": helicopter.hover(delta)
+		"depart": helicopter.depart(delta)
 
 
 ## Between two messages from the host every peer counts the objective's clock down itself.
@@ -1062,6 +1095,7 @@ func _process(delta: float) -> void:
 	hud.set_objective(mission_view, zombies.size())
 	hud.set_countdown(mission_view)
 	_update_extraction()
+	_update_helicopter(delta)
 	var status: int = mission_view.status
 	if status == MissionRules.Status.WON or status == MissionRules.Status.FAILED:
 		hud.show_end(status == MissionRules.Status.WON, mission_view.reason)

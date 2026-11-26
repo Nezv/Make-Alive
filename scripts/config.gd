@@ -217,3 +217,15 @@ const LAYER_ZOMBIE := 4    # zombie movement capsules
 const LAYER_HITBOX := 8    # per-body-part areas that bullets hit
 const LAYER_INTERACT := 16 # things you can right-click
 const LAYER_DEBRIS := 32   # gibs and ragdolls
+
+# --- The extraction helicopter (scripts/fx/helicopter.gd) ---
+const HELI_FLIGHT := 45.0          # seconds from first sight to settling on its spot
+const HELI_FROM := Vector3(0, 140, 700) # where it is first seen, in its landing spot's own space (behind it, high)
+const HELI_CIRCLE := 70.0          # radius of the circle it flies once round its spot
+const HELI_ROTOR_RPS := 4.6        # main rotor turns per second (the tail rotor five times that)
+const HELI_BLUR_RPS := 2.0         # above this the blades are drawn as a blur disc
+const HELI_STROBE_EVERY := 1.1     # seconds between white strobe flashes
+const HELI_WASH_HEIGHT := 30.0     # the rotor wash raises dust when it is this low over its spot
+const HELI_WASH_EVERY := 0.06      # seconds between puffs of it
+const HELI_SWAY := 0.25            # metres it drifts about in the hover
+const HELI_CLIMB := 7.0            # m/s it climbs away at once everyone is aboard
