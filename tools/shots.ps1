@@ -33,6 +33,23 @@ foreach ($m in 'terminal', 'hospital', 'prefeitura', 'batalhao', 'mirante') {
     $shots["${m}_landmark"] = @('--host', "--mission=$m", '--no-hordes', '--poi-cam')
 }
 
+# The Prefeitura from every side (references/prefeitura_elements.md): front, air, top, door, lawn,
+# roof, stair tower, the avenue from the forecourt, the back.
+$pref = @('--host', '--mission=prefeitura', '--no-hordes')
+$prefCams = [ordered]@{
+    'pref_front'     = '308.8,7.0,-649.4,-90.0,0.7'
+    'pref_air'       = '285.8,48.0,-594.4,-59.9,-20.9'
+    'pref_air_north' = '300.8,40.0,-709.4,-126.2,-18.5'
+    'pref_top'       = '388.8,150.0,-649.4,-90.0,-89.0'
+    'pref_door'      = '356.8,1.8,-656.4,-109.3,4.6'
+    'pref_lawn'      = '324.8,1.7,-623.4,-71.6,3.3'
+    'pref_roof'      = '362.8,28.0,-619.4,-35.0,-14.9'
+    'pref_tower'     = '360.8,6.0,-701.4,-120.2,6.4'
+    'pref_avenue'    = '369.8,2.6,-649.4,90.0,-0.6'
+    'pref_back'      = '432.8,30.0,-659.4,102.8,-24.0'
+}
+foreach ($k in $prefCams.Keys) { $shots[$k] = $pref + "--shot-cam=$($prefCams[$k])" }
+
 $made = @()
 foreach ($name in $shots.Keys) {
     if ($Filter -and $name -notlike "*$Filter*") { continue }

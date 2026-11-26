@@ -435,6 +435,36 @@ class Builder:
 			pts.append(Vector2(0, height))
 		return lathe(pts, pos, color, segments, rot, xf)
 
+	## A flat-faced rectangular frustum: `bottom` (x, z) at its foot (`pos`), `top` (x, z) `height`
+	## above, the top moved by `shift` (x, z). Buttresses, plinths that widen to the ground, hoppers,
+	## wedges (a `top` of zero depth). Shaded darker at the foot like the other kit shapes. 12 triangles.
+	func frustum(bottom: Vector2, top: Vector2, height: float, pos: Vector3, color: Color,
+			rot := Basis.IDENTITY, xf := Transform3D.IDENTITY, shift := Vector2.ZERO) -> Builder:
+		var t := xf * Transform3D(rot, pos)
+		var lo_c := []
+		var hi_c := []
+		for k: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			lo_c.append(Vector3(k.x * bottom.x * 0.5, 0, k.y * bottom.y * 0.5))
+			hi_c.append(Vector3(k.x * top.x * 0.5 + shift.x, height, k.y * top.y * 0.5 + shift.y))
+		var mid := Vector3(shift.x * 0.5, height * 0.5, shift.y * 0.5)
+		var c0 := _graded(color, 0.0)
+		var c1 := _graded(color, 1.0)
+		for i in 4:
+			var a: Vector3 = lo_c[i]
+			var b: Vector3 = lo_c[(i + 1) % 4]
+			var c: Vector3 = hi_c[(i + 1) % 4]
+			var d: Vector3 = hi_c[i]
+			var n := (b - a).cross(d - a).normalized()
+			if n.dot((a + b + c + d) * 0.25 - mid) < 0.0:
+				n = -n
+			var wn := (t.basis * n).normalized()
+			_tri3(t * a, t * b, t * c, wn, wn, wn, c0, c0, c1)
+			_tri3(t * a, t * c, t * d, wn, wn, wn, c0, c1, c1)
+		var up := (t.basis * Vector3.UP).normalized()
+		_tri3(t * hi_c[0], t * hi_c[1], t * hi_c[2], up, up, up, c1, c1, c1)
+		_tri3(t * hi_c[0], t * hi_c[2], t * hi_c[3], up, up, up, c1, c1, c1)
+		return self
+
 	## A lumpy rounded mass of `radii` centred at `pos`: canopy clumps, bushes, sandbags, rocks,
 	## heaps. `lump` (0..0.4) dents it, from `key` (the same key, the same shape on every peer).
 	## `flat` cuts the bottom flat at that fraction of the height (0.5 = a half dome on the ground).

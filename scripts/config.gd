@@ -187,7 +187,7 @@ const BOT_TIME_SCALE := 8.0     # bot playtests run this many times faster than 
 # --- Performance budget (scripts/budget.gd, tests/test_budget.gd). Raise one only on purpose. ---
 const BUDGET := {
 	"corridor": { "meshes": 12, "surfaces": 12, "lights": 8, "shadow_lights": 2, "shapes": 20, "worst_view": 11 }, # +1: the checkpoint's lamp
-	"city": { "meshes": 16, "surfaces": 16, "lights": 17, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 }, # lights +3: the Mirante gate, guard hut and snack bar
+	"city": { "meshes": 16, "surfaces": 16, "lights": 18, "shadow_lights": 2, "shapes": 26000, "worst_view": 14 }, # lights +3: the Mirante gate, guard hut and snack bar; +1 the Prefeitura door
 }
 const BUDGET_HOST_TICK_MS := 16.6  # the host's tick with ZOMBIE_MAX zombies must fit one 60 Hz frame
 const BUDGET_PACKET_BYTES := 1392  # a snapshot larger than this is split by the network and may stall

@@ -51,6 +51,7 @@ var boundary := PackedVector2Array() ## the map's edge, (x, z) in metres
 var building_count := 0
 var landmarks := {}
 var prop_counts := {}               ## set piece props by kind
+var prefeitura := {}                 ## the Prefeitura's lot frame (-Z to the avenue), its door and its pad (world)
 var mirante := {}                    ## where the Mirante's pieces stand (world): gate, gate_yaw, tower, deck, poles, rails
 var roadside_trees: Array = []       ## [{ at, kind }]: the real trees (Vegetation) lining the forest's roads
 
@@ -154,10 +155,12 @@ func zombie_spawn_point(avoid: Array) -> Vector3:
 	return last
 
 
-## The Mirante has its own objectives, built from where its gate and tower ended up.
+## The Mirante and the Prefeitura have their own objectives, built from where their pieces ended up.
 func _mission_changed() -> void:
 	if mission == "mirante" and mirante.has("gate") and nav != null:
 		use_data(MapAreas.mirante(self))
+	elif mission == "prefeitura" and prefeitura.has("pad") and nav != null:
+		use_data(MapAreas.prefeitura(self))
 	else:
 		use_data({})
 
@@ -720,20 +723,82 @@ func _terminal(c: Vector3) -> void:
 	_label(CityData.POIS.terminal.name, c + Vector3(0, 6.6, 34.25), 150, Color("e8e4d8"))
 
 
-## Prefeitura: a long seven-floor slab and an annex, with the flag poles out front.
+## Prefeitura: the long four-storey block facing west over its lawn to Avenida Hermann August
+## Lepper and the river (PrefeituraSet): brick piers, concrete bands, blue space frames, the stair
+## tower, the towers on the roof. In front: the forecourt, the walk down the middle, the zig-zag
+## ramp, the sign on the lawn, flower beds, imperial palms along the avenue, the car park to the
+## north and the round pad on the south lawn. A last stand was made at the door.
+## `prefeitura` keeps the lot's frame (-Z faces the avenue) and where the mission's places are.
+const PREFEITURA_BUILDING_Z := 18.0  # the block's centre, metres back from the POI point
 func _prefeitura(c: Vector3) -> void:
-	var stone := Color("a39d8e")
-	var h := 7 * Config.CITY_FLOOR_H
-	_solid(c + Vector3(4, h * 0.5, -28), Vector3(84, h, 24), stone)
-	_solid(c + Vector3(30, 4.8, 26), Vector3(30, 9.6, 20), stone.darkened(0.15))
-	for f in range(1, 7):
-		_b.box(Vector3(80, 1.3, 0.12), c + Vector3(4, f * Config.CITY_FLOOR_H + 1.7, -15.95), Props.GLASS)
-	_b.box(Vector3(18, 3.4, 0.3), c + Vector3(4, 1.7, -15.9), SHOPFRONT) # the doors
-	_b.box(Vector3(22, 0.4, 6), c + Vector3(4, 3.8, -13), stone.darkened(0.3))
-	for i in 3:
-		_b.box(Vector3(0.15, 11.0, 0.15), c + Vector3(-20.0 + i * 3.0, 5.5, -9), Props.STEEL)
-		_b.box(Vector3(1.8, 1.1, 0.05), c + Vector3(-19.0 + i * 3.0, 10.2, -9), [Color("2a7a3a"), Color("b8b8a8"), Color("a01e1e")][i])
-	_label(CityData.POIS.prefeitura.name, c + Vector3(4, h - 2.2, -15.85), 170, Color("2a2a2a"))
+	var lot := Transform3D(Basis(Vector3.UP, PI * 0.5), c)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 18510320
+	var bt := lot * Transform3D(Basis.IDENTITY, Vector3(0, 0, PREFEITURA_BUILDING_Z))
+	_put(PrefeituraSet.building(_b, _glow, bt), bt)
+	_put_free(PrefeituraSet.canopy_columns(), bt)
+	_lamp(bt * PrefeituraSet.ENTRANCE_LAMP, 1.8, 12.0, Config.LOOK_LAMP_WARM)
+	prefeitura.frame = lot
+	prefeitura.door = bt * Vector3(0, 0, -PrefeituraSet.DEPTH * 0.5 - PrefeituraSet.CENTRE_OUT)
+	# The ground: paving along the front and down the middle, grass either side, the car park.
+	var y := 0.035
+	for r: Array in [[-40.0, -2.0, 40.0, 9.0], [-14.0, -12.0, 14.0, -2.0], [-3.0, -58.0, 3.0, -12.0]]:
+		_patch(lot, r, y, PrefeituraSet.PAVING)
+	for r: Array in [[-45.0, -58.0, -14.0, -2.0], [14.0, -58.0, 45.0, -2.0], [-14.0, -58.0, -3.0, -12.0], [3.0, -58.0, 14.0, -12.0]]:
+		_patch(lot, r, y, PrefeituraSet.GRASS)
+	_patch(lot, [22.0, -52.0, 44.0, -24.0], y + 0.01, PrefeituraSet.ASPHALT)
+	for k in 9: # bay lines, cars nose in from the aisle
+		_patch(lot, [22.0, -50.0 + k * 3.0, 27.5, -49.9 + k * 3.0], y + 0.02, PrefeituraSet.LINE)
+		_patch(lot, [38.5, -50.0 + k * 3.0, 44.0, -49.9 + k * 3.0], y + 0.02, PrefeituraSet.LINE)
+	for k in 6:
+		var row_x := 24.8 if k % 2 == 0 else 41.2
+		var t := lot * Transform3D(Basis(Vector3.UP, PI * 0.5 + rng.randf_range(-0.12, 0.12) + (PI if k % 2 == 1 else 0.0)), Vector3(row_x, 0, -47.0 + k * 4.4))
+		var paint: Color = RoadProps.PAINTS[rng.randi() % RoadProps.PAINTS.size()]
+		_put(RoadProps.hatchback(_b, t, paint, rng.randi_range(0, 2)), t)
+	# The pad on the south lawn, the sign, the ramp, beds, lamps, flags, palms.
+	var pad := lot * Transform3D(Basis.IDENTITY, Vector3(-31, 0, -38))
+	PrefeituraSet.pad(_b, pad, _glow)
+	prefeitura.pad = pad.origin
+	var sign_t := lot * Transform3D(Basis(Vector3.UP, 0.12), Vector3(-13, 0, -24))
+	_put_free(PrefeituraSet.lawn_sign(_b, sign_t), sign_t)
+	_label("Prefeitura Municipal de Joinville", sign_t * (PrefeituraSet.SIGN_AT + Vector3(0, 0, -0.08)), 30, PrefeituraSet.SIGN_TEXT,
+		rad_to_deg(sign_t.basis.get_euler().y) + 180.0)
+	_put_free(PrefeituraSet.ramp(_b, _g, lot, Vector3(7, 0, -52), Vector3(11, 0, -13), 3, 5.0, 2.2), lot)
+	for e: Array in [[-6.5, -13.5, 4.0, 1.6], [6.5, -13.5, 4.0, 1.6], [-22.0, -3.2, 7.0, 1.2], [22.0, -3.2, 7.0, 1.2]]:
+		PrefeituraSet.flower_bed(_b, lot * Transform3D(Basis.IDENTITY, Vector3(e[0], 0, e[1])), e[2], e[3], int(e[0]) + 50)
+	for z in [-50.0, -38.0, -26.0]:
+		for x in [-4.2, 4.2]:
+			var t := lot * Transform3D(Basis.IDENTITY, Vector3(x, 0, z))
+			_put_free(PrefeituraSet.lamp_post(_b, t, _glow, z == -26.0 and x > 0.0), t)
+	for k in 3:
+		PrefeituraSet.flag(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-11.0 - k * 1.7, 0, 4.4)), k)
+	for x in [-40.0, -28.0, -16.0, 16.0, 30.0, 42.0]:
+		var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(x, 0, -55.5))
+		_put_free(Vegetation.plant(_trees, t, Vegetation.Kind.IMPERIAL_PALM, rng), t)
+	# The last stand at the door: sandbags either side of the walk, a patrol car and an ambulance
+	# left across the forecourt, a bench dragged over, things dropped, a body dragged inside.
+	for x in [-4.4, 4.4]:
+		var t := lot * Transform3D(Basis(Vector3.UP, 0.08 if x < 0.0 else -0.08), Vector3(x, 0, -5.5))
+		_put_free(Props.sandbags(_b, t, 5.0, 3), t)
+	var car := lot * Transform3D(Basis(Vector3.UP, 0.55), Vector3(-10.5, 0, -4.0))
+	_put_free(RoadProps.patrol_car(_b, car, _glow), car)
+	var amb := lot * Transform3D(Basis(Vector3.UP, -1.9), Vector3(11.5, 0, -7.0))
+	_put_free(Props.ambulance(_b, amb), amb)
+	var bench := lot * Transform3D(Basis(Vector3.UP, 1.2), Vector3(-6.5, 0, -9.0))
+	_put_free(RoadProps.bench(_b, bench, true), bench)
+	RoadProps.litter(_b, lot * Transform3D(Basis.IDENTITY, Vector3(2.5, 0.0, -8.5)), 5, rng, _glow)
+	RoadProps.litter(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-2.0, 0.0, 1.5)), 4, rng, _glow)
+	var ground_at := func(_p: Vector3) -> float: return c.y
+	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, PI), Vector3(0.8, 0, -6.0)), 11.0, rng, ground_at)
+
+
+## A flat patch of ground in the frame `t`: `r` is [x0, z0, x1, z1] in that frame, `y` above it.
+func _patch(t: Transform3D, r: Array, y: float, color: Color) -> void:
+	var x0: float = r[0]
+	var z0: float = r[1]
+	var x1: float = r[2]
+	var z1: float = r[3]
+	_g.ground_quad(t * Vector3(x0, y, z0), t * Vector3(x1, y, z0), t * Vector3(x1, y, z1), t * Vector3(x0, y, z1), color)
 
 
 ## 62º Batalhão: a walled compound with barracks, headquarters, a parade ground and a motor pool.
