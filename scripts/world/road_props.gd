@@ -6,20 +6,21 @@ class_name RoadProps
 ## [[center, size, basis?], ...] in its own space. Scattered detail takes the caller's seeded rng,
 ## never randf, so every peer builds the same road. RoadScatter decides where they go.
 
-const PAINTS := [Color("8a2222"), Color("2a4a8a"), Color("b8b8b0"), Color("3a3a3e"), Color("6a7a3a"),
-	Color("c8a030"), Color("5a2a5a"), Color("9a9a9e"), Color("1e3a3a")]
-const TAXI_WHITE := Color("e2e2da")
-const BUS_LINE := Color("2a7a4a")         ## the green of the town's bus line
-const GUARDA_BLUE := Color("1a3a7a")      ## Guarda Municipal
-const BARK := Color("4a3a2a")
-const BARK_DARK := Color("34281c")
-const LEAF := Color("2a4a24")
-const LEAF_DARK := Color("1c3318")
-const BLOOD := Color("4a0606")
-const BLOOD_DARK := Color("2a0303")
+## Alpha is the surface class (MeshKit): cc = PAINT, glossy.
+const PAINTS := [Color("8a2222cc"), Color("2a4a8acc"), Color("b8b8b0cc"), Color("3a3a3ecc"), Color("6a7a3acc"),
+	Color("c8a030cc"), Color("5a2a5acc"), Color("9a9a9ecc"), Color("1e3a3acc")]
+const TAXI_WHITE := Color("e2e2dacc")
+const BUS_LINE := Color("2a7a4acc")         ## the green of the town's bus line
+const GUARDA_BLUE := Color("1a3a7acc")      ## Guarda Municipal
+const BARK := Color("4a3a2a4d")        ## BARK
+const BARK_DARK := Color("34281c4d")
+const LEAF := Color("2a4a2433")        ## LEAF
+const LEAF_DARK := Color("1c331833")
+const BLOOD := Color("4a0606cc")      ## wet: PAINT
+const BLOOD_DARK := Color("2a0303cc")
 const BAG_BLACK := Color("18181a")
-const BIN_GREEN := Color("2a5a2a")
-const BIN_ORANGE := Color("c86a1a")
+const BIN_GREEN := Color("2a5a2acc")
+const BIN_ORANGE := Color("c86a1acc")
 const RUBBISH := [Color("8a7a5a"), Color("c8c8c0"), Color("5a6a7a"), Color("7a3a2a"), Color("3a5a3a")]
 const STUFF := [Color("7a2a2a"), Color("2a4a7a"), Color("3a3a3a"), Color("c86a1a"), Color("3a6a4a"),
 	Color("7a4a7a"), Color("d8c040"), Color("2a8a9a")]
@@ -30,7 +31,7 @@ static func V(x: float, y: float, z: float) -> Vector3:
 
 
 static func bx(b: MeshKit.Builder, t: Transform3D, size: Vector3, pos: Vector3, color: Color, rot := Basis.IDENTITY) -> void:
-	b.box(size, pos, color, rot, t)
+	b.rbox(size, pos, color, -1.0, rot, t)
 
 
 ## A door hung on its front edge at `hinge` (side -1 left, 1 right), swung open by `open` radians.

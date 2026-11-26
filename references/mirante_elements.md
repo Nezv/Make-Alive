@@ -4,6 +4,8 @@ Everything that belongs on Morro da Boa Vista, from the gate at the foot to the 
 summit, and whether the game has it yet. Built from `mirante_entrance.jpg`, `mirante_street.jpg`,
 the topography map, and what is written about the place (sources at the bottom).
 
+Art quality: everything here has had the pass in `references/asset_quality.md` (bevels, trims, details, materials); its inventory says what is left.
+
 Legend: [x] built · [~] built roughly, needs a better pass · [ ] not built yet.
 Code: `scripts/world/mirante_set.gd` (the pieces), `scripts/world/vegetation.gd` (plants),
 `CityMap._hill_road` / `_mirante` (where they go), `MapAreas.mirante` (the mission's data).
@@ -33,7 +35,7 @@ Code: `scripts/world/mirante_set.gd` (the pieces), `scripts/world/vegetation.gd`
 - [x] A few street lamps on the poles, most dark: long unlit stretches
 - [x] Galvanised guard rails round the outside of the sharp bends
 - [x] Atlantic forest walls both sides: broad canopy trees, tree ferns (xaxim), juçara palms, araucárias, ipês in bloom
-- [~] Herringbone paver pattern itself (texture or a pattern in the mesh)
+- [x] Paver pattern (a basket weave drawn by the world shader's PAVERS class; the brick lane is BRICK)
 - [ ] Grass verge between the brick lane and the forest
 - [ ] Tall grass, bamboo clumps and lianas hanging off the trees
 - [ ] Canopy closing over the road (branches reaching across)

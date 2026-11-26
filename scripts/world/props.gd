@@ -13,21 +13,22 @@ const TAN_DARK := Color("8a7850")
 const CONCRETE := Color("8a8c8e")
 const CONCRETE_DARK := Color("6a6c6f")
 const DARK := Color("1b1b1e")
-const TYRE := Color("141416")
-const GLASS := Color("16212b")
-const STEEL := Color("5a5e64")
+const TYRE := Color("1414161a")   ## alpha = surface class (MeshKit): SOOT
+const GLASS := Color("16212b66")  ## GLASS
+const STEEL := Color("5a5e6499")  ## METAL
 const RUST := Color("5a3320")
 const WHITE := Color("d4d4cc")
-const RED := Color("a01e1e")
+const RED := Color("a01e1ecc")
 const WOOD := Color("6a4a2c")
-const HAZARD := Color("d8b21a")
-const BRASS := Color("b8922e")
-const SOOT := Color("0e0e0f")
+const HAZARD := Color("d8b21acc") ## PAINT
+const BRASS := Color("b8922e99")
+const SOOT := Color("0e0e0f1a")
 
 
+## Every prop box is bevelled (MeshKit.rbox): edges catch the light, nothing reads as a raw cube.
 static func bx(b: MeshKit.Builder, t: Transform3D, size: Vector3, pos: Vector3, color: Color,
 		rot := Basis.IDENTITY) -> void:
-	b.box(size, pos, color, rot, t)
+	b.rbox(size, pos, color, -1.0, rot, t)
 
 
 static func V(x: float, y: float, z: float) -> Vector3:
@@ -35,10 +36,12 @@ static func V(x: float, y: float, z: float) -> Vector3:
 
 
 static func _wheels(b: MeshKit.Builder, t: Transform3D, half_w: float, zs: Array, r := 0.5, tw := 0.36) -> void:
+	var axle := Basis(Vector3.FORWARD, PI * 0.5)
 	for z: float in zs:
 		for side in [-1.0, 1.0]:
-			bx(b, t, V(tw, r * 2.0, r * 2.0), V(side * half_w, r, z), TYRE)
-			bx(b, t, V(tw + 0.02, r * 0.9, r * 0.9), V(side * half_w, r, z), STEEL) # hub
+			b.rcyl(r, tw, V(side * half_w, r, z), TYRE, 14, minf(0.08, r * 0.3), axle, t)   # tyre, round shoulders
+			b.rcyl(r * 0.55, tw + 0.03, V(side * half_w, r, z), STEEL, 10, 0.03, axle, t)  # rim
+			b.rcyl(r * 0.18, tw + 0.07, V(side * half_w, r, z), STEEL.darkened(0.3), 6, 0.01, axle, t) # hub nut
 
 
 # --- Vehicles ---------------------------------------------------------------------
@@ -385,7 +388,9 @@ static func floodlight(b: MeshKit.Builder, t: Transform3D) -> Array:
 
 
 static func barrel(b: MeshKit.Builder, t: Transform3D, color := RUST) -> Array:
-	b.cyl(0.3, 0.9, V(0, 0.45, 0), color, 8, Basis.IDENTITY, t)
+	b.rcyl(0.3, 0.9, V(0, 0.45, 0), color, 14, 0.03, Basis.IDENTITY, t)
+	for y in [0.3, 0.6]: # the rolling hoops
+		b.rcyl(0.312, 0.035, V(0, y, 0), color.darkened(0.15), 14, 0.01, Basis.IDENTITY, t)
 	return [[V(0, 0.45, 0), V(0.6, 0.9, 0.6)]]
 
 
@@ -464,9 +469,16 @@ static func casings(b: MeshKit.Builder, t: Transform3D, count: int, rng: RandomN
 	return []
 
 
+## Traffic cone: a square rubber foot, an orange body turned round with two reflective bands.
 static func cone(b: MeshKit.Builder, t: Transform3D) -> Array:
-	bx(b, t, V(0.36, 0.04, 0.36), V(0, 0.02, 0), DARK)
-	bx(b, t, V(0.22, 0.3, 0.22), V(0, 0.19, 0), Color("e0661a"))
-	bx(b, t, V(0.24, 0.08, 0.24), V(0, 0.26, 0), WHITE)
-	bx(b, t, V(0.12, 0.25, 0.12), V(0, 0.46, 0), Color("e0661a"))
+	var orange := Color("e0661acc")
+	bx(b, t, V(0.38, 0.04, 0.38), V(0, 0.02, 0), TYRE)
+	b.lathe(PackedVector2Array([V2(0, 0.04), V2(0.15, 0.04), V2(0.135, 0.12), V2(0.112, 0.26), V2(0.09, 0.4),
+		V2(0.05, 0.66), V2(0.032, 0.7), V2(0, 0.71)]), V(0, 0, 0), orange, 12, Basis.IDENTITY, t)
+	b.taper(0.127, 0.116, 0.07, V(0, 0.19, 0), Color("e8e8e0cc"), 12, Basis.IDENTITY, t)
+	b.taper(0.091, 0.085, 0.05, V(0, 0.42, 0), Color("e8e8e0cc"), 12, Basis.IDENTITY, t)
 	return []
+
+
+static func V2(x: float, y: float) -> Vector2:
+	return Vector2(x, y)

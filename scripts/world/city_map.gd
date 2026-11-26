@@ -652,10 +652,10 @@ func _label(text: String, pos: Vector3, size: int, color: Color, yaw_deg := 0.0)
 	root.add_child(l)
 
 
-func _lamp(pos: Vector3, energy := 3.0, reach := 34.0) -> void:
+func _lamp(pos: Vector3, energy := 3.0, reach := 34.0, color := Color("ffd9a0")) -> void:
 	var light := OmniLight3D.new()
 	light.position = pos
-	light.light_color = Color("ffd9a0")
+	light.light_color = color
 	light.light_energy = energy
 	light.omni_range = reach
 	root.add_child(light)
@@ -772,7 +772,12 @@ func _mirante(c: Vector3) -> void:
 	for piece: Array in [[Vector3(-14, 0, -12), 160.0, "snack_bar"], [Vector3(-13, 0, 10), 20.0, "toilets"], [Vector3(6, 0, 16), 180.0, "booth"]]:
 		var t := _on_ground(c + (piece[0] as Vector3), piece[1])
 		match piece[2]:
-			"snack_bar": _put(MiranteSet.snack_bar(_b, t), t)
+			"snack_bar":
+				_put(MiranteSet.snack_bar(_b, t), t)
+				_label("LANCHONETE", t * (MiranteSet.SNACK_SIGN_AT + Vector3(0, 0, -0.01)), 26, Color("8a2a10"), rad_to_deg(t.basis.get_euler().y) + 180.0)
+				for sx in [-1.2, 1.2]: # the sign's two lamps, still on, and the light they throw
+					_glow.box(Vector3(0.14, 0.03, 0.14), t * Vector3(sx, 4.11, -2.72), Color.WHITE)
+				_lamp(t * Vector3(0, 3.6, -3.4), 1.6, 9.0, Config.LOOK_LAMP_WARM)
 			"toilets": _put(MiranteSet.toilets(_b, t), t)
 			"booth": _put(Props.booth(_b, t), t)
 	for mast: Array in [[Vector3(-6, 0, -26), 26.0], [Vector3(26, 0, 6), 20.0]]:
@@ -844,6 +849,11 @@ func _hill_road() -> void:
 	mirante.gate_yaw = yaw
 	_label("MORRO DA BOA VISTA", gate * (MiranteSet.GATE_SIGN_AT + Vector3(0, 0.15, -0.02)), 46, MiranteSet.SIGN_GREEN, rad_to_deg(yaw) + 180.0)
 	_label("ÁREA DE RELEVANTE INTERESSE ECOLÓGICO", gate * (MiranteSet.GATE_SIGN_AT + Vector3(0, -0.5, -0.02)), 17, MiranteSet.SIGN_GREEN, rad_to_deg(yaw) + 180.0)
+	# Warm light under the roof and over the guard hut's door: the gate is the last lit place.
+	var hut := Vector3(width * 0.5 + 0.8 + 2.4, 0, 3.0)
+	_lamp(gate * Vector3(0, 8.4, 1.0), 2.2, 16.0, Config.LOOK_LAMP_WARM)
+	_lamp(gate * (hut + Vector3(0.4, 2.2, 2.1)), 1.2, 7.0, Config.LOOK_LAMP_WARM)
+	_glow.box(Vector3(0.2, 0.03, 0.2), gate * (hut + Vector3(0.4, 2.39, 1.62)), Color.WHITE, gate.basis)
 	# Flowers by the gate, as in the photo: hibiscus and bougainvillea, a purple ipê.
 	for bush: Array in [[Vector3(-width * 0.5 - 2.5, 0, -3), Vegetation.Kind.HIBISCUS], [Vector3(-width * 0.5 - 3.0, 0, 2), Vegetation.Kind.HIBISCUS],
 			[Vector3(width * 0.5 + 6.0, 0, -2), Vegetation.Kind.BOUGAINVILLEA], [Vector3(-width * 0.5 - 4.0, 0, 9), Vegetation.Kind.IPE_PURPLE],
@@ -886,12 +896,9 @@ func _hill_road() -> void:
 			var b := q * w
 			var mid := (a + b) * 0.5 + Vector3(0, -0.9 if w.y < 8.0 else -0.6, 0)
 			var thick := 0.1 if w.y < 8.0 else 0.04
-			for seg: Array in [[a, mid], [mid, b]]:
-				var s0: Vector3 = seg[0]
-				var s1: Vector3 = seg[1]
-				if s0.distance_to(s1) < 0.1:
-					continue
-				_b.box(Vector3(thick, thick, s0.distance_to(s1)), (s0 + s1) * 0.5, Props.DARK, Basis.looking_at((s1 - s0).normalized(), Vector3.UP))
+			if a.distance_to(b) < 0.1:
+				continue
+			_b.tube(MeshKit.sag(a, b, (mid.y - (a.y + b.y) * 0.5) * -1.0, 10), thick * 0.5, Props.DARK, 5)
 	# Guard rails round the outside of every sharp bend on the hill.
 	var walked := 0.0
 	for i in range(1, line.size() - 1):

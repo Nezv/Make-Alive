@@ -48,6 +48,7 @@ var names := {}          ## peer id -> player name, on every peer (sent when som
 var zombies := {}        ## zombie id -> Zombie
 var zombie_list: Array[Zombie] = [] ## same zombies as an array, refreshed each host tick
 var looked_at: Interactable = null
+var environment: Environment  ## the world's look; post effects follow the graphics tier (_apply_tier_look)
 var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellets (tests seed it)
 
 # Host-only
@@ -151,6 +152,8 @@ func _build_world() -> void:
 		env.ambient_light_energy = 0.6
 		env.fog_light_color = Color("151b28")
 		env.fog_density = 0.011
+	environment = env
+	_apply_tier_look(Settings.get_value("graphics_tier"))
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -952,6 +955,32 @@ func play_fx(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 func _on_setting_changed(key: String) -> void:
 	if key == "graphics_tier":
 		fx.set_tier(Settings.get_value(key))
+		_apply_tier_look(Settings.get_value(key))
+
+
+## The post effects that make the procedural models read like the art references (soft contact
+## shadows, lamps that bloom, a touch of colour grading): SSAO and glow from medium up, SSIL on
+## high. Numbers are in Config (LOOK_*). Low turns them all off.
+func _apply_tier_look(tier: String) -> void:
+	if environment == null:
+		return
+	var env := environment
+	var on := tier != "low"
+	env.ssao_enabled = on
+	env.ssao_radius = Config.LOOK_SSAO_RADIUS
+	env.ssao_intensity = Config.LOOK_SSAO_INTENSITY
+	env.ssao_power = Config.LOOK_SSAO_POWER
+	env.ssao_light_affect = 0.15
+	env.ssil_enabled = tier == "high"
+	env.ssil_intensity = Config.LOOK_SSIL_INTENSITY
+	env.glow_enabled = on
+	env.glow_intensity = Config.LOOK_GLOW_INTENSITY
+	env.glow_bloom = Config.LOOK_GLOW_BLOOM
+	env.glow_hdr_threshold = Config.LOOK_GLOW_THRESHOLD
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	env.adjustment_enabled = on
+	env.adjustment_contrast = Config.LOOK_CONTRAST
+	env.adjustment_saturation = Config.LOOK_SATURATION
 
 
 # --- Every peer: gore -------------------------------------------------------------
