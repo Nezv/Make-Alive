@@ -1,0 +1,12 @@
+{
+ "view": "front",
+ "ppm": 300,
+ "refs": {
+  "zinc_row.jpg": {
+   "px": [[368, 505], [548, 505], [545, 768], [372, 768]],
+   "m": [[-0.65, 1.95], [0.65, 1.95], [0.65, 0.0], [-0.65, 0.0]],
+   "crop": [-1.2, -0.2, 1.2, 2.7],
+   "note": "the front's jambs 1.30 apart (its casement taken as 0.95 x 1.9); seen from above, so the cap and the cheeks stand off by their depth"
+  }
+ }
+}

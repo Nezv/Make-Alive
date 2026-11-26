@@ -30,15 +30,35 @@ func on_low_hp(player_id: int) -> void:
 func on_player_damaged(player_id: int, amount: int, by: Zombie) -> void:
 	fired.emit(&"on_player_damaged", [player_id, amount, by])
 	game.score.add(player_id, "damage", amount)
+	game.director.hurt(amount) # being hurt is what the pacing feels
 
 
 func on_player_died(player_id: int) -> void:
 	fired.emit(&"on_player_died", [player_id])
 	game.feed.rpc("%s was eaten" % game.player_name(player_id))
+	game.drop_backpack(player_id) # what they carried stays where they fell
+	game.clear_status(player_id)
 	if game.rules.running() and not game.rules.respawn:
-		game.rules.set_out(player_id, true) # no way back on this mission: with everyone out it is lost
+		game.rules.set_out(player_id, true) # no way back yet: with everyone out the mission is lost
+		game.mark_dead(player_id)
 	else:
 		game.respawn_player(player_id, "died")
+
+
+## A player is back on their feet at the spawn (or the checkpoint): `reason` is "died", "respawn" (the
+## timer), "checkpoint" or "spawn" (joining).
+func on_player_respawned(player_id: int, reason: String) -> void:
+	fired.emit(&"on_player_respawned", [player_id, reason])
+
+
+## Someone said something in the chat (the dead too).
+func on_chat(player_id: int, text: String) -> void:
+	fired.emit(&"on_chat", [player_id, text])
+
+
+## Someone marked a spot for everyone.
+func on_ping(player_id: int, spot: Vector3) -> void:
+	fired.emit(&"on_ping", [player_id, spot])
 
 
 func on_player_joined(player_id: int) -> void:
@@ -112,17 +132,33 @@ func on_right_click(player_id: int, target: Interactable) -> void:
 		on_right_click_ammo_box(player_id, target)
 	elif target is AmmoCrate:
 		on_right_click_ammo_crate(player_id, target)
+	elif target is Backpack:
+		on_right_click_backpack(player_id, target)
 
 
 func on_right_click_door(player_id: int, door: Door) -> void:
 	fired.emit(&"on_right_click_door", [player_id, door])
+	var was_open := door.is_open
 	door.toggle()
+	if door.is_open != was_open:
+		game.play_sound("door_open" if door.is_open else "door_close", _door_at(door), Config.WORLD_SOUND_JITTER, Config.DOOR_SOUND_DB)
+
+
+## Where a door's sounds come from: the middle of its panel.
+func _door_at(door: Door) -> Vector3:
+	return door.global_position + Vector3(0, Door.HEIGHT * 0.45, 0)
 
 
 func on_right_click_lootbox(player_id: int, box: Lootbox) -> void:
 	fired.emit(&"on_right_click_lootbox", [player_id, box])
+	var wanted := StringName(box.loot)
+	if not box.opened and Inventory.valid(wanted) and game.inventory_room(player_id, wanted) <= 0:
+		game.refuse_to(player_id, "Can't carry any more %s" % Inventory.item_name(wanted)) # it stays shut for later
+		game.play_sound("latch", box.global_position + Vector3(0, 0.5, 0))
+		return
 	var item := box.try_open()
 	if item != "":
+		game.play_sound("lootbox_open", box.global_position + Vector3(0, 0.5, 0))
 		on_loot_received(player_id, item)
 
 
@@ -170,26 +206,93 @@ func on_right_click_ammo_box(player_id: int, box: AmmoBox) -> void:
 ## The military crate: a couple of cartons of whatever the gun in the player's hands is fed with.
 func on_right_click_ammo_crate(player_id: int, crate: AmmoCrate) -> void:
 	fired.emit(&"on_right_click_ammo_crate", [player_id, crate])
-	if crate.locked or crate.uses <= 0 or not game.players.has(player_id):
+	if crate.locked:
+		game.play_sound("locked_rattle", crate.global_position + Vector3(0, 0.5, 0))
+		return
+	if crate.uses <= 0 or not game.players.has(player_id):
 		return
 	var type := Weapons.ammo_of(game.players[player_id].weapon)
 	var carton: int = Weapons.AMMO[type].box
 	var got := game.give_ammo(player_id, type, carton * Config.AMMO_CRATE_BOXES)
 	if got > 0 and crate.use(): # a full player wastes no use
+		game.play_sound("crate_open", crate.global_position + Vector3(0, 0.5, 0))
 		on_ammo_picked_up(player_id, type, got)
 
 
 ## `rounds` of a calibre (Weapons.Ammo) went into a player's reserve from a box, a crate or a drop.
 func on_ammo_picked_up(player_id: int, ammo_type: int, rounds: int) -> void:
 	fired.emit(&"on_ammo_picked_up", [player_id, ammo_type, rounds])
+	_pickup_sound(player_id, "ammo_clink")
 
 
+## A pickup's sound at the player who took it.
+func _pickup_sound(player_id: int, sound: String) -> void:
+	if game.players.has(player_id):
+		var pos: Vector3 = game.players[player_id].pos
+		game.play_sound(sound, pos + Vector3(0, 1.0, 0), Config.WORLD_SOUND_JITTER, Config.PICKUP_SOUND_DB)
+
+
+## What a lootbox held, by Inventory id: it goes in the player's pack.
 func on_loot_received(player_id: int, item: String) -> void:
 	fired.emit(&"on_loot_received", [player_id, item])
-	match item:
-		"medkit":
-			game.heal_player(player_id, Config.MEDKIT_HEAL)
-			game.feed.rpc("%s found a medkit (+%d HP)" % [game.player_name(player_id), Config.MEDKIT_HEAL])
+	if Inventory.valid(StringName(item)) and game.give_item(player_id, StringName(item)) > 0:
+		game.feed.rpc("%s found a %s" % [game.player_name(player_id), Inventory.item_name(StringName(item)).to_lower()])
+
+
+# --- Inventory --------------------------------------------------------------------
+
+## `count` of an item went into a player's inventory (found, looted, handed out).
+func on_item_picked_up(player_id: int, item: StringName, count: int) -> void:
+	fired.emit(&"on_item_picked_up", [player_id, item, count])
+	_pickup_sound(player_id, "medkit_zip" if item in [&"medkit", &"bandage"] else "rummage")
+
+
+func on_key_picked_up(player_id: int, key: StringName) -> void:
+	fired.emit(&"on_key_picked_up", [player_id, key])
+	_pickup_sound(player_id, "key_jingle")
+
+
+## A player used an item (it is on, and the host already took it out of their inventory): this is what it does.
+## Throwables have no effect yet: S093 writes theirs here.
+func on_item_used(player_id: int, item: StringName) -> void:
+	fired.emit(&"on_item_used", [player_id, item])
+	if item == Inventory.PAINKILLERS:
+		game.players[player_id].health.add_temp(Config.PAINKILLERS_TEMP)
+		return
+	if item != Inventory.MEDKIT and item != Inventory.BANDAGE:
+		return
+	var health: Health = game.players[player_id].health
+	var before := health.hp
+	game.heal_player(player_id, Config.MEDKIT_HEAL if item == Inventory.MEDKIT else Config.BANDAGE_HEAL)
+	(game.players[player_id].status as PlayerStatus).stop_bleeding()
+	game._sync_status(player_id)
+	on_player_healed(player_id, item, health.hp - before)
+
+
+## A heal finished: `amount` HP came back (and the wounds closed).
+func on_player_healed(player_id: int, item: StringName, amount: int) -> void:
+	fired.emit(&"on_player_healed", [player_id, item, amount])
+
+
+## A zombie's hit opened another wound: `stacks` are bleeding now.
+func on_player_bleeding(player_id: int, stacks: int) -> void:
+	fired.emit(&"on_player_bleeding", [player_id, stacks])
+
+
+## What a player was putting on was knocked off (a hit) or abandoned (a sprint). The item is still theirs.
+func on_item_use_cancelled(player_id: int, item: StringName) -> void:
+	fired.emit(&"on_item_use_cancelled", [player_id, item])
+
+
+## A dead player's inventory is lying where they fell.
+func on_backpack_dropped(player_id: int, pack: Backpack) -> void:
+	fired.emit(&"on_backpack_dropped", [player_id, pack])
+
+
+## Someone takes what they can from a backpack; what does not fit stays in it.
+func on_right_click_backpack(player_id: int, pack: Backpack) -> void:
+	fired.emit(&"on_right_click_backpack", [player_id, pack])
+	game.loot_backpack(player_id, pack)
 
 
 # --- Zombies ----------------------------------------------------------------------
@@ -227,6 +330,11 @@ func on_zombie_leap_landed(zombie: Zombie) -> void:
 	fired.emit(&"on_zombie_leap_landed", [zombie])
 
 
+## The director's pace changed: `state` is a HordeDirector.State (CALM, BUILD, PEAK, RELAX).
+func on_pacing_changed(state: int) -> void:
+	fired.emit(&"on_pacing_changed", [state])
+
+
 func on_horde_incoming(wave: int, count: int) -> void:
 	fired.emit(&"on_horde_incoming", [wave, count])
 	game.announce.rpc("HORDE INCOMING  ·  wave %d" % wave)
@@ -237,6 +345,13 @@ func on_horde_incoming(wave: int, count: int) -> void:
 ## Zombies smashed a door down.
 func on_door_broken(door: Door) -> void:
 	fired.emit(&"on_door_broken", [door])
+	game.play_sound("door_break", _door_at(door), Config.WORLD_SOUND_JITTER, Config.DOOR_SOUND_DB)
+
+
+## A zombie's blow landed on a closed door that held (for now).
+func on_door_bashed(door: Door, zombie: Zombie) -> void:
+	fired.emit(&"on_door_bashed", [door, zombie])
+	game.play_sound("door_splinter", _door_at(door), 0.12, Config.DOOR_SOUND_DB)
 	game.feed.rpc("The door has been smashed!")
 
 
@@ -244,3 +359,13 @@ func on_door_broken(door: Door) -> void:
 ## `by_player` is 0 when no player caused it.
 func on_noise(position: Vector3, loudness: float, by_player: int) -> void:
 	fired.emit(&"on_noise", [position, loudness, by_player])
+
+
+## A player climbed into the landed helicopter.
+func on_heli_boarded(player_id: int) -> void:
+	fired.emit(&"on_heli_boarded", [player_id])
+
+
+## Everyone still standing is aboard: the helicopter lifts off with them.
+func on_heli_departed(player_ids: Array) -> void:
+	fired.emit(&"on_heli_departed", [player_ids])

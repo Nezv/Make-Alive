@@ -1,0 +1,104 @@
+{
+ "view": "front",
+ "ppm": 160,
+ "refs": {
+  "frontal_wood.jpg": {
+   "px": [
+    [
+     130,
+     480
+    ],
+    [
+     1765,
+     480
+    ],
+    [
+     1765,
+     1300
+    ],
+    [
+     130,
+     1300
+    ]
+   ],
+   "m": [
+    [
+     -2.4,
+     2.54
+    ],
+    [
+     2.4,
+     2.54
+    ],
+    [
+     2.4,
+     0.13
+    ],
+    [
+     -2.4,
+     0.13
+    ]
+   ],
+   "crop": [
+    -2.9,
+    -0.1,
+    2.9,
+    3.9
+   ],
+   "open": {
+    "door": 1,
+    "shutters": 1
+   },
+   "note": "the side boxes' outsides 4.80 apart (the scale: the table, 0.75 m, and the chair inside)"
+  },
+  "brown_frontal.jpg": {
+   "px": [
+    [
+     310,
+     360
+    ],
+    [
+     1560,
+     360
+    ],
+    [
+     1560,
+     1070
+    ],
+    [
+     310,
+     1070
+    ]
+   ],
+   "m": [
+    [
+     -2.4,
+     2.73
+    ],
+    [
+     2.4,
+     2.73
+    ],
+    [
+     2.4,
+     0.0
+    ],
+    [
+     -2.4,
+     0.0
+    ]
+   ],
+   "crop": [
+    -2.9,
+    -0.1,
+    2.9,
+    3.9
+   ],
+   "open": {
+    "door": 0,
+    "shutters": 1
+   },
+   "note": "pilasters' outsides taken as 4.80: proportions only"
+  }
+ }
+}

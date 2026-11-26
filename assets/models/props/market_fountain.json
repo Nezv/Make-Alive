@@ -1,0 +1,40 @@
+{
+ "name": "market_fountain",
+ "family": "monument",
+ "size": [
+  9.0,
+  14.151961524227067,
+  9.0
+ ],
+ "min": [
+  -4.5,
+  0.0,
+  -4.5
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  3026,
+  1466,
+  680
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  3.0,
+  -1.2
+ ]
+}

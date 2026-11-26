@@ -1,0 +1,401 @@
+# To verify by a human
+
+Things that are quick for a person to judge by eye or ear and that no test can: looks, sounds, feel.
+Open the page: `python tools/verify_page.py` writes `references/verify.html` from this file and the
+pictures and sounds on disk (make them first with `tools\shots.ps1` and `tools\sounds.ps1`). Each check
+there has OK / Issue buttons and a note; "Copy verdicts" puts them on the clipboard as Markdown to paste
+back here or into chat.
+
+## Format (verify_page.py reads it)
+
+- `## name` is a section of the page.
+- `- [ ] **id** · title (step) — what to judge` is one check; `[x]` once a person has passed it.
+- Indented under a check: `- see: glob, glob` (pictures, `.wav` sounds, `.html` pages to show, paths from
+  the project folder), `- ref: glob` (reference photos shown beside them), `- make: command` (how to
+  remake what it shows), `- src: glob` (the sources: the page flags a picture older than them as stale),
+  `- note: text` (what the person found).
+- **Every step that makes something to look at or listen to adds its checks here before it is closed**,
+  adds its shots to `tools\shots.ps1` or its sounds to `tools/sound_sheet.gd` when they are not there yet,
+  and reruns `python tools/verify_page.py`. A check stays open until a person ticks it.
+
+## Zombies
+
+- [ ] **bodies** · Generic bodies, male and female (S136) — the faces read angry (V brow over sunk sockets, glowing slit eyes, downturned mouth with teeth); proportions and colours match `zombies.png`; female narrower at waist and shoulders; nothing gapes where two pieces meet.
+  - see: references/shots/model_body.png, references/shots/model_body_*.png, references/shots/body_faces.png, references/shots/sketch_body.png, references/shots/sketch_face.png
+  - ref: references/zombies.png, references/shots/measure_zombies.png
+  - make: tools\blender.ps1 tools\models\body.py
+  - src: tools/models/body.py, tools/models/poly.py
+- [ ] **bodies_posed** · Bodies in the game, still and in poses (S136) — the torso break stays closed in walk and attack; no spikes or inverted faces at shoulders, hips, knees.
+  - see: references/shots/body_rack*.png
+  - make: tools\shots.ps1 body_rack
+  - src: assets/models/zombie_body_*.glb
+- [ ] **skeleton** · Skeleton model (S136) — reads as a skeleton at a glance; skull sockets sit behind the eyes; ribs, pelvis and limbs in proportion; nothing pokes out of the male body when fitted.
+  - see: references/shots/model_skeleton*.png
+  - make: tools\blender.ps1 tools\models\skeleton.py
+  - src: tools/models/skeleton.py
+- [ ] **outfits** · Nine outfits on both bodies (S137) — each reads as its job at a glance (civilian, worker, nurse, doctor, cop, soldier, firefighter, office, prisoner); no skin poking through cloth; hats sit on the head; colours plain per garment (details come with S139 / S235).
+  - see: references/shots/model_outfits.png, references/shots/model_zombie_*_front.png, references/shots/model_zombie_*_three_quarter.png, references/shots/model_zombie_*_back.png
+  - make: tools\blender.ps1 tools\models\outfits.py
+  - src: tools/models/clothes.py, tools/models/outfits.py
+- [ ] **outfits_posed** · Outfits bending in the game's poses (S137) — no pinched or folded cloth at shoulders, elbows, hips and knees in walk, run and attack.
+  - see: references/shots/outfit_rack_1.png, references/shots/outfit_rack_2.png, references/shots/outfit_rack_3.png, references/shots/outfit_rack_1_back.png, references/shots/outfit_rack_*_walk.png, references/shots/outfit_rack_*_run.png, references/shots/outfit_rack_*_attack.png, references/shots/sketch_outfit_*.png
+  - make: tools\shots.ps1 outfit_rack
+  - src: assets/models/zombie_*_m.glb, assets/models/zombie_*_f.glb
+- [ ] **stumps** · Severed arm, leg and head on the outfits (S137) — every stump closed by a wound, no see-through holes, bone stub showing.
+  - see: references/shots/outfit_rack_*_stumps*.png, references/shots/outfit_rack_1_headless.png
+  - make: tools\shots.ps1 stumps
+- [ ] **bites** · Ten bite variants on the female nurse (S138) — each hole ragged (not a clean cut) with a blood-dark rim; only that region's bones show; you never see through; the right place on the body (abdomen l/r, ribs, chest, shoulder, upper arm, forearm, thigh, calf, neck).
+  - see: references/shots/bites_nurse_f.png, references/shots/bites_nurse_f_game.png, references/shots/bite_rack_*.png, references/shots/bite_zombie_nurse_f_b*_close.png, references/shots/bite_zombie_nurse_f_b*_wide.png
+  - make: python tools/models/outfits.py --bites nurse --f
+  - src: tools/models/bites.py
+- [ ] **zombies_ingame** · Every outfit standing in the corridor, front and back, and the demo line-up — lit well enough to read; eyes glow; the feral leaper on the round body does not look out of place next to the models.
+  - see: references/shots/zombie_rack_*.png, references/shots/demo_zombies.png
+  - make: tools\shots.ps1 zombie_rack
+
+## Survivors and first person
+
+- [ ] **viewmodel** · First-person gun poses (S034, S015, S016) — aim, sprint carry, reload, inspect, shove, heal and downed read clearly; the gun sits naturally in frame. Known gap: the hands are boxes until S142.
+  - see: references/shots/view_*.png
+  - make: tools\shots.ps1 view_
+- [ ] **guns** · The nine gun models side on (S013) — each recognisable (P19, P90, Type 95, AK47, AS Val, USAS-12, SPAS-12, T-5000, Dragunov); blockouts until the gun-model steps (S143..).
+  - see: references/shots/gun_rack.png
+  - make: tools\shots.ps1 gun_rack
+  - src: scripts/models/guns.gd
+- [ ] **survivors** · Other players as you see them (S038) — aiming, reloading on the run, shoving, throwing, healing, down: each pose reads from across a room.
+  - see: references/shots/survivor_rack.png
+  - make: tools\shots.ps1 survivor_rack
+- [ ] **wheel** · Item wheel (S014) — eight wedges, icons readable, the lit one clear, counts visible.
+  - see: references/shots/item_wheel.png
+  - make: tools\shots.ps1 item_wheel
+- [ ] **death** · Death camera, the body and zombies feeding (S017) — the body lies believably, the feeding zombies crouch over it, the spectator camera frames it.
+  - see: references/shots/feed_death.png
+  - make: tools\shots.ps1 feed_death
+  - note: agent, 2026-11-24: at 2.2 s the shot shows the spectator camera on a teammate over plain black, no body or feeding zombies in frame; check in the game whether the camera sits above the corridor's ceiling or the shot is just too early.
+- [ ] **heli** · Helicopter landing (S024) — rotor blur, skids on the ground, dust, lights; scale right next to a person.
+  - see: references/shots/heli_landing.png
+  - make: tools\shots.ps1 heli_landing
+  - note: agent, 2026-11-24: the shot catches it still 26 m off down the corridor; judge it in the game with `--heli`.
+
+## Effects
+
+- [ ] **fx** · Every effect looping in a row (S004, S029..S032) — blood, gibs, impacts per surface, muzzle flash, smoke, sparks: each reads as what it is; nothing is a flat white quad.
+  - see: references/shots/fx_rack.png
+  - make: tools\shots.ps1 fx_rack
+  - src: scripts/fx/*.gd
+
+## Elements
+
+- [ ] **hydrant** · The hydrant, last review round (S140) — beside the photos: shape, red paint, wear, the four states.
+  - see: references/elements/reviews/hydrant_rfinal.jpg, references/shots/prop_rack_hydrant.png, references/shots/review_hydrant_*.png, references/shots/sketch_hydrant.png
+  - ref: references/elements/hydrant/*.jpg
+  - make: python tools/models/review.py hydrant --round=final
+- [ ] **kit** · The detail kit's board, last round, in every state (S141) — bricks, setts, tiles, plaster, glass, lettering, wear: each sample reads as its material beside the photos; clean, abandoned, damaged and burnt differ clearly.
+  - see: references/elements/reviews/kit_r5*.jpg, references/shots/prop_rack_kit.png, references/shots/sketch_kit*.png
+  - ref: references/elements/kit/*.jpg
+  - make: python tools/models/review.py kit --round=5
+- [ ] **window_french** · The French casement, round 2 (S157) — the cast garde-corps (oval, rosette, scrolls, lattice) reads as tall_railing's; pentures and pins on the persiennes, the catch; jet d'eau on the leaves; the sill's drip; persiennes open flat against the wall without passing through it.
+  - see: references/elements/reviews/window_french_r2*.*, references/shots/sketch_window_french.png
+  - ref: references/elements/window_french/*.jpg
+  - make: python tools/models/review.py window_french --round=2
+  - src: tools/models/props/windows.py
+- [ ] **shopfront** · The shopfront, round 2 (S158) — fluted pilasters with console capitals, the fascia's rosette blocks, the rolled striped store, studded night shutters with hooked bars, letterbox and kick plate, counter and shelves behind the glass; nothing reads as a box.
+  - see: references/elements/reviews/shopfront_r2*.*, references/shots/sketch_shopfront.png
+  - ref: references/elements/shopfront/*.jpg
+  - make: python tools/models/review.py shopfront --round=2
+  - src: tools/models/props/shopfronts.py
+- [ ] **chimney_stacks** · Chimney stacks, round 2 (S159) — the extension pipes and hats, the cowl, the broken pot, the aerial on the long stack read as pots_antennas and stacks_rows; the render band and rungs.
+  - see: references/elements/reviews/chimney_stack*_r2*.*, references/shots/sketch_chimney_stack*.png
+  - ref: references/elements/chimney_stack/*.jpg
+  - make: python tools/models/review.py chimney_stack_long --round=2
+  - src: tools/models/props/roofs.py
+- [ ] **dormer** · The zinc dormer, round 2 (S159) — leaves open into the room clear of the frame; standing seams and the cornice's drip on the cap; the jambs' panels; the flashing on the slope.
+  - see: references/elements/reviews/dormer_r2*.*, references/shots/sketch_dormer.png
+  - ref: references/elements/dormer/*.jpg
+  - make: python tools/models/review.py dormer --round=2
+  - src: tools/models/props/roofs.py
+- [ ] **balcony** · Stone balconies on consoles, round 1 (S159) — the slab's moulding and rounded ends, the consoles' volutes, the railing's hearts read as consoles_front; the long one across three bays; at 50 m the railing still reads as bars.
+  - see: references/elements/reviews/balcony*_r1*.*, references/shots/sketch_balcony*.png
+  - ref: references/elements/balcony/*.jpg
+  - make: python tools/models/review.py balcony --round=1
+  - src: tools/models/props/roofs.py
+- [ ] **mansard** · The mansard bay, round 1 (S159) — slates in rows with a few missing, the zinc roll at the break, the terrasson's seams, the gutter's lip, the tabatière; slates not a checkerboard; at 80 m the slope still reads as slate.
+  - see: references/elements/reviews/mansard_r1*.*, references/shots/sketch_mansard.png
+  - ref: references/elements/mansard/*.jpg
+  - make: python tools/models/review.py mansard --round=1
+  - src: tools/models/props/roofs.py, tools/models/surfaces.py
+- [ ] **manholes** · Manhole covers and the gas valve, round 1 (S155) — the round cover in its square frame reads as round_ballu (rings, EAUX / ÉGOUTS the right way round, the studs' checker in the bake); the square one's diamonds; GAZ; the cover pried off beside an open shaft.
+  - see: references/elements/reviews/manhole*_r1*.*, references/elements/reviews/valve_cover_r1*.*, references/shots/sketch_manhole*.png
+  - ref: references/elements/manhole/*.jpg
+  - make: python tools/models/review.py manhole --round=1
+  - src: tools/models/props/road.py
+- [ ] **lamps** · The candélabre and the wall lantern, round 1 (S166) — the post's sections in louvre's proportions (pedestal, bell, collar, fluted shaft, capital), the lantern's shape; the wall bracket's scrolls; the glass glows warm at night.
+  - see: references/elements/reviews/lamp_post_r1*.*, references/elements/reviews/wall_lantern_r1*.*, references/shots/sketch_lamp_post.png, references/shots/sketch_wall_lantern.png
+  - ref: references/elements/lamp_post/*.jpg
+  - make: python tools/models/review.py lamp_post --round=1
+  - src: tools/models/props/lamps.py
+- [ ] **street_small** · Double bench, borne and guard bar, round 1 (S173) — the bench's end frame reads as end_frame's (post, crest, brackets, rings, shield); slats green, frames pale; the borne leans and is nicked, not halved; the guard bar curves smoothly into the wall.
+  - see: references/elements/reviews/bench_double_r1*.*, references/elements/reviews/borne_r1*.*, references/elements/reviews/guard_bar_r1*.*
+  - ref: references/elements/bench_double/*.jpg
+  - make: python tools/models/review.py bench_double --round=1
+  - src: tools/models/props/street_small.py
+- [ ] **signs** · Street plate and road signs, round 1 (S169) — the plate reads as plate_beaubourg (blue, green frame, rosettes, arch); STOP, give-way and no-entry read at 30 m and match the French standard's colours; the rails and clamps sit behind the plates.
+  - see: references/elements/reviews/street_plate_r1*.*, references/elements/reviews/sign_*_r1*.*, references/elements/reviews/signs_r1_faces.png
+  - ref: references/elements/street_plate/*.jpg, references/elements/sign_stop/*.jpg
+  - make: python tools/models/review.py sign_stop --round=1
+  - src: tools/models/props/signs_street.py
+- [ ] **street_small 2** · Bins, bollard, post box, tree grate, wall fountain, round 1 (S173) — the bag bin reads as bag_hoop (green post, ring, a full bag); the cage bin's rods bulge like cage.jpg; the bollard is the Paris potelet (foot, collar, ball); the post box has no brand and its words read; the grate lies flush; the fountain reads as the 1872 applied model at 10 m (arch, shell, head, cup).
+  - see: references/elements/reviews/bin_hoop_r1*.*, references/elements/reviews/bin_cage_r1*.*, references/elements/reviews/bollard_r1*.*, references/elements/reviews/post_box_r1*.*, references/elements/reviews/tree_grille_r1*.*, references/elements/reviews/fountain_wall_r1*.*, references/elements/reviews/bike_hoop_r1*.*, references/elements/reviews/lawn_hoops_r1*.*
+  - ref: references/elements/bin_hoop/*.jpg, references/elements/bollard/*.jpg, references/elements/post_box/*.jpg, references/elements/fountain_wall/*.jpg
+  - make: python tools/models/review.py fountain_wall --round=1
+  - src: tools/models/props/street_small.py
+- [ ] **bus_stop** · Bus shelter and stop pole, round 1 (S170) — the roof reads as a thin wing over the kerb; glass, poster case and bench where shelter_front has them; no brand anywhere; the poster case glows at night; PLACE DU MARCHE and BUS read at 10 m.
+  - see: references/elements/reviews/bus_shelter_r1*.*, references/elements/reviews/bus_stop_pole_r1*.*
+  - ref: references/elements/bus_shelter/*.jpg
+  - make: python tools/models/review.py bus_shelter --round=1
+  - src: tools/models/props/bus_stop.py
+- [ ] **kiosk** · Newspaper kiosk, round 1 (S172) — the hexagon, cresting, attic and dome read as dome_today's; PRESSE on every panel; the shutter opens up and out clear of the dome and the counter.
+  - see: references/elements/reviews/kiosk_r1*.*
+  - ref: references/elements/kiosk/*.jpg
+  - make: python tools/models/review.py kiosk --round=1
+  - src: tools/models/props/kiosk.py
+- [ ] **traffic** · Traffic lights and controller cabinet, round 1 (S168) — the head, visors and repeater sit as in short_pole; the lenses glow red, amber, green at night; the pedestrians' figures read; the cabinet is a plain grey box with its door.
+  - see: references/elements/reviews/traffic_light_r1*.*, references/elements/reviews/traffic_light_ped_r1*.*, references/elements/reviews/controller_cabinet_r1*.*
+  - ref: references/elements/traffic_light/*.jpg
+  - make: python tools/models/review.py traffic_light --round=1
+  - src: tools/models/props/traffic.py
+- [ ] **boundaries** · Porte cochère, railing, pier, gate, garden wall, round 1 (S156) — the gateway reads as square_on (surround, leaves of panels, chasse-roues) and its leaves open into the court; the railing's bays join without a seam; the gate's top rail rises to the middle.
+  - see: references/elements/reviews/porte_cochere_r1*.*, references/elements/reviews/railing_plinth_r1*.*, references/elements/reviews/railing_pier_r1*.*, references/elements/reviews/railing_gate_r1*.*, references/elements/reviews/garden_wall_r1*.*
+  - ref: references/elements/porte_cochere/*.jpg, references/elements/railing_plinth/*.jpg
+  - make: python tools/models/review.py porte_cochere --round=1
+  - src: tools/models/props/boundaries.py
+- [ ] **signs_shops** · Tabac, pharmacy cross, hanging sign, round 1 (S160) — TABAC reads down both faces of the carotte; the cross glows green at night; the hanging sign's key reads at 10 m; no brand anywhere.
+  - see: references/elements/reviews/sign_tabac_r1*.*, references/elements/reviews/sign_pharmacy_r1*.*, references/elements/reviews/sign_hanging_r1*.*
+  - ref: references/elements/sign_tabac/*.jpg, references/elements/sign_hanging/*.jpg
+  - make: python tools/models/review.py sign_tabac --round=1
+  - src: tools/models/props/signs_shops.py
+- [ ] **containers** · Supply chest, ammo crate, carton, round 1 (S152) — the chest reads as pressed steel with clasps, the crate as boards with cleats and rope handles; both lids open clear; the stencils read at 1 m.
+  - see: references/elements/reviews/lootbox_r1*.*, references/elements/reviews/ammo_crate_r1*.*, references/elements/reviews/ammo_carton_r1*.*
+  - ref: references/elements/lootbox/*.jpg, references/elements/ammo_crate/*.jpg
+  - make: python tools/models/review.py ammo_crate --round=1
+  - src: tools/models/props/containers.py
+- [ ] **carried** · Medkit, bandage, pills, planks, backpack, round 1 (S153) — each reads at hand size (1 m): the red bag and its cross, the roll and its loose end, the bottle and its cap, the nailed planks, the pack with its straps on the back.
+  - see: references/elements/reviews/medkit_r1*.*, references/elements/reviews/bandage_r1*.*, references/elements/reviews/pills_r1*.*, references/elements/reviews/planks_r1*.*, references/elements/reviews/backpack_r1*.*
+  - ref: references/elements/backpack/*.jpg, references/elements/pills/*.jpg
+  - make: python tools/models/review.py backpack --round=1
+  - src: tools/models/props/carried.py
+- [ ] **signs 2** · Speed limit, no parking, one-way, crossing, direction signs, round 1 (S169) — each face matches the French standard's (red ring and 30; blue disc with the red bar top left to bottom right; the white arrow; the walker in the triangle; black words on white arrow plates); the plates' backs and rails as the STOP's.
+  - see: references/elements/reviews/sign_speed_r1*.*, references/elements/reviews/sign_no_parking_r1*.*, references/elements/reviews/sign_one_way_r1*.*, references/elements/reviews/sign_crossing_r1*.*, references/elements/reviews/sign_direction_r1*.*
+  - ref: references/elements/sign_stop/*.jpg
+  - make: python tools/models/review.py sign_speed --round=1
+  - src: tools/models/props/signs_street.py
+- [ ] **road 2** · Gully grate and speed hump, round 1 (S155) — the grates lie flush with dark slots like double.jpg; the hump's teeth point up its ramps like teeth.jpg.
+  - see: references/elements/reviews/gully_grate_r1*.*, references/elements/reviews/speed_hump_r1*.*
+  - ref: references/elements/gully_grate/*.jpg, references/elements/speed_hump/*.jpg
+  - make: python tools/models/review.py gully_grate --round=1
+  - src: tools/models/props/road.py
+- [ ] **checkpoint** · Crowd barrier, concrete barrier, sandbags, wire, cone, round 1 (S185) — the crowd barrier reads as stacked.jpg's; the concrete barrier's profile as jersey.jpg's; the sandbags as pillows in courses, not planks; the wire's coil and barbs read at 10 m; the cone's bands.
+  - see: references/elements/reviews/barrier_crowd_r1*.*, references/elements/reviews/barrier_concrete_r1*.*, references/elements/reviews/sandbag_wall_r1*.*, references/elements/reviews/wire_coil_r1*.*, references/elements/reviews/traffic_cone_r1*.*
+  - ref: references/elements/barrier_crowd/*.jpg, references/elements/sandbag_wall/*.jpg, references/elements/wire_coil/*.jpg
+  - make: python tools/models/review.py sandbag_wall --round=1
+  - src: tools/models/props/checkpoint.py
+- [ ] **remains** · Trolley, monobloc chair, pram, suitcases, round 1 (S184) — the trolley reads as side.jpg's (tapered basket, seat flap, casters); the chair as the white monobloc; the pram's hood ribs lie on the hood; no brand on the suitcases.
+  - see: references/elements/reviews/trolley_r1*.*, references/elements/reviews/plastic_chair_r1*.*, references/elements/reviews/pram_r1*.*, references/elements/reviews/suitcase_hard_r1*.*, references/elements/reviews/suitcase_soft_r1*.*
+  - ref: references/elements/trolley/*.jpg, references/elements/pram/*.jpg, references/elements/suitcase_hard/*.jpg
+  - make: python tools/models/review.py trolley --round=1
+  - src: tools/models/props/remains.py
+- [ ] **hospital** · Wheelchair, gurney, drip stand, oxygen cylinder, round 1 (S211) — the wheelchair reads as behind.jpg's (spokes, push rims, cross brace); the gurney's head is raised; the drip bag hangs on a hook.
+  - see: references/elements/reviews/wheelchair_r1*.*, references/elements/reviews/gurney_r1*.*, references/elements/reviews/iv_stand_r1*.*, references/elements/reviews/oxygen_cylinder_r1*.*, references/elements/reviews/medicine_cabinet_r1*.*, references/elements/reviews/sharps_bin_r1*.*
+  - ref: references/elements/wheelchair/*.jpg
+  - make: python tools/models/review.py wheelchair --round=1
+  - src: tools/models/props/hospital.py
+- [ ] **fittings** · Tube batten, exit sign, extinguisher, alarm point, round 1 (S194) — the tubes and the exit sign's face glow at night; the exit sign's man runs to his door; the extinguisher hangs at 0.80 on its bracket.
+  - see: references/elements/reviews/tube_light_r1*.*, references/elements/reviews/exit_sign_r1*.*, references/elements/reviews/extinguisher_r1*.*, references/elements/reviews/alarm_point_r1*.*
+  - ref: references/elements/tube_light/*.jpg, references/elements/extinguisher/*.jpg
+  - make: python tools/models/review.py exit_sign --round=1
+  - src: tools/models/props/fittings.py
+- [ ] **decals** · Posters, flyers and painted words, round 1 (S186) — every word reads whole at 1 m (DÉFENSE D'AFFICHER inside its band), the sprayed words run, the flyers' tape, no real party or brand on the election poster.
+  - see: references/elements/reviews/decals_r1*.*
+  - make: python tools/models/review.py decals --round=1
+  - src: tools/models/props/decals.py
+- [ ] **clutter** · Papers, shards, fallen frame, round 1 (S196) — the sheets lie flat and curl, not float; the shards read as glass thrown one way; the frame leans face to the wall with its glass out.
+  - see: references/elements/reviews/papers_r1*.*, references/elements/reviews/shards_r1*.*, references/elements/reviews/picture_frame_r1*.*
+  - make: python tools/models/review.py papers --round=1
+  - src: tools/models/props/clutter.py
+- [ ] **vehicle_kit** · Wheel, plate, lamps, mirror, round 1 (S179) — the tyre's tread and the rim's holes and nuts read at 1 m; the plate reads as a French plate (bands, stars, F) with an invented code; the lamps glow at night.
+  - see: references/elements/reviews/wheel_steel_r1*.*, references/elements/reviews/plate_fr_r1*.*, references/elements/reviews/headlamp_r1*.*, references/elements/reviews/tail_lamp_r1*.*, references/elements/reviews/wing_mirror_r1*.*
+  - ref: references/elements/plate_fr/*.jpg, references/elements/wing_mirror/*.jpg
+  - make: python tools/models/review.py wheel_steel --round=1
+  - src: tools/models/props/vehicle_kit.py
+- [ ] **cemetery** · Chapel, cross, grave, obelisk, round 1 (S189) — the chapel reads as one of four_chapels' classical ones (the name on its frieze, the grilled door); the cross as cast_cross's; the headstone faces the foot of its grave.
+  - see: references/elements/reviews/tomb_chapel_r1*.*, references/elements/reviews/tomb_cross_r1*.*, references/elements/reviews/tomb_slab_r1*.*, references/elements/reviews/obelisk_r1*.*
+  - ref: references/elements/tomb_chapel/*.jpg, references/elements/tomb_cross/*.jpg
+  - make: python tools/models/review.py tomb_chapel --round=1
+  - src: tools/models/props/cemetery.py
+- [ ] **park** · Bandstand, round 1 (S190) — it reads as small.jpg's (base, slender columns, railing, green tent roof, lantern) at 10 m and 50 m.
+  - see: references/elements/reviews/bandstand_r1*.*
+  - ref: references/elements/bandstand/*.jpg
+  - make: python tools/models/review.py bandstand --round=1
+  - src: tools/models/props/park.py
+- [ ] **cemetery 2** · Gothic chapel, cemetery gate, round 1 (S189) — the gothic chapel reads as four_chapels.jpg's left one (steep roof, pinnacles, pointed door) and its door opens out; the gate reads as pl_entree.jpg's (round-topped pylons, roundels, the lintel of wreaths) and its name reads on the pylons; the leaves open inward.
+  - see: references/elements/reviews/tomb_gothic_r1*.*, references/elements/reviews/cemetery_gate_r1*.*
+  - ref: references/elements/tomb_gothic/*.jpg, references/elements/cemetery_gate/*.jpg
+  - make: python tools/models/review.py tomb_gothic --round=1
+  - src: tools/models/props/cemetery.py
+- [ ] **bridges** · Stone road bridge, iron footbridge, round 1 (S165) — the stone bridge reads as an old Paris bridge (elliptical arches, half-round bays over the piers, cornice and parapet) from the quay at 50 m; the footbridge's ribs and rings read under its deck; the lanterns glow at night.
+  - see: references/elements/reviews/bridge_stone_r1*.*, references/elements/reviews/bridge_foot_r1*.*
+  - ref: references/elements/bridge_stone/*.jpg
+  - make: python tools/models/review.py bridge_stone --round=1
+  - src: tools/models/props/bridges.py
+- [ ] **office** · Desk, chair, filing cabinet, shelving, computer, beam seating, vending machine, water cooler, round 1 (S193) — each at its real size beside the others; the drawers pull out (`--part=open`); the vending machine's goods read behind their frame and its panel glows; no brand anywhere.
+  - see: references/elements/reviews/desk_r1*.*, references/elements/reviews/office_chair_r1*.*, references/elements/reviews/filing_cabinet_r1*.*, references/elements/reviews/shelving_r1*.*, references/elements/reviews/desk_computer_r1*.*, references/elements/reviews/beam_seating_r1*.*, references/elements/reviews/vending_machine_r1*.*, references/elements/reviews/water_cooler_r1*.*
+  - make: python tools/models/review.py desk --round=1
+  - src: tools/models/props/office.py
+- [ ] **doors** · Panelled, glass, fire and plank doors, round 1 (S191) — each leaf hangs on the viewer's left and opens inward (`--part=open`) without passing through its frame; the panels, push bar, panic bar and strap hinges sit on the right faces; the fire door's wire reads in its glass at 1 m.
+  - see: references/elements/reviews/door_wood_r1*.*, references/elements/reviews/door_glass_r1*.*, references/elements/reviews/door_fire_r1*.*, references/elements/reviews/door_plank_r1*.*
+  - make: python tools/models/review.py door_wood --round=1
+  - src: tools/models/props/doors.py
+- [ ] **generator** · Genset, day tank, switchgear, round 1 (S212) — the set reads as a diesel generator (radiator and guard, engine, alternator, exhaust to the silencer); GAZOLE reads on the tank; the start lever throws up (`--part=open`) and MARCHE / ARRÊT read on its plate; the lamps glow.
+  - see: references/elements/reviews/genset_r1*.*, references/elements/reviews/fuel_tank_r1*.*, references/elements/reviews/switchgear_r1*.*
+  - make: python tools/models/review.py switchgear --round=1
+  - src: tools/models/props/generator.py
+- [ ] **summit** · Coin binoculars, panorama table, antenna mast, round 1 (S231) — the binoculars' barrels look out to -Z at eye height; the table's names read the right way up from the front and point out from the centre; the mast's red lamps glow and its guys reach the ground.
+  - see: references/elements/reviews/coin_binoculars_r1*.*, references/elements/reviews/panorama_table_r1*.*, references/elements/reviews/antenna_mast_r1*.*
+  - make: python tools/models/review.py panorama_table --round=1
+  - src: tools/models/props/summit.py
+- [ ] **terminal_signs** · Departure board, quay sign, wayfinding blade, round 1 (S202) — the board's rows read from 5 m and only its letters glow at night (the face stays dark); the quay's letter reads in its disc on both faces; the blade's words and arrows read the right way on both faces.
+  - see: references/elements/reviews/departure_board_r1*.*, references/elements/reviews/quay_sign_r1*.*, references/elements/reviews/wayfinding_sign_r1*.*
+  - make: python tools/models/review.py departure_board --round=1
+  - src: tools/models/props/terminal_signs.py
+- [ ] **stairs** · Stair flight, ceiling module, round 1 (S192) — the risers are even and the nosings sit on the treads' edges; the handrail and balustrade follow the pitch and run on round the landing; the hanging tile hangs from the grid, the light glows, the stain reads from below.
+  - see: references/elements/reviews/stair_flight_r1*.*, references/elements/reviews/ceiling_grid_r1*.*
+  - make: python tools/models/review.py stair_flight --round=1
+  - src: tools/models/props/stairs.py
+- [ ] **helipad** · Rooftop helipad, round 1 (S208) — the H, its circle and the touchdown ring read from the helicopter's approach; the netting slopes out all round; the edge lights glow at night; the stair reaches the roof.
+  - see: references/elements/reviews/helipad_r1*.*
+  - make: python tools/models/review.py helipad --round=1
+  - src: tools/models/props/helipad.py
+- [ ] **terminal_columns** · Tree column, edge truss, round 1 (S198) — the tree's arms meet the slab's underside on their plates; the truss's diagonals alternate and meet at the gussets.
+  - see: references/elements/reviews/column_tree_r1*.*, references/elements/reviews/edge_truss_r1*.*
+  - make: python tools/models/review.py column_tree --round=1
+  - src: tools/models/props/terminal_columns.py
+- [ ] **townhall** · The name and the arms, round 1 (S218) — HÔTEL DE VILLE reads gilded from the garden, the motto at 1 m; the arms read as a French town's (shield with its tower and chief, mural crown, branches) and copy no real town's.
+  - see: references/elements/reviews/townhall_name_r1*.*, references/elements/reviews/town_arms_r1*.*
+  - make: python tools/models/review.py town_arms --round=1
+  - src: tools/models/props/townhall.py
+- [ ] **barracks_court** · Memorial, flagpoles, round 1 (S222) — AUX MORTS and the dates read on the die's front and the names on its sides, the right way round; the helmet and wreaths read as bronze; the flag hangs, not floats.
+  - see: references/elements/reviews/war_memorial_r1*.*, references/elements/reviews/flagpoles_r1*.*
+  - make: python tools/models/review.py war_memorial --round=1
+  - src: tools/models/props/barracks_court.py
+- [ ] **leftovers 1** · Emergency light, switch and socket, food litter, clothes pile, reception counter, broken column, double door, round 1 (S194, S196, S184, S193, S189, S191) — each at its real size; the emergency light's diffuser glows; the litter and the clothes lie on the floor without floating; the column's drape hangs over its break; both leaves of the double door open inward.
+  - see: references/elements/reviews/emergency_light_r1*.*, references/elements/reviews/switch_socket_r1*.*, references/elements/reviews/food_litter_r1*.*, references/elements/reviews/clothes_pile_r1*.*, references/elements/reviews/reception_counter_r1*.*, references/elements/reviews/tomb_column_r1*.*, references/elements/reviews/door_double_r1*.*
+  - make: python tools/models/review.py door_double --round=1
+  - src: tools/models/props/fittings.py, tools/models/props/clutter.py, tools/models/props/remains.py, tools/models/props/office.py, tools/models/props/cemetery.py, tools/models/props/doors.py
+- [ ] **vehicle_kit 2** · Alloy wheel, seat, dashboard, round 1 (S179) — the alloy's spokes read at 5 m and carry no badge; the seat faces forward (-Z); the steering wheel sits on the left facing the driver and the dials glow.
+  - see: references/elements/reviews/wheel_alloy_r1*.*, references/elements/reviews/car_seat_r1*.*, references/elements/reviews/dashboard_r1*.*
+  - make: python tools/models/review.py dashboard --round=1
+  - src: tools/models/props/vehicle_kit.py
+- [ ] **lamps 3** · Wooden pole, wall insulators, round 1 (S167) — the pole's crossarms and insulators read at 20 m against the sky; the wires sag, never straight; the wall bracket's wires drop into the wall through their tubes.
+  - see: references/elements/reviews/utility_pole_r1*.*, references/elements/reviews/wall_insulators_r1*.*
+  - make: python tools/models/review.py utility_pole --round=1
+  - src: tools/models/props/lamps.py
+- [ ] **campanile** · The town hall's campanile, round 1 (S214) — it reads as a French town hall's lantern from the garden and the quay (open arches, the bell inside, a lead dome à l'impériale); the clock's dial and its stopped hands read from the square.
+  - see: references/elements/reviews/campanile_r1*.*
+  - make: python tools/models/review.py campanile --round=1
+  - src: tools/models/props/campanile.py
+- [ ] **riding_hall** · Riding hall, sports court, round 1 (S224) — the hall reads as an old manège from the cour d'honneur (long stone walls, round-headed windows, gable doors and oculi, slate roof); its front doors open out; the court's lines read from above and the hoops sit over the keys.
+  - see: references/elements/reviews/riding_hall_r1*.*, references/elements/reviews/sports_court_r1*.*
+  - make: python tools/models/review.py riding_hall --round=1
+  - src: tools/models/props/riding_hall.py
+- [ ] **park 2** · Garden chair, round basin, gate, round 1 (S190) — the chair reads as rows.jpg's iron chairs (slats, raked back); the basin's roll as bassin2016.jpg's; the gate as monceau.jpg's (black and gilt, urns on the piers) and its leaves open inward on their piers.
+  - see: references/elements/reviews/park_chair_r1*.*, references/elements/reviews/park_basin_r1*.*, references/elements/reviews/park_gate_r1*.*
+  - ref: references/elements/park_chair/*.jpg, references/elements/park_basin/*.jpg, references/elements/park_gate/*.jpg
+  - make: python tools/models/review.py park_gate --round=1
+  - src: tools/models/props/park.py
+- [ ] **checkpoint 2** · Works barrier, water barrier, body bag, tape, tarp, sett barricade, round 1 (S185) — the works barrier's red and white bands read at 20 m and its lamp glows; the water barrier as connected.jpg's; the body bag shows a body without showing one; the tape sags and twists; the tarp lies over things, not as a hard box; the barricade reads as temple.jpg's (setts in courses, a cart against it).
+  - see: references/elements/reviews/works_barrier_r1*.*, references/elements/reviews/water_barrier_r1*.*, references/elements/reviews/body_bag_r1*.*, references/elements/reviews/police_tape_r1*.*, references/elements/reviews/tarp_r1*.*, references/elements/reviews/sett_barricade_r1*.*
+  - ref: references/elements/water_barrier/*.jpg, references/elements/body_bag/*.jpg, references/elements/sett_barricade/*.jpg, references/elements/tarp/*.jpg
+  - make: python tools/models/review.py sett_barricade --round=1
+  - src: tools/models/props/checkpoint.py
+- [ ] **remains 2** · Mattress, teddy bear, rowing boat, shoes, water pack, round 1 (S184) — the mattress reads as ostia.jpg's (piping, quilting); the bear sits slumped; the boat's hull is smooth from bow to transom with its oars inside; the shoes read as shoes at 2 m; no brand on the bottles.
+  - see: references/elements/reviews/mattress_r1*.*, references/elements/reviews/teddy_bear_r1*.*, references/elements/reviews/rowboat_r1*.*, references/elements/reviews/shoes_r1*.*, references/elements/reviews/water_pack_r1*.*
+  - ref: references/elements/mattress/*.jpg, references/elements/teddy_bear/*.jpg, references/elements/rowboat/*.jpg
+  - make: python tools/models/review.py rowboat --round=1
+  - src: tools/models/props/remains.py
+- [ ] **trees** · Plane tree and pollard, round 1 (S174) — the plane reads as square.jpg's (stout trunk, low fork, dense rounded crown) at 10 m and 50 m, not as a pine; the bark's patches read at 1 m; the LODs keep the crown's size.
+  - see: references/elements/reviews/plane_tree_r1*.*, references/elements/reviews/plane_pollard_r1*.*, references/elements/reviews/chestnut_old_r1*.*, references/elements/reviews/street_lime_r1*.*
+  - also: the old chestnut (S175) reads as in_flower.jpg's dome down to the ground, its candles white; the street lime (S176) is narrow and staked.
+  - ref: references/elements/plane_tree/*.jpg
+  - make: python tools/models/review.py plane_tree --round=1
+  - src: tools/models/props/trees.py
+- [ ] **shrubs** · Window box, yew cone, box hedge, ivy, round 1 (S177) — the geraniums' red heads read at 10 m; the yew is a clean cone in its bed; hedge modules join without a seam; the ivy lies flat on its wall.
+  - see: references/elements/reviews/window_box_r1*.*, references/elements/reviews/yew_cone_r1*.*, references/elements/reviews/hedge_box_r1*.*, references/elements/reviews/ivy_patch_r1*.*
+  - make: python tools/models/review.py window_box --round=1
+  - src: tools/models/props/shrubs.py
+- [ ] **lamps 2** · Mast, réverbère, rope box, round 1 (S166, S167) — the mast's head glows warm at night over the road; the réverbère hangs from its hook with the rope rising both ways, its reflector over the flame; the rope box sits on the wall with its pulley.
+  - see: references/elements/reviews/lamp_mast_r1*.*, references/elements/reviews/reverbere_r1*.*, references/elements/reviews/rope_box_r1*.*
+  - make: python tools/models/review.py reverbere --round=1
+  - src: tools/models/props/lamps.py
+- [ ] **monument** · The market fountain, round 1 (S187) — it reads as whole.jpg's kind from the square's corners (basin, banded column, gilt capital and Victory); the inscription reads at 1 m; the jets fall into the basin.
+  - see: references/elements/reviews/market_fountain_r1*.*
+  - ref: references/elements/market_fountain/*.jpg
+  - make: python tools/models/review.py market_fountain --round=1
+  - src: tools/models/props/monument.py
+
+- [ ] **house_floors** · House interiors, the sample's three floors (S246) — rooms read as a Paris house before Haussmann (shop and allée below, salon and bedrooms on the street, kitchen on the court, WC and box rooms in the dark middle); walls meet the facades between windows and line up from band to band and floor to floor; every room is reached without passing through a WC or box room; doors near corners, leaves clear of each other; furniture slots in sensible places at real sizes; the floors differ but share the stair, refends and flues.
+  - see: references/shots/houses/house_floors.png
+  - make: tools\houses.ps1
+  - src: scripts/world/house_plan.gd, scripts/world/house_floor.gd, scripts/world/room_dressing.gd
+- [ ] **house_variants** · House interiors, other houses (S246) — two to five bays, shallow and deep, stair in the middle or on the court, shop or flat on the ground floor: every one laid out, none looks like a copy of another.
+  - see: references/shots/houses/house_variants.png
+  - make: tools\houses.ps1
+  - src: scripts/world/house_floor.gd
+- [ ] **house_walk** · House interiors in 3D (S246) — play `tools\godot.ps1 -- --house-rack --eye` and walk it (right mouse + WASD, 1-3 to stand on a floor, PageUp/PageDown): corridors and doors feel the player's size, ceilings high enough, the stair climbs, paint and lamps vary room to room.
+  - src: scripts/world/interior_builder.gd, scripts/house_rack.gd
+
+## Sounds
+
+- [ ] **world_sounds** · World sounds (S084) — listen to each: doors, barricade, lootbox, pickups, glass, vehicles, UI, generators; each sounds like what it says (the line under each), loops join without a click; they were only checked on the spectrogram sheet, never by ear. Then once in the corridor (doors, lootbox).
+  - see: references/shots/sounds/*.wav, references/shots/sounds/sheet.png
+  - make: tools\sounds.ps1
+  - src: scripts/world_sounds.gd
+- [ ] **gun_voices** · Every gun's shot near, far and suppressed, and the three room tails (S033) — each gun distinct (P19 pop, P90 buzzy snap, AK heavier than Type 95, shotguns boom, T-5000 rolls on); far loses the crack; suppressed is a thud.
+  - see: references/shots/sounds/game/shot_*.wav, references/shots/sounds/game/tail_*.wav
+  - make: tools\sounds.ps1
+  - src: scripts/gun_voice.gd
+- [ ] **handling** · Reload and handling sounds (S034) — mag release, out, in, slap, bolt, shells, pump, draw, holster, inspect, low-ammo click: metallic, short, not clipped.
+  - see: references/shots/sounds/game/h_*.wav, references/shots/sounds/game/low_ammo_click.wav, references/shots/sounds/game/dry_fire.wav
+  - make: tools\sounds.ps1
+- [ ] **other_sounds** · The engine's own sounds (S005, S015, S030, S031) — whiz, tink, thud, siren, beep, breath, heartbeat, wet sever, the old gunshot.
+  - see: references/shots/sounds/game/whiz.wav, references/shots/sounds/game/tink.wav, references/shots/sounds/game/thud.wav, references/shots/sounds/game/siren.wav, references/shots/sounds/game/beep.wav, references/shots/sounds/game/breath.wav, references/shots/sounds/game/heartbeat.wav, references/shots/sounds/game/sever_wet.wav, references/shots/sounds/game/gunshot.wav
+  - make: tools\sounds.ps1
+
+## The town
+
+- [ ] **street_plan** · Street network 2, the traced rework (S040, uncommitted) — the streets follow Joinville's (orange over the map), main streets where the bus routes run, junction shapes clean (no slivers or overlaps in the core close-up), the hill road reaches the Mirante.
+  - see: references/city_plan.png, references/city_core.png, references/city_on_reference.png, references/streets_on_reference.png
+  - ref: references/joinville.png, references/joinville_main_streets.png
+  - make: $a = @('--headless','--','--city-plan=C:/Users/Nez/Desktop/GitHub/Make Alive/references'); tools\godot.ps1 @a
+  - src: scripts/world/street_net.gd, scripts/world/city_data.gd, scripts/world/city_streets.gd
+- [ ] **pois** · The five missions' start and place (placeholders until P06) — you start in a street, the place is in view, nothing floats or sinks into the hill.
+  - see: references/shots/*_street.png, references/shots/*_landmark.png
+  - make: tools\shots.ps1 _street
+- [ ] **sky_presets** · Sky and time of day (S050) — clear, overcast, dusk, night and storm each read at a glance and sit beside their reference photo; clouds look like clouds (no blocks, streaks or ripples); stars are points; no line or seam where the town's geometry ends at 1200 m and the painted backdrop goes on; the hill and the smoke columns stand on the horizon from the roofs.
+  - see: references/shots/sky_marche_*.png, references/shots/sky_roofs_*.png, references/shots/sky_hill_*.png, references/elements/reviews/sky_rfinal.jpg
+  - ref: references/elements/sky/*.jpg
+  - make: python tools/sky_review.py final --missions
+  - src: scripts/fx/sky_shader.gd, scripts/fx/sky_dome.gd, scripts/time_of_day.gd
+- [ ] **sky_town_below** · The town seen from the Mirante (S050) — by day roofs and streets readable into the haze; at night streets as lines of lamps, the far town glowing up to the horizon; the western ridge only to the west.
+  - see: references/shots/sky_hill_*.png
+  - ref: references/elements/sky/overcast_montmartre.jpg, references/elements/sky/night_paris.jpg
+  - make: python tools/sky_review.py final --view=hill
+  - src: scripts/fx/sky_shader.gd
+- [ ] **sky_storm** · A lightning strike (S050) — one part of the deck lit from inside, not the whole sky white; the town brightens for a moment. Also play `tools\godot.ps1 -- --host --time=storm` for a minute: strikes every few seconds, the clouds race.
+  - see: references/shots/sky_*_storm.png
+  - ref: references/elements/sky/storm_night.jpg
+  - make: python tools/sky_review.py final
+- [ ] **sky_missions** · Each mission's own sky from its start (S050) — terminal dusk, hospital night, prefeitura storm, batalhão overcast, mirante night; nothing in the sky looks wrong behind the placeholder buildings.
+  - see: references/shots/sky_start_*.png, references/elements/reviews/sky_rfinal_missions.jpg
+  - make: python tools/sky_review.py final --missions
+- [ ] **corridor** · The corridor's map data drawn (S002) — zones, closets out of sight, routes reaching the play area.
+  - see: references/shots/corridor_zones.png
+  - make: tools\shots.ps1 corridor_zones

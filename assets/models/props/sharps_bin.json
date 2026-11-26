@@ -1,0 +1,39 @@
+{
+ "name": "sharps_bin",
+ "family": "hospital",
+ "size": [
+  0.27,
+  0.3356568542494924,
+  0.2
+ ],
+ "min": [
+  -0.135,
+  0.0,
+  -0.1
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  64,
+  24
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.2,
+  -0.1
+ ]
+}

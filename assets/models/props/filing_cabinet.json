@@ -1,0 +1,52 @@
+{
+ "name": "filing_cabinet",
+ "family": "office",
+ "size": [
+  0.47,
+  1.32,
+  0.65
+ ],
+ "min": [
+  -0.235,
+  0.0,
+  -0.34
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "drawer": {
+   "pivot": [
+    0.0,
+    1.1425,
+    -0.31
+   ],
+   "move": [
+    0.0,
+    0.0,
+    -0.45
+   ]
+  }
+ },
+ "tris": [
+  642,
+  354,
+  84
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  1.0,
+  -0.31
+ ]
+}

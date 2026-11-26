@@ -1,0 +1,40 @@
+{
+ "name": "bus_stop_pole",
+ "family": "bus_stop",
+ "size": [
+  0.74,
+  3.0749999999999997,
+  0.164
+ ],
+ "min": [
+  -0.22,
+  0.0,
+  -0.099
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  258,
+  210,
+  132
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  2.55,
+  0.0
+ ]
+}

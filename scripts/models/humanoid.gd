@@ -1,7 +1,11 @@
 class_name Humanoid
 extends Node3D
-## Blocky humanoid with a real joint chain (hips, spine, neck, shoulders, elbows, hips, knees)
+## Low-poly humanoid with a real joint chain (hips, spine, neck, shoulders, elbows, hips, knees)
 ## and fully procedural animation. ~1.8 m tall, stands on y=0, faces -Z.
+##
+## The body is round: every part is a smooth loft through the ring tables below (made once,
+## shared by every rig), painted face by face, plus a face (brow, eyes, nose, mouth, ears).
+## A zombie's face has sunken dark sockets, glowing eyes and a gaping mouth with teeth.
 ##
 ## How animation works: each frame the current Anim writes a *goal pose* (one float per joint
 ## angle, see J). The rig eases its current pose toward the goal, so every state change blends
@@ -9,26 +13,107 @@ extends Node3D
 ##
 ## Body parts can be severed (sever) or all handed over to a ragdoll (take_all).
 ##
-## style keys: zombie (bool), skin, shirt, pants, shoes (Color), eyes (Color, glowing),
-##   scale (float), limp (0..1), sleeve / forearm / hands (Color; default shirt / skin / darker skin),
-##   clothes as extra boxes merged into the part they sit on, each [size: Vector3, pos: Vector3,
-##   color: Color] in that part's space: torso_extras, head_extras, upper_arm_extras,
-##   forearm_extras, thigh_extras, shin_extras (limb extras go on both sides)
+## style keys: zombie (bool), skin, shirt, pants, shoes, sole, hands (Color), eyes (Color, glowing),
+##   brows (Color, a living face's eyebrows), scale (float), limp (0..1),
+##   sleeve (Color, default shirt), sleeves ("short", "long" or "none"), forearm (Color, overrides),
+##   belt (Color).
+## Paint (MeshKit.Body.add rules, in the part's own space): head_paint, torso_paint,
+##   upper_arm_paint, forearm_paint, hand_paint, thigh_paint, shin_paint, shoe_paint. Limb keys
+##   go on both sides; `<part>_l_paint` / `<part>_r_paint` on one.
+## Stains (blood: MeshKit.Body.stain, lying on the surface, with drips), [at, radius, color,
+##   drip, layer] where `at` is any point straight out from the part's axis: head_stains,
+##   torso_stains, upper_arm_stains, forearm_stains, thigh_stains, shin_stains (and _l / _r).
+## Extras, merged into the part they sit on (a hat leaves with the head): head_extras,
+##   torso_extras, upper_arm_extras, forearm_extras, thigh_extras, shin_extras (both sides),
+##   each [size, pos, color] (a box) or [size, pos, color, kind, rot: Basis] where kind is a
+##   MeshKit.unit ("box", "ball", "dome", "tube") or a shape of this rig ("hair_cap").
+## Placing things on the round body: `chest(x, y)`, `back(x, y)`, `face(x, y)`.
 
 enum Part { HEAD, TORSO, ARM_L, ARM_R, LEG_L, LEG_R }
-enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP }
+enum Anim { IDLE, WALK, RUN, ATTACK, WINDUP, LEAP, LAND, STAGGER, CRAWL, CROUCH, JUMP, HEAL, DOWNED, GETUP, FEED,
+	SPRINT, LUNGE, SURGE }
+## SPRINT, LUNGE and SURGE are the frantic runner's: a flat-out sprint with flailing arms and
+## stumbles, a pounce-and-maul attack, and clawing over the backs of a jam it can't get through.
+## What a survivor's arms are doing on top of the legs' state (`upper`).
+enum Upper { NONE, AIM, RELOAD, SHOVE, THROW }
 ## Pose channels. "PITCH" = lean forward/down, limbs: positive swings forward, knees bend negative.
 enum J { HIPS_Y, HIPS_PITCH, HIPS_ROLL, SPINE_PITCH, SPINE_YAW, SPINE_ROLL,
 	NECK_PITCH, NECK_YAW, NECK_ROLL, SH_L_X, SH_L_OUT, SH_R_X, SH_R_OUT, EL_L, EL_R,
-	HIP_L, HIP_R, KNEE_L, KNEE_R, COUNT }
+	HIP_L, HIP_R, KNEE_L, KNEE_R, HIPS_Z, COUNT }
 
 const HIP_HEIGHT := 0.92
+## Where each joint sits on its parent at rest (tools/models builds models on the same joints).
+const NECK_AT := Vector3(0, 0.64, 0)
+const SHOULDER_AT := Vector3(0.33, 0.58, 0)   # the right one; the left is mirrored
+const ELBOW_AT := Vector3(0, -0.32, 0)
+const HIP_AT := Vector3(0.12, 0, 0)            # the right one
+const KNEE_AT := Vector3(0, -0.45, 0)
+## A model rig's segments: name -> [part, parent segment, joint, hitbox size, hitbox centre].
+const MODEL_SEGMENTS := {
+	"torso": [Part.TORSO, "", "spine", Vector3(0.5, 0.62, 0.28), Vector3(0, 0.31, 0)],
+	"head": [Part.HEAD, "torso", "neck", Vector3(0.3, 0.3, 0.3), Vector3(0, 0.15, 0)],
+	"upper_arm_l": [Part.ARM_L, "torso", "shoulder_l", Vector3(0.15, 0.32, 0.17), Vector3(0, -0.16, 0)],
+	"forearm_l": [Part.ARM_L, "upper_arm_l", "elbow_l", Vector3(0.13, 0.36, 0.15), Vector3(0, -0.18, 0)],
+	"upper_arm_r": [Part.ARM_R, "torso", "shoulder_r", Vector3(0.15, 0.32, 0.17), Vector3(0, -0.16, 0)],
+	"forearm_r": [Part.ARM_R, "upper_arm_r", "elbow_r", Vector3(0.13, 0.36, 0.15), Vector3(0, -0.18, 0)],
+	"thigh_l": [Part.LEG_L, "torso", "hip_l", Vector3(0.19, 0.45, 0.21), Vector3(0, -0.225, 0)],
+	"shin_l": [Part.LEG_L, "thigh_l", "knee_l", Vector3(0.17, 0.47, 0.2), Vector3(0, -0.235, 0)],
+	"thigh_r": [Part.LEG_R, "torso", "hip_r", Vector3(0.19, 0.45, 0.21), Vector3(0, -0.225, 0)],
+	"shin_r": [Part.LEG_R, "thigh_r", "knee_r", Vector3(0.17, 0.47, 0.2), Vector3(0, -0.235, 0)],
+}
+## The bone a part hangs from on a model rig (shrunk to nothing when the part is shot off).
+const PART_BONE := { Part.HEAD: "neck", Part.ARM_L: "shoulder_l", Part.ARM_R: "shoulder_r",
+	Part.LEG_L: "hip_l", Part.LEG_R: "hip_r" }
+## The part each limb joint of a model rig belongs to, by bone (CharacterModel.JOINTS).
+const JOINT_PART := { 3: Part.ARM_L, 4: Part.ARM_L, 5: Part.ARM_R, 6: Part.ARM_R,
+	7: Part.LEG_L, 8: Part.LEG_L, 9: Part.LEG_R, 10: Part.LEG_R }
 const BLOOD := Color("7a0a0a")
+const MOUTH := Color("2a0606")
+const TEETH := Color("d6cfa4")
+
+# Ring tables: [y, half-width, half-depth, depth offset (+ is back)] in the part's space, bottom up.
+const TORSO_RINGS := [[-0.06, 0.14, 0.095], [0.02, 0.18, 0.115], [0.08, 0.182, 0.115],
+	[0.14, 0.175, 0.112], [0.2, 0.178, 0.117, -0.003], [0.26, 0.186, 0.124, -0.006],
+	[0.32, 0.196, 0.13, -0.008], [0.38, 0.208, 0.135, -0.01], [0.44, 0.222, 0.14, -0.01],
+	[0.5, 0.236, 0.138, -0.006], [0.56, 0.246, 0.128], [0.61, 0.222, 0.11, 0.006],
+	[0.655, 0.145, 0.085, 0.01], [0.685, 0.075, 0.065, 0.012]]
+const TORSO_POWER := 2.5
+const HEAD_RINGS := [[0.02, 0.06, 0.06, -0.04], [0.045, 0.095, 0.1, -0.03], [0.08, 0.115, 0.125, -0.016],
+	[0.12, 0.127, 0.137, -0.008], [0.165, 0.135, 0.148, -0.002], [0.21, 0.139, 0.153, 0.004],
+	[0.255, 0.136, 0.15, 0.008], [0.295, 0.122, 0.137, 0.011], [0.325, 0.095, 0.108, 0.012],
+	[0.345, 0.055, 0.065, 0.012]]
+const HEAD_POWER := 2.3
+const HAIR_RINGS := [[0.245, 0.147, 0.162, 0.009], [0.28, 0.142, 0.157, 0.012], [0.31, 0.128, 0.143, 0.014],
+	[0.336, 0.1, 0.114, 0.015], [0.356, 0.058, 0.068, 0.015]]
+const UPPER_ARM_RINGS := [[-0.345, 0.032, 0.034], [-0.32, 0.052, 0.055], [-0.25, 0.056, 0.059],
+	[-0.16, 0.062, 0.066], [-0.08, 0.07, 0.073], [-0.02, 0.074, 0.077], [0.035, 0.064, 0.068], [0.06, 0.035, 0.035]]
+const FOREARM_RINGS := [[-0.25, 0.03, 0.032], [-0.235, 0.037, 0.039], [-0.19, 0.042, 0.044],
+	[-0.12, 0.049, 0.051], [-0.05, 0.055, 0.057], [0.01, 0.052, 0.054], [0.035, 0.036, 0.038]]
+const HAND_RINGS := [[-0.328, 0.024, 0.048], [-0.3, 0.031, 0.056], [-0.258, 0.034, 0.054], [-0.232, 0.03, 0.044]]
+const THIGH_RINGS := [[-0.47, 0.042, 0.045], [-0.43, 0.063, 0.068], [-0.32, 0.074, 0.079],
+	[-0.2, 0.083, 0.089], [-0.08, 0.089, 0.096], [0.03, 0.091, 0.098], [0.08, 0.08, 0.085]]
+const SHIN_RINGS := [[-0.39, 0.033, 0.034], [-0.36, 0.045, 0.047], [-0.28, 0.051, 0.054],
+	[-0.18, 0.06, 0.067, 0.006], [-0.08, 0.067, 0.074, 0.008], [0.0, 0.066, 0.07], [0.035, 0.056, 0.06]]
+## The shoe runs heel to toe; rings are [along, half-width, half-height, height offset].
+const SHOE_RINGS := [[0.0, 0.042, 0.03], [0.015, 0.056, 0.046], [0.09, 0.06, 0.047, -0.003],
+	[0.17, 0.064, 0.042, -0.008], [0.23, 0.06, 0.033, -0.014], [0.262, 0.045, 0.022, -0.02],
+	[0.272, 0.025, 0.012, -0.022]]
+const SLEEVE_END := -0.13   # a short sleeve covers the upper arm down to here
+const PELVIS_TOP := 0.07    # trousers come up the torso to here
+const SOLE_TOP := -0.452    # shin space: a shoe's faces under this are sole
+
+static var _shapes := {}
+static var _eye_mats := {}
 
 var is_zombie := false
 var anim: int = Anim.IDLE
 var anim_t := 0.0     ## seconds since the current anim started
 var phase := 0.0      ## walk-cycle phase
+var reach := 0.0      ## 0..1: a downed survivor's free arm reaching out to a teammate (a goal, eased like the rest)
+var upper: int = Upper.NONE ## a survivor's arms: an action layered over the legs
+var look_pitch := 0.0 ## where a survivor looks, up +, for the head and a shouldered gun
+var kick := 0.0       ## 1 right after a shot, settling (the gun climbs)
+var _upper_t := 0.0
 var flinch := Vector2.ZERO  ## (pitch, yaw) spring offset from being hit
 var segs := {}        ## name -> { name, part, parent, node, mesh, size, center, hitbox? }
 var severed_mask := 0
@@ -45,6 +130,12 @@ var hip_r: Node3D
 var knee_l: Node3D
 var knee_r: Node3D
 
+## Set on a rig made from a model (create_model): the skinned body and its bones. The joints
+## above still carry the pose; _apply copies it onto the bones.
+var skeleton: Skeleton3D
+var body_mesh: MeshInstance3D
+var _bone_nodes: Array[Node3D] = []
+
 var _goal := PackedFloat32Array()
 var _cur := PackedFloat32Array()
 var _flinch_vel := Vector2.ZERO
@@ -53,11 +144,23 @@ var _tilt := 0.0
 var _arm_bias := 0.0
 var _seed := 0.0
 var _stagger_side := 1.0
+var frantic := false  ## a runner: twitchy idle, frenzied sprint (set from the style's "frantic")
+var turn := 0.0       ## how fast the body is turning (rad/s, + = left): sprinters bank into it
+var _gait := 0        ## which way a sprinter flails its arms (0..2), from its id
+var _sid := 0         ## the id the style was made for (stumbles are picked from it)
 
 
 static func create(style: Dictionary) -> Humanoid:
 	var h := Humanoid.new()
 	h._build(style)
+	return h
+
+
+## A rig wearing a model (one skinned, textured mesh made by tools/models) instead of style
+## boxes. `style` still gives zombie, limp and scale.
+static func create_model(model: CharacterModel, style: Dictionary) -> Humanoid:
+	var h := Humanoid.new()
+	h._build_model(model, style)
 	return h
 
 
@@ -77,7 +180,7 @@ func _joint(parent: Node3D, pos: Vector3) -> Node3D:
 
 
 func _seg(seg_name: String, part: int, parent_seg: String, node: Node3D, size: Vector3,
-		center: Vector3, b: MeshKit.Builder) -> MeshInstance3D:
+		center: Vector3, b: MeshKit.Body) -> MeshInstance3D:
 	var mi := b.instance()
 	node.add_child(mi)
 	segs[seg_name] = { "name": seg_name, "part": part, "parent": parent_seg, "node": node,
@@ -85,49 +188,138 @@ func _seg(seg_name: String, part: int, parent_seg: String, node: Node3D, size: V
 	return mi
 
 
+## The body's round shapes, made once and shared by every rig.
+static func shape(shape_name: String) -> MeshKit.Shape:
+	if _shapes.has(shape_name):
+		return _shapes[shape_name]
+	var sh: MeshKit.Shape
+	match shape_name:
+		"torso": sh = MeshKit.loft(TORSO_RINGS, 16, TORSO_POWER)
+		"head": sh = MeshKit.loft(HEAD_RINGS, 16, HEAD_POWER, [0.0, 0.01])
+		"hair_cap": sh = MeshKit.loft(HAIR_RINGS, 16, HEAD_POWER, [null, 0.01])
+		"neck": sh = MeshKit.loft([[-0.05, 0.06, 0.062], [0.07, 0.055, 0.058, -0.01]], 10, 2.0, [null, null])
+		"upper_arm": sh = MeshKit.loft(UPPER_ARM_RINGS, 8, 2.2, [0.0, 0.012])
+		"forearm": sh = MeshKit.loft(FOREARM_RINGS, 8, 2.2)
+		"thigh": sh = MeshKit.loft(THIGH_RINGS, 8, 2.2)
+		"shin": sh = MeshKit.loft(SHIN_RINGS, 8, 2.2)
+		"shoe":
+			sh = MeshKit.Shape.new().merge(MeshKit.loft(SHOE_RINGS, 8, 2.8),
+				Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3(0, -0.425, 0.085))).finish(8)
+		"hand": # a mitten of a palm (thumb forward, palm to the body) and four fingers
+			sh = MeshKit.Shape.new().merge(MeshKit.loft(HAND_RINGS, 8, 2.6))
+			var box := MeshKit.unit("box")
+			for k in 4:
+				sh.merge(box, Transform3D(Basis.from_scale(Vector3(0.026, 0.066 - absf(k - 1.5) * 0.008, 0.02)),
+					Vector3(0, -0.352 + absf(k - 1.5) * 0.004, -0.033 + k * 0.022)))
+			sh.merge(box, Transform3D(Basis(Vector3.RIGHT, 0.45) * Basis.from_scale(Vector3(0.024, 0.056, 0.024)),
+				Vector3(0, -0.282, -0.054)))
+			sh.finish(8)
+	_shapes[shape_name] = sh
+	return sh
+
+
+## The surface of a round part at (x, y), on its front (side -1) or back (+1), `out` metres proud.
+static func _surface(rings: Array, power: float, x: float, y: float, side: float, out: float) -> Vector3:
+	var r := MeshKit.ring_at(rings, y)
+	var u := clampf(absf(x) / r.x, 0.0, 1.0)
+	var z := r.z + side * (r.y * pow(1.0 - pow(u, power), 1.0 / power) + out)
+	return Vector3(x, y, z)
+
+
+## A point on the front of the torso (spine space): where a badge or a pocket goes.
+static func chest(x: float, y: float, out := 0.0) -> Vector3:
+	return _surface(TORSO_RINGS, TORSO_POWER, x, y, -1.0, out)
+
+
+static func back(x: float, y: float, out := 0.0) -> Vector3:
+	return _surface(TORSO_RINGS, TORSO_POWER, x, y, 1.0, out)
+
+
+## A point on the front of the head (neck space): where glasses or a mask go.
+static func face(x: float, y: float, out := 0.0) -> Vector3:
+	return _surface(HEAD_RINGS, HEAD_POWER, x, y, -1.0, out)
+
+
+static func _eye_material(c: Color) -> Material:
+	if not _eye_mats.has(c):
+		_eye_mats[c] = MeshKit.emissive(c, 3.0)
+	return _eye_mats[c]
+
+
+## A style's paint rules for one part (and side).
+static func _paints(s: Dictionary, part_name: String, side := "") -> Array:
+	var out: Array = s.get(part_name + "_paint", []).duplicate()
+	if side != "":
+		out.append_array(s.get(part_name + "_" + side + "_paint", []))
+	return out
+
+
+## Lay a style's stains (`<part>_stains`, `<part>_<side>_stains`: [at, radius, color, drip, layer])
+## on the part's round shape.
+static func _stains(b: MeshKit.Body, s: Dictionary, part_name: String, side := "") -> void:
+	var sh := shape(part_name)
+	var list: Array = s.get(part_name + "_stains", []).duplicate()
+	if side != "":
+		list.append_array(s.get(part_name + "_" + side + "_stains", []))
+	for st: Array in list:
+		b.stain(sh, st[0], st[1], st[2], st[3] if st.size() > 3 else 0.0, st[4] if st.size() > 4 else 0)
+
+
 func _build(s: Dictionary) -> void:
-	is_zombie = s.get("zombie", false)
 	var skin: Color = s.get("skin", Color("e0b48a"))
 	var shirt: Color = s.get("shirt", Color("3366cc"))
 	var pants: Color = s.get("pants", Color("2d3a4a"))
-	var shoes: Color = s.get("shoes", Color("222222"))
+	_traits(s)
+	hips = _joint(self, Vector3(0, HIP_HEIGHT, 0))
+	spine = _joint(hips, Vector3.ZERO)
+	var paint := [[Vector3(-1, -1, -1), Vector3(1, PELVIS_TOP, 1), pants]]
+	if s.has("belt"):
+		paint.append([Vector3(-1, PELVIS_TOP, -1), Vector3(1, 0.115, 1), s.belt])
+	var tb := MeshKit.Body.new().add(shape("torso"), shirt, paint + _paints(s, "torso"))
+	_stains(tb, s, "torso")
+	_extras(tb, s, "torso_extras")
+	_seg("torso", Part.TORSO, "", spine, Vector3(0.5, 0.62, 0.28), Vector3(0, 0.31, 0), tb)
+
+	neck = _joint(spine, NECK_AT)
+	var hb := MeshKit.Body.new().add(shape("head"), skin, _face_paint(skin) + _paints(s, "head"))
+	hb.add(shape("neck"), skin, [])
+	_stains(hb, s, "head")
+	_face(hb, s, skin)
+	_extras(hb, s, "head_extras") # hats, hair, masks: one mesh with the head, so they leave with it
+	var head := _seg("head", Part.HEAD, "torso", neck, Vector3(0.3, 0.3, 0.3), Vector3(0, 0.15, 0), hb)
+	if s.has("eyes") and is_zombie:
+		var eb := MeshKit.Body.new()
+		for x in [-0.054, 0.054]:
+			eb.box(Vector3(0.032, 0.022, 0.01), face(x, 0.176, 0.012), s.eyes)
+		head.add_child(eb.instance(_eye_material(s.eyes), false)) # child of head: goes with it
+
+	shoulder_l = _joint(spine, SHOULDER_AT * Vector3(-1, 1, 1))
+	shoulder_r = _joint(spine, SHOULDER_AT)
+	elbow_l = _arm("l", Part.ARM_L, shoulder_l, skin, shirt, s)
+	elbow_r = _arm("r", Part.ARM_R, shoulder_r, skin, shirt, s)
+	hip_l = _joint(hips, HIP_AT * Vector3(-1, 1, 1))
+	hip_r = _joint(hips, HIP_AT)
+	knee_l = _leg("l", Part.LEG_L, hip_l, pants, s)
+	knee_r = _leg("r", Part.LEG_R, hip_r, pants, s)
+	_finish(s)
+
+
+## What every rig takes from its style: zombie or not, the limp, a random tilt and arm swing.
+func _traits(s: Dictionary) -> void:
+	is_zombie = s.get("zombie", false)
 	_limp = s.get("limp", 0.0)
 	_seed = randf() * 10.0
+	frantic = s.get("frantic", false)
+	if s.has("seed"): # zombies: everything that makes this one move differently comes from its id
+		_sid = int(s.seed)
+		_seed = fposmod(float(_sid) * 1.618, 10.0)
+		_gait = absi(_sid * 7 + 3) % 3
 	_tilt = randf_range(-0.3, 0.3) if is_zombie else 0.0
 	_arm_bias = randf_range(-0.35, 0.35) if is_zombie else 0.0
 	phase = _seed
 
-	hips = _joint(self, Vector3(0, HIP_HEIGHT, 0))
-	spine = _joint(hips, Vector3.ZERO)
-	var tb := MeshKit.Builder.new().box(Vector3(0.5, 0.62, 0.28), Vector3(0, 0.31, 0), shirt)
-	tb.box(Vector3(0.52, 0.08, 0.3), Vector3(0, 0.04, 0), pants) # belt line
-	for e: Array in s.get("torso_extras", []):
-		tb.box(e[0], e[1], e[2])
-	_seg("torso", Part.TORSO, "", spine, Vector3(0.5, 0.62, 0.28), Vector3(0, 0.31, 0), tb)
 
-	neck = _joint(spine, Vector3(0, 0.64, 0))
-	var hb := MeshKit.Builder.new().box(Vector3(0.3, 0.3, 0.3), Vector3(0, 0.15, 0), skin)
-	hb.box(Vector3(0.2, 0.05, 0.02), Vector3(0, 0.06, -0.151), Color("3a1010") if is_zombie else Color("8a5a4a")) # mouth
-	_extras(hb, s, "head_extras") # hats, hair, masks: one mesh with the head, so they leave with it
-	if not s.has("eyes"):
-		hb.box(Vector3(0.05, 0.05, 0.02), Vector3(-0.07, 0.19, -0.151), Color("111111"))
-		hb.box(Vector3(0.05, 0.05, 0.02), Vector3(0.07, 0.19, -0.151), Color("111111"))
-	var head := _seg("head", Part.HEAD, "torso", neck, Vector3(0.3, 0.3, 0.3), Vector3(0, 0.15, 0), hb)
-	if s.has("eyes"):
-		var eb := MeshKit.Builder.new()
-		eb.box(Vector3(0.06, 0.04, 0.02), Vector3(-0.07, 0.19, -0.152), s.eyes)
-		eb.box(Vector3(0.06, 0.04, 0.02), Vector3(0.07, 0.19, -0.152), s.eyes)
-		head.add_child(eb.instance(MeshKit.emissive(s.eyes, 4.0), false)) # child of head: goes with it
-
-	shoulder_l = _joint(spine, Vector3(-0.33, 0.58, 0))
-	shoulder_r = _joint(spine, Vector3(0.33, 0.58, 0))
-	elbow_l = _arm("l", Part.ARM_L, shoulder_l, skin, shirt, s)
-	elbow_r = _arm("r", Part.ARM_R, shoulder_r, skin, shirt, s)
-	hip_l = _joint(hips, Vector3(-0.12, 0, 0))
-	hip_r = _joint(hips, Vector3(0.12, 0, 0))
-	knee_l = _leg("l", Part.LEG_L, hip_l, pants, shoes, s)
-	knee_r = _leg("r", Part.LEG_R, hip_r, pants, shoes, s)
-
+func _finish(s: Dictionary) -> void:
 	if s.has("scale"):
 		scale = Vector3.ONE * float(s.scale)
 	_goal.resize(J.COUNT)
@@ -138,34 +330,129 @@ func _build(s: Dictionary) -> void:
 	_apply()
 
 
-## Merge a style's extra boxes (clothes, hats, stains) into the mesh being built for one part.
-func _extras(b: MeshKit.Builder, s: Dictionary, key: String) -> void:
+## The joints, a skeleton copying them, the shared skinned mesh on it, and per segment a hidden
+## rigid piece of the model riding its joint (shown when the segment is shot off or ragdolls).
+func _build_model(model: CharacterModel, s: Dictionary) -> void:
+	_traits(s)
+	var m := Vector3(-1, 1, 1)
+	hips = _joint(self, Vector3(0, HIP_HEIGHT, 0))
+	spine = _joint(hips, Vector3.ZERO)
+	neck = _joint(spine, NECK_AT)
+	shoulder_l = _joint(spine, SHOULDER_AT * m)
+	elbow_l = _joint(shoulder_l, ELBOW_AT)
+	shoulder_r = _joint(spine, SHOULDER_AT)
+	elbow_r = _joint(shoulder_r, ELBOW_AT)
+	hip_l = _joint(hips, HIP_AT * m)
+	knee_l = _joint(hip_l, KNEE_AT)
+	hip_r = _joint(hips, HIP_AT)
+	knee_r = _joint(hip_r, KNEE_AT)
+	_bone_nodes = [hips, spine, neck, shoulder_l, elbow_l, shoulder_r, elbow_r, hip_l, knee_l, hip_r, knee_r]
+	skeleton = model.make_skeleton()
+	add_child(skeleton)
+	body_mesh = MeshInstance3D.new()
+	body_mesh.name = "Body"
+	body_mesh.mesh = model.mesh
+	body_mesh.skin = model.skin
+	body_mesh.material_override = model.material
+	skeleton.add_child(body_mesh)
+	body_mesh.skeleton = NodePath("..")
+	for seg_name: String in MODEL_SEGMENTS:
+		var d: Array = MODEL_SEGMENTS[seg_name]
+		var node: Node3D = _bone_nodes[CharacterModel.JOINTS.find(d[2])]
+		var piece := MeshInstance3D.new()
+		piece.mesh = model.parts[seg_name]
+		piece.material_override = model.material
+		piece.visible = false
+		node.add_child(piece)
+		segs[seg_name] = { "name": seg_name, "part": d[0], "parent": d[1], "node": node,
+			"mesh": piece, "size": d[3], "center": d[4] }
+	_finish(s)
+
+
+## Merge a style's extras (clothes, hats, hair) into the mesh being built for one part.
+func _extras(b: MeshKit.Body, s: Dictionary, key: String) -> void:
 	for e: Array in s.get(key, []):
-		b.box(e[0], e[1], e[2])
+		var kind: String = e[3] if e.size() > 3 else "box"
+		var rot: Basis = e[4] if e.size() > 4 else Basis.IDENTITY
+		if kind in ["box", "ball", "dome", "tube"]:
+			b.part(kind, e[0], e[1], e[2], rot)
+		else:
+			b.put(shape(kind), Transform3D(rot * Basis.from_scale(e[0]), e[1]), e[2])
+
+
+## Shading painted onto the head: a zombie's hollow cheeks and the bruised ring round its eyes.
+func _face_paint(skin: Color) -> Array:
+	if not is_zombie:
+		return []
+	var hollow := skin.darkened(0.16)
+	var bruise := skin.darkened(0.28).lerp(Color("4a2a3a"), 0.2)
+	return [
+		[Vector3(-0.15, 0.08, -1), Vector3(-0.06, 0.15, -0.04), hollow],
+		[Vector3(0.06, 0.08, -1), Vector3(0.15, 0.15, -0.04), hollow],
+		[Vector3(-0.11, 0.14, -1), Vector3(-0.03, 0.2, -0.09), bruise],
+		[Vector3(0.03, 0.14, -1), Vector3(0.11, 0.2, -0.09), bruise],
+	]
+
+
+## Brow, eyes, nose, mouth and ears, in the head's mesh.
+func _face(b: MeshKit.Body, s: Dictionary, skin: Color) -> void:
+	for x in [-0.14, 0.14]:
+		b.box(Vector3(0.03, 0.062, 0.048), Vector3(x, 0.165, 0.012), skin.darkened(0.12)) # ears
+	b.box(Vector3(0.036, 0.058, 0.042), face(0, 0.13, -0.008), skin.darkened(0.06), Basis(Vector3.RIGHT, 0.35)) # nose
+	if is_zombie:
+		for x in [-0.054, 0.054]:
+			b.box(Vector3(0.082, 0.026, 0.03), face(x, 0.214, -0.004), skin.darkened(0.3),
+				Basis(Vector3.FORWARD, 0.22 * signf(x))) # heavy brows, sloping in to a frown
+			b.box(Vector3(0.07, 0.05, 0.02), face(x, 0.176, -0.005), skin.darkened(0.75).lerp(Color("1e0e16"), 0.4)) # sockets
+			if not s.has("eyes"):
+				b.box(Vector3(0.03, 0.02, 0.01), face(x, 0.176, 0.009), Color("bdb898")) # dead, milky eyes
+		b.box(Vector3(0.088, 0.06, 0.03), face(0, 0.078, -0.01), MOUTH) # the jaw hangs open
+		for i in 3:
+			b.box(Vector3(0.024, 0.02 - i % 2 * 0.004, 0.012), face(-0.028 + i * 0.028, 0.099 - i % 2 * 0.002, 0.008), TEETH)
+		for i in 2:
+			b.box(Vector3(0.026, 0.016, 0.012), face(-0.016 + i * 0.032, 0.056, 0.006), TEETH)
+	else:
+		b.box(Vector3(0.22, 0.026, 0.04), face(0, 0.214, -0.012), skin.darkened(0.05)) # brow
+		var brows: Color = s.get("brows", Color("3a2a1a"))
+		for x in [-0.052, 0.052]:
+			b.box(Vector3(0.034, 0.018, 0.008), face(x, 0.176, 0.0), Color("ece8de")) # whites
+			b.box(Vector3(0.016, 0.017, 0.006), face(x, 0.176, 0.006), Color("2a1a10")) # irises
+			b.box(Vector3(0.056, 0.013, 0.012), face(x, 0.207, 0.008), brows)
+		b.box(Vector3(0.062, 0.012, 0.01), face(0, 0.083, 0.0), skin.darkened(0.35).lerp(Color("8a3a30"), 0.3))
 
 
 func _arm(side: String, part: int, shoulder: Node3D, skin: Color, shirt: Color, s: Dictionary) -> Node3D:
 	var sleeve: Color = s.get("sleeve", shirt)
-	var lower: Color = s.get("forearm", skin)
-	var hand: Color = s.get("hands", skin.darkened(0.15))
-	var ub := MeshKit.Builder.new().box(Vector3(0.15, 0.32, 0.17), Vector3(0, -0.16, 0), sleeve)
+	var sleeves: String = s.get("sleeves", "short")
+	var paint := []
+	if sleeves == "short":
+		paint.append([Vector3(-1, -1, -1), Vector3(1, SLEEVE_END, 1), skin])
+	var ub := MeshKit.Body.new().add(shape("upper_arm"), skin if sleeves == "none" else sleeve,
+		paint + _paints(s, "upper_arm", side))
+	_stains(ub, s, "upper_arm", side)
 	_extras(ub, s, "upper_arm_extras")
 	_seg("upper_arm_" + side, part, "torso", shoulder, Vector3(0.15, 0.32, 0.17), Vector3(0, -0.16, 0), ub)
 	var elbow := _joint(shoulder, Vector3(0, -0.32, 0))
-	var fb := MeshKit.Builder.new().box(Vector3(0.12, 0.26, 0.14), Vector3(0, -0.13, 0), lower)
-	fb.box(Vector3(0.13, 0.1, 0.16), Vector3(0, -0.31, 0), hand)
+	var lower: Color = s.get("forearm", sleeve if sleeves == "long" else skin)
+	var fb := MeshKit.Body.new().add(shape("forearm"), lower, _paints(s, "forearm", side))
+	_stains(fb, s, "forearm", side)
+	fb.add(shape("hand"), s.get("hands", skin.darkened(0.08)), _paints(s, "hand", side))
 	_extras(fb, s, "forearm_extras")
 	_seg("forearm_" + side, part, "upper_arm_" + side, elbow, Vector3(0.13, 0.36, 0.15), Vector3(0, -0.18, 0), fb)
 	return elbow
 
 
-func _leg(side: String, part: int, hip: Node3D, pants: Color, shoes: Color, s: Dictionary) -> Node3D:
-	var tb := MeshKit.Builder.new().box(Vector3(0.19, 0.45, 0.21), Vector3(0, -0.225, 0), pants)
+func _leg(side: String, part: int, hip: Node3D, pants: Color, s: Dictionary) -> Node3D:
+	var tb := MeshKit.Body.new().add(shape("thigh"), pants, _paints(s, "thigh", side))
+	_stains(tb, s, "thigh", side)
 	_extras(tb, s, "thigh_extras")
 	_seg("thigh_" + side, part, "torso", hip, Vector3(0.19, 0.45, 0.21), Vector3(0, -0.225, 0), tb)
 	var knee := _joint(hip, Vector3(0, -0.45, 0))
-	var sb := MeshKit.Builder.new().box(Vector3(0.16, 0.38, 0.18), Vector3(0, -0.19, 0), pants.darkened(0.1))
-	sb.box(Vector3(0.18, 0.09, 0.28), Vector3(0, -0.425, -0.04), shoes) # foot
+	var shoes: Color = s.get("shoes", Color("222222"))
+	var sb := MeshKit.Body.new().add(shape("shin"), pants, _paints(s, "shin", side))
+	_stains(sb, s, "shin", side)
+	sb.add(shape("shoe"), shoes, [[Vector3(-1, -1, -1), Vector3(1, SOLE_TOP, 1), s.get("sole", shoes.darkened(0.5))]]
+		+ _paints(s, "shoe", side))
 	_extras(sb, s, "shin_extras")
 	_seg("shin_" + side, part, "thigh_" + side, knee, Vector3(0.17, 0.47, 0.2), Vector3(0, -0.235, 0), sb)
 	return knee
@@ -230,8 +517,11 @@ func sever(part: int) -> Array:
 				seg.erase("hitbox")
 			out.append(seg)
 			segs.erase(seg_name)
+			(seg.mesh as Node3D).visible = true # a model rig's rigid piece, ready to fly
+	if skeleton:
+		skeleton.set_bone_pose_scale(skeleton.find_bone(PART_BONE[part]), Vector3.ONE * 0.001)
 	var root := part_root(part)
-	var stump := MeshKit.Builder.new().box(Vector3(0.16, 0.08, 0.16), Vector3.ZERO, BLOOD).instance(null, false)
+	var stump := MeshKit.Body.new().part("tube", Vector3(0.15, 0.06, 0.15), Vector3.ZERO, BLOOD).instance(null, false)
 	stump.position = root.position
 	root.get_parent().add_child(stump)
 	return out
@@ -244,6 +534,9 @@ func take_all() -> Array:
 		if seg.has("hitbox"):
 			(seg.hitbox as Node).queue_free()
 			seg.erase("hitbox")
+		(seg.mesh as Node3D).visible = true
+	if body_mesh:
+		body_mesh.visible = false # the rigid pieces take over
 	segs = {}
 	return out
 
@@ -263,8 +556,17 @@ func hit_react(dir_local: Vector3, strength: float) -> void:
 	_flinch_vel += Vector2(dir_local.z, -dir_local.x) * strength * 9.0
 
 
+## The arms' action: restarted when it changes.
+func set_upper(u: int) -> void:
+	if u != upper:
+		upper = u
+		_upper_t = 0.0
+
+
 func update(delta: float, speed: float) -> void:
 	anim_t += delta
+	_upper_t += delta
+	kick = maxf(0.0, kick - kick * Config.REMOTE_KICK_DECAY * delta - delta * 0.2)
 	phase += delta * _phase_rate(speed)
 	_write_goal(speed)
 	var k := 1.0 - exp(-_blend_rate() * delta)
@@ -283,27 +585,38 @@ func _blend_rate() -> float:
 		Anim.STAGGER: return 24.0
 		Anim.LEAP: return 14.0
 		Anim.CRAWL: return 6.0
-	return 10.0
+		Anim.DOWNED: return 4.0 # a slow fall to the ground
+		Anim.GETUP: return 7.0
+		Anim.LUNGE: return 22.0
+		Anim.SPRINT: return 16.0
+		Anim.SURGE: return 14.0
+	return 16.0 if frantic else 10.0
 
 
 func _stride_amp() -> float:
-	return 0.8 if anim == Anim.RUN else 0.5
+	match anim:
+		Anim.RUN: return 0.8
+		Anim.SPRINT: return 0.9
+	return 0.5
 
 
 func _phase_rate(speed: float) -> float:
 	match anim:
-		Anim.WALK, Anim.RUN:
+		Anim.WALK, Anim.RUN, Anim.SPRINT:
 			# Match leg swing to ground speed so feet don't slide.
 			return maxf(1.5, PI * speed / (2.0 * HIP_HEIGHT * sin(_stride_amp())))
 		Anim.CRAWL:
 			return 2.0 + speed * 5.0
 		Anim.CROUCH:
 			return 2.0 + speed * 3.0
-	return 2.0
+		Anim.SURGE:
+			return 9.0
+	return 4.5 if frantic else 2.0
 
 
 func _apply() -> void:
 	hips.position.y = _cur[J.HIPS_Y]
+	hips.position.z = _cur[J.HIPS_Z]
 	hips.rotation = Vector3(-_cur[J.HIPS_PITCH], 0, _cur[J.HIPS_ROLL])
 	spine.rotation = Vector3(-_cur[J.SPINE_PITCH] + flinch.x, _cur[J.SPINE_YAW] + flinch.y, _cur[J.SPINE_ROLL])
 	neck.rotation = Vector3(-_cur[J.NECK_PITCH] + flinch.x * 0.6, _cur[J.NECK_YAW], _cur[J.NECK_ROLL])
@@ -315,6 +628,18 @@ func _apply() -> void:
 	hip_r.rotation.x = _cur[J.HIP_R]
 	knee_l.rotation.x = _cur[J.KNEE_L]
 	knee_r.rotation.x = _cur[J.KNEE_R]
+	if skeleton:
+		for b in _bone_nodes.size():
+			skeleton.set_bone_pose_rotation(b, _bone_nodes[b].quaternion)
+		skeleton.set_bone_pose_position(0, hips.position)
+		# Clothes' helpers turn half as far as their joints; a shot-off limb's stays at rest, so
+		# the ring of cloth it holds closes the stump where the clothes were cut.
+		for h: int in CharacterModel.HELPER_OF:
+			var j: int = CharacterModel.HELPER_OF[h]
+			var q := Quaternion.IDENTITY
+			if not is_severed(JOINT_PART[j]):
+				q = q.slerp(_bone_nodes[j].quaternion, 0.5)
+			skeleton.set_bone_pose_rotation(h, q)
 
 
 func _crouch(depth: float) -> void:
@@ -327,6 +652,55 @@ func _crouch(depth: float) -> void:
 	_goal[J.HIPS_Y] = HIP_HEIGHT * cos(a)
 
 
+## A survivor's arms, spine and head doing an action on top of whatever the legs do (`upper`), the
+## head and gun following the look (`look_pitch`), and a shot's kick.
+func _write_upper() -> void:
+	var t := _upper_t
+	var look := look_pitch
+	match upper:
+		Upper.AIM: # shouldered, the gun and the head on the look
+			_goal[J.SPINE_PITCH] = 0.05
+			_goal[J.SH_L_X] = 1.2 + look * 0.7
+			_goal[J.SH_R_X] = 1.25 + look * 0.7
+			_goal[J.EL_L] = 0.8
+			_goal[J.EL_R] = 0.5
+			_goal[J.NECK_PITCH] = -look * 0.7
+			_goal[J.NECK_YAW] = -0.1
+		Upper.RELOAD: # the gun tilted low, the left hand to the pouch and back
+			var reach := sin(clampf(fmod(t, 1.6) / 1.6, 0.0, 1.0) * PI)
+			_goal[J.SH_R_X] = 0.7
+			_goal[J.EL_R] = 0.9
+			_goal[J.SPINE_ROLL] = 0.15
+			_goal[J.SH_L_X] = lerpf(0.9, 0.1, reach)
+			_goal[J.SH_L_OUT] = 0.2 * reach
+			_goal[J.EL_L] = lerpf(0.7, 1.4, reach)
+			_goal[J.NECK_PITCH] = 0.3
+		Upper.SHOVE: # the stock driven out with a turn of the body
+			var thrust := sin(clampf(t / Config.SHOVE_TIME, 0.0, 1.0) * PI)
+			_goal[J.SPINE_YAW] = lerpf(0.3, -0.25, thrust)
+			_goal[J.SH_L_X] = 1.2 + thrust * 0.4
+			_goal[J.SH_R_X] = 1.3 + thrust * 0.4
+			_goal[J.EL_L] = lerpf(1.0, 0.2, thrust)
+			_goal[J.EL_R] = lerpf(1.0, 0.2, thrust)
+		Upper.THROW: # wind the arm back, then over and out
+			if t < 0.3:
+				_goal[J.SH_R_X] = -0.5
+				_goal[J.EL_R] = 1.6
+				_goal[J.SPINE_YAW] = 0.4
+				_goal[J.SPINE_PITCH] = -0.1
+			else:
+				_goal[J.SH_R_X] = 2.4
+				_goal[J.EL_R] = 0.2
+				_goal[J.SPINE_YAW] = -0.3
+				_goal[J.SPINE_PITCH] = 0.25
+			_goal[J.SH_L_X] = 1.0
+			_goal[J.EL_L] = 0.5
+	if kick > 0.0: # a shot: the muzzle climbs, the shoulders rock back
+		_goal[J.SH_R_X] += kick * 0.35
+		_goal[J.SH_L_X] += kick * 0.3
+		_goal[J.SPINE_PITCH] -= kick * 0.15
+
+
 func _write_goal(speed: float) -> void:
 	_goal.fill(0.0)
 	_goal[J.HIPS_Y] = HIP_HEIGHT
@@ -335,7 +709,24 @@ func _write_goal(speed: float) -> void:
 	var c := cos(p)
 	match anim:
 		Anim.IDLE:
-			if is_zombie:
+			if is_zombie and frantic: # can't keep still: heaving, swaying, head snapping about
+				var heave := sin(p * 1.3)
+				_goal[J.SPINE_PITCH] = 0.45 + heave * 0.08 + _jerk(p, 2.1) * 0.06
+				_goal[J.SPINE_YAW] = _jerk(p, 0.9) * 0.25
+				_goal[J.SPINE_ROLL] = sin(p * 0.5 + _seed) * 0.1
+				_goal[J.NECK_PITCH] = -0.45 + heave * 0.1
+				_goal[J.NECK_YAW] = _jerk(p, 1.7) * 0.6
+				_goal[J.NECK_ROLL] = _tilt + _jerk(p, 2.6) * 0.3
+				_goal[J.SH_L_X] = 0.5 + _arm_bias + _jerk(p, 1.9) * 0.35
+				_goal[J.SH_R_X] = 0.4 - _arm_bias + _jerk(p, 2.3) * 0.35
+				_goal[J.SH_L_OUT] = 0.25
+				_goal[J.SH_R_OUT] = 0.25
+				_goal[J.EL_L] = 0.6 + _jerk(p, 3.1) * 0.3
+				_goal[J.EL_R] = 0.7 + _jerk(p, 2.7) * 0.3
+				_crouch(0.25 + heave * 0.04)
+				_goal[J.HIP_L] += sin(p * 0.8) * 0.1 # weight shifting foot to foot
+				_goal[J.HIP_R] -= sin(p * 0.8) * 0.1
+			elif is_zombie:
 				_goal[J.SPINE_PITCH] = 0.28 + sin(p * 0.7) * 0.05
 				_goal[J.SPINE_ROLL] = sin(p * 0.45 + _seed) * 0.08
 				_goal[J.NECK_ROLL] = _tilt + sin(p * 0.6) * 0.15
@@ -468,6 +859,15 @@ func _write_goal(speed: float) -> void:
 			_goal[J.KNEE_R] = -0.6
 			_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1
 
+		Anim.SPRINT:
+			_sprint(speed, p)
+
+		Anim.LUNGE:
+			_lunge(anim_t)
+
+		Anim.SURGE:
+			_surge(p)
+
 		Anim.CROUCH: # a survivor on their haunches, gun up; the legs shuffle when they move
 			var shuffle := s * 0.25 * clampf(speed / 1.5, 0.0, 1.0)
 			_goal[J.HIPS_Y] = HIP_HEIGHT - 0.4
@@ -493,6 +893,76 @@ func _write_goal(speed: float) -> void:
 			_goal[J.EL_L] = 0.7
 			_goal[J.EL_R] = 0.5
 
+		Anim.HEAL: # a survivor wrapping a wound: head down, left forearm across the body, the right hand going round it
+			var wrap := anim_t * TAU / (4.0 * Config.HEAL_POSE_TIME)
+			_goal[J.SPINE_PITCH] = 0.25
+			_goal[J.NECK_PITCH] = 0.7
+			_goal[J.NECK_YAW] = 0.2
+			_goal[J.SH_L_X] = 0.3
+			_goal[J.SH_L_OUT] = -0.3
+			_goal[J.EL_L] = 1.25
+			_goal[J.SH_R_X] = 0.45 + sin(wrap) * 0.2
+			_goal[J.SH_R_OUT] = -0.3 + cos(wrap) * 0.12
+			_goal[J.EL_R] = 1.1 + cos(wrap) * 0.25
+			_goal[J.KNEE_L] = -0.1
+			_goal[J.HIP_L] = 0.05
+
+		Anim.DOWNED: # a survivor on the ground: half lying back, propped on the left arm, the right hand on the wound or reaching out
+			_goal[J.HIPS_Y] = 0.2
+			_goal[J.HIPS_PITCH] = -1.1
+			_goal[J.HIPS_ROLL] = 0.15
+			_goal[J.SPINE_PITCH] = 0.6 + sin(p * 0.6) * 0.03 # laboured breathing
+			_goal[J.SPINE_ROLL] = -0.15
+			_goal[J.NECK_PITCH] = 0.25
+			_goal[J.SH_L_X] = -0.55
+			_goal[J.SH_L_OUT] = 0.3
+			_goal[J.EL_L] = 0.1
+			_goal[J.SH_R_X] = lerpf(0.4, 2.0, reach)
+			_goal[J.SH_R_OUT] = lerpf(-0.25, 0.1, reach)
+			_goal[J.EL_R] = lerpf(1.4, 0.25, reach)
+			_goal[J.HIP_L] = 0.35
+			_goal[J.KNEE_L] = -0.15
+			_goal[J.HIP_R] = 0.6
+			_goal[J.KNEE_R] = -0.9
+
+		Anim.FEED: # a zombie on its knees over a body, hunched, tearing at it with one hand then the other
+			var tear := sin(anim_t * 5.0 + _seed)
+			_goal[J.HIPS_Y] = 0.42
+			_goal[J.HIP_L] = 1.5
+			_goal[J.KNEE_L] = -2.3
+			_goal[J.HIP_R] = 0.2
+			_goal[J.KNEE_R] = -2.2
+			_goal[J.SPINE_PITCH] = 0.9 + sin(anim_t * 2.5) * 0.08
+			_goal[J.NECK_PITCH] = 0.35 + maxf(0.0, -tear) * 0.3 # the head dips in to bite
+			_goal[J.NECK_ROLL] = _tilt
+			_goal[J.SH_L_X] = 1.0 + tear * 0.45
+			_goal[J.SH_R_X] = 1.0 - tear * 0.45
+			_goal[J.SH_L_OUT] = 0.2
+			_goal[J.SH_R_OUT] = 0.2
+			_goal[J.EL_L] = 0.7 - tear * 0.4
+			_goal[J.EL_R] = 0.7 + tear * 0.4
+
+		Anim.GETUP: # back on the feet: a knee and a hand on it first, then standing
+			var u := clampf(anim_t / Config.GETUP_TIME, 0.0, 1.0)
+			if u < 0.5:
+				_goal[J.HIPS_Y] = 0.45
+				_goal[J.HIP_L] = 1.4
+				_goal[J.KNEE_L] = -2.0
+				_goal[J.HIP_R] = -0.2
+				_goal[J.KNEE_R] = -1.6
+				_goal[J.SPINE_PITCH] = 0.55
+				_goal[J.SH_L_X] = 0.6
+				_goal[J.EL_L] = 0.5
+				_goal[J.SH_R_X] = 0.3
+				_goal[J.NECK_PITCH] = -0.2
+			else:
+				_crouch(0.35 * (1.0 - u) * 2.0)
+				_goal[J.SPINE_PITCH] = 0.3 * (1.0 - u) * 2.0
+				_goal[J.SH_L_X] = 0.9
+				_goal[J.SH_R_X] = 1.0
+				_goal[J.EL_L] = 0.7
+				_goal[J.EL_R] = 0.5
+
 		Anim.CRAWL: # face down, dragging itself forward one arm at a time
 			_goal[J.HIPS_Y] = 0.22
 			_goal[J.HIPS_PITCH] = 1.38
@@ -509,10 +979,13 @@ func _write_goal(speed: float) -> void:
 			_goal[J.HIP_L] = -0.05 + c * 0.1
 			_goal[J.HIP_R] = -0.05 - c * 0.1
 
+	if not is_zombie and (upper != Upper.NONE or kick > 0.0) and anim not in [Anim.HEAL, Anim.DOWNED, Anim.CRAWL, Anim.GETUP]:
+		_write_upper()
+
 	# Missing a leg: it can't stand, so every other state plays lying down. Attacks rear the
 	# chest up off the floor before the arms come down; staggers flop it flat.
 	if legs_lost() > 0 and anim != Anim.CRAWL:
-		var rear := 0.45 if anim == Anim.ATTACK and anim_t < 0.2 else 0.0
+		var rear := 0.45 if (anim == Anim.ATTACK or anim == Anim.LUNGE) and anim_t < 0.2 else 0.0
 		_goal[J.HIPS_Y] = 0.22 + rear * 0.15
 		_goal[J.HIPS_PITCH] = 1.38 - rear
 		_goal[J.HIPS_ROLL] = 0.0
@@ -522,6 +995,167 @@ func _write_goal(speed: float) -> void:
 		_goal[J.HIP_R] = -0.05
 		_goal[J.KNEE_L] = 0.0
 		_goal[J.KNEE_R] = 0.0
+		_goal[J.HIPS_Z] = 0.0
 		if anim == Anim.IDLE or anim == Anim.STAGGER:
 			_goal[J.SH_L_X] = 2.6
 			_goal[J.SH_R_X] = 2.6
+
+
+# --- The frantic runner ---------------------------------------------------------
+
+## A twitch: -1..1, mostly held, snapping from one side to the other. `k` is how often.
+## Two out-of-step waves, clipped, so it sits still for a moment then jerks; each zombie and
+## each joint (different `k`) twitch on their own clock.
+func _jerk(t: float, k: float) -> float:
+	var x := sin(t * k + _seed * 3.7) + sin(t * k * 1.73 + _seed * 1.3 + k)
+	return clampf(x * 1.6, -1.0, 1.0)
+
+
+## How hard this stride is a stumble, 0..1..0 over it. Every so many strides (picked from the
+## id and the stride's number, so every peer sees the same trip) the sprinter lurches forward.
+func _lurch(p: float) -> float:
+	var stride := int(floor(p / TAU))
+	if posmod(stride * 73 + _sid * 31, 11) != 0:
+		return 0.0
+	return sin(fposmod(p, TAU) * 0.5)
+
+
+## Flat out: thrown forward from the hips, high knees and heels kicked up, shoulders wrenching
+## round against the legs, arms flailing (one of three ways, by id), the head stabbing ahead
+## and snapping side to side, banking into turns, now and then tripping over its own feet.
+func _sprint(speed: float, p: float) -> void:
+	var s := sin(p)
+	var c := cos(p)
+	var amp := _stride_amp() * clampf(speed / 1.2, 0.0, 1.0)
+	var stiff := 1.0 - _limp * 0.4
+	var burst := clampf(1.0 - anim_t / 0.4, 0.0, 1.0) # the first steps out of a stand: dug in
+	var lurch := _lurch(p)
+	var bank := clampf(turn * 0.12, -0.45, 0.45)
+	# Legs: the forward thigh drives high, the trailing shin folds right up.
+	_goal[J.HIP_L] = s * amp + 0.2 * amp
+	_goal[J.HIP_R] = (-s * amp + 0.2 * amp) * stiff
+	_goal[J.KNEE_L] = -0.2 - maxf(0.0, c) * 2.3 * amp
+	_goal[J.KNEE_R] = (-0.2 - maxf(0.0, -c) * 2.3 * amp) * stiff
+	_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1 + absf(c) * 0.14 * amp - lurch * 0.1
+	_goal[J.HIPS_PITCH] = 0.22 + amp * 0.1 + burst * 0.15 + lurch * 0.15
+	_goal[J.HIPS_ROLL] = s * 0.09 + bank + maxf(0.0, -s) * _limp * 0.15
+	# Body: bobbing down on every footfall, the shoulders counter-twisting hard.
+	_goal[J.SPINE_PITCH] = 0.45 + amp * 0.25 + sin(p * 2.0) * 0.09 + burst * 0.25 + lurch * 0.35
+	_goal[J.SPINE_YAW] = -s * 0.38 + _jerk(p, 0.7) * 0.08
+	_goal[J.SPINE_ROLL] = -s * 0.1 + bank * 0.5
+	# Head: kept looking ahead past the lean, thrust out, snapping about.
+	var lean := _goal[J.HIPS_PITCH] + _goal[J.SPINE_PITCH]
+	_goal[J.NECK_PITCH] = -lean * 0.75 - 0.15 + _jerk(p, 1.9) * 0.12
+	_goal[J.NECK_YAW] = s * 0.2 + _jerk(p, 1.3) * 0.35
+	_goal[J.NECK_ROLL] = _tilt * 0.6 + _jerk(p, 2.4) * 0.25 - bank * 0.6
+	# Arms.
+	var fl := _jerk(p, 2.9) * 0.3
+	var fr := _jerk(p, 3.3) * 0.3
+	match _gait:
+		0: # reaching: both arms out for the kill, clawing in turn
+			_goal[J.SH_L_X] = 1.75 - s * 0.55 + fl
+			_goal[J.SH_R_X] = 1.75 + s * 0.55 + fr
+			_goal[J.SH_L_OUT] = 0.15 + absf(fl) * 0.4
+			_goal[J.SH_R_OUT] = 0.15 + absf(fr) * 0.4
+			_goal[J.EL_L] = 0.25 + maxf(0.0, s) * 0.9
+			_goal[J.EL_R] = 0.25 + maxf(0.0, -s) * 0.9
+		1: # thrashing: arms swung wide and loose, like they're being dragged along
+			_goal[J.SH_L_X] = 0.3 - s * 1.5 + fl
+			_goal[J.SH_R_X] = 0.3 + s * 1.5 + fr
+			_goal[J.SH_L_OUT] = 0.5 + c * 0.35
+			_goal[J.SH_R_OUT] = 0.5 - c * 0.35
+			_goal[J.EL_L] = 0.2 + maxf(0.0, -s) * 1.4
+			_goal[J.EL_R] = 0.2 + maxf(0.0, s) * 1.4
+		_: # lopsided: one arm grabbing ahead, the other flapping behind
+			_goal[J.SH_L_X] = 1.9 + s * 0.35 + fl
+			_goal[J.SH_R_X] = -0.2 + s * 1.3 + fr
+			_goal[J.SH_L_OUT] = 0.1
+			_goal[J.SH_R_OUT] = 0.55 + absf(fr) * 0.5
+			_goal[J.EL_L] = 0.3 + maxf(0.0, -s) * 0.6
+			_goal[J.EL_R] = 0.4 + maxf(0.0, s) * 1.2
+	if lurch > 0.0: # tripping: arms flung out ahead to catch itself
+		for j: int in [J.SH_L_X, J.SH_R_X]:
+			_goal[j] = lerpf(_goal[j], 2.2, lurch * 0.7)
+		_goal[J.SH_L_OUT] += lurch * 0.4
+		_goal[J.SH_R_OUT] += lurch * 0.4
+
+
+## The runner's attack (same timing as Config.ZOMBIE_ATTACK_TIME / HIT_AT as the walker's):
+## a coil, a pounce that throws the whole body and both hands at the target with the jaws out,
+## then a flurry of clawing and biting until the swing is over.
+func _lunge(t: float) -> void:
+	if t < 0.12: # coil
+		_crouch(0.45)
+		_goal[J.HIPS_PITCH] = 0.2
+		_goal[J.SPINE_PITCH] = 0.85
+		_goal[J.NECK_PITCH] = -0.85
+		_goal[J.SH_L_X] = 0.9
+		_goal[J.SH_R_X] = 0.8
+		_goal[J.SH_L_OUT] = 0.7
+		_goal[J.SH_R_OUT] = 0.7
+		_goal[J.EL_L] = 1.7
+		_goal[J.EL_R] = 1.7
+		_goal[J.HIPS_Z] = 0.1
+	elif t < 0.34: # pounce: lead leg out, trailing leg driving, hands and teeth first
+		_goal[J.HIP_L] = 0.95
+		_goal[J.KNEE_L] = -0.8
+		_goal[J.HIP_R] = -0.6
+		_goal[J.KNEE_R] = -0.25
+		_goal[J.HIPS_Y] = HIP_HEIGHT - 0.12
+		_goal[J.HIPS_PITCH] = 0.35
+		_goal[J.HIPS_Z] = -0.4
+		_goal[J.SPINE_PITCH] = 0.5
+		_goal[J.NECK_PITCH] = -0.75 + _jerk(t * 10.0, 3.0) * 0.1
+		_goal[J.SH_L_X] = 1.75
+		_goal[J.SH_R_X] = 1.6
+		_goal[J.SH_L_OUT] = -0.15 # hands in, grabbing
+		_goal[J.SH_R_OUT] = -0.15
+		_goal[J.EL_L] = 0.05
+		_goal[J.EL_R] = 0.1
+	else: # maul: clawing left-right-left, head jabbing in to bite
+		var claw := sin(t * 30.0)
+		_goal[J.HIP_L] = 0.7
+		_goal[J.KNEE_L] = -0.6
+		_goal[J.HIP_R] = -0.4
+		_goal[J.KNEE_R] = -0.3
+		_goal[J.HIPS_Y] = HIP_HEIGHT - 0.1
+		_goal[J.HIPS_PITCH] = 0.25
+		_goal[J.HIPS_Z] = -0.3 * clampf((0.7 - t) / 0.2, 0.0, 1.0)
+		_goal[J.SPINE_PITCH] = 0.6 + sin(t * 22.0) * 0.12
+		_goal[J.SPINE_YAW] = claw * 0.25
+		_goal[J.NECK_PITCH] = -0.6 + sin(t * 26.0) * 0.25
+		_goal[J.NECK_YAW] = -claw * 0.3
+		_goal[J.SH_L_X] = 1.4 + claw * 0.7
+		_goal[J.SH_R_X] = 1.4 - claw * 0.7
+		_goal[J.SH_L_OUT] = 0.1
+		_goal[J.SH_R_OUT] = 0.1
+		_goal[J.EL_L] = 0.3 + maxf(0.0, -claw) * 1.1
+		_goal[J.EL_R] = 0.3 + maxf(0.0, claw) * 1.1
+
+
+## Jammed in behind others and going nowhere: up on its toes, legs scrabbling, hands clawing
+## at the backs and over the heads in front, trying to climb its way through.
+func _surge(p: float) -> void:
+	var s := sin(p)
+	var c := cos(p)
+	_goal[J.HIP_L] = 0.35 + s * 0.45
+	_goal[J.HIP_R] = 0.35 - s * 0.45
+	_goal[J.KNEE_L] = -0.3 - maxf(0.0, c) * 1.1
+	_goal[J.KNEE_R] = -0.3 - maxf(0.0, -c) * 1.1
+	_goal[J.HIPS_Y] = HIP_HEIGHT - 0.04 + absf(c) * 0.06
+	_goal[J.HIPS_PITCH] = 0.15
+	_goal[J.HIPS_Z] = -0.08 + absf(s) * 0.08 # shoving into the back in front
+	_goal[J.SPINE_PITCH] = 0.25 + absf(c) * 0.15
+	_goal[J.SPINE_YAW] = s * 0.25
+	_goal[J.SPINE_ROLL] = c * 0.12
+	_goal[J.NECK_PITCH] = -0.55 + _jerk(p, 0.6) * 0.15
+	_goal[J.NECK_YAW] = _jerk(p, 0.45) * 0.4
+	_goal[J.NECK_ROLL] = _tilt + _jerk(p, 0.8) * 0.2
+	# Arms reach up and over in turn and drag down, like climbing a pile.
+	var a := p * 1.0 + _seed
+	_goal[J.SH_L_X] = 2.45 + sin(a) * 0.55
+	_goal[J.SH_R_X] = 2.45 + sin(a + PI) * 0.55
+	_goal[J.SH_L_OUT] = 0.2 + _jerk(p, 0.9) * 0.15
+	_goal[J.SH_R_OUT] = 0.2 + _jerk(p, 1.1) * 0.15
+	_goal[J.EL_L] = 0.2 + maxf(0.0, -sin(a)) * 1.0
+	_goal[J.EL_R] = 0.2 + maxf(0.0, sin(a)) * 1.0

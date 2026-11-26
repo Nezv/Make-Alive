@@ -10,6 +10,7 @@ extends Node
 
 signal leave_requested
 signal retry_requested ## the host wants the same match again (main.gd starts it)
+signal join_refused(message: String) ## this client's build and the host's do not match (main.gd goes back to the menu with it)
 
 enum GoreFx { HIT, SEVER, DIE }
 
@@ -21,7 +22,13 @@ var bot_aim := "chest" ## chest | head | legs | arms
 var brain: Bot             ## what plays for the local player when `bot` is on (scripts/bot.gd)
 var map_name := "corridor" ## set before start_host; clients get it in `welcome`
 var mission := ""          ## a city POI id ("mirante"...) or "" for free play; clients get it in `welcome`
+var mode := ""             ## GameModes: "" (free play), extraction, defense, open_world; set before start_host, clients get it in `welcome`
+var open_world: OpenWorld = null ## the day and night clock, in the open world mode
+var _open_clock := 0.0     ## client: the host's open-world clock when we joined
 var difficulty := "normal" ## Difficulty.LEVELS; set before start_host, clients get it in `welcome`
+var sky_choice := ""       ## the host's `--time=` (a TimeOfDay name); "" = the mission's or the map's own
+var sky := "night"         ## the TimeOfDay preset this match plays; clients get it in `welcome`
+var sky_dome: SkyDome      ## the sky, its light and fog, the far backdrop
 var limited_ammo := false  ## set before start_host: reloads take from a reserve even on a test map (--limited-ammo, tests)
 var map: GameMap
 var world: Node3D
@@ -32,18 +39,30 @@ var local_player: LocalPlayer
 var hud: Hud
 var gore: Gore
 var fx: Fx
-var helicopter: Helicopter = null ## the one coming for everyone, when the map has a spot for it (cosmetic, local)
 var extraction: ExtractionZone = null ## the open way out's look, while its objective is up
 var noise_rings: NoiseRings = null ## --noise: rings where noise happened (host, debug)
 var hooks: GameHooks
 var director: HordeDirector
 var score := Score.new() ## what each player did this match (host)
+var director_overlay := false ## --director: the pacing as text on the HUD (host)
 var final_score_view := {} ## the end screen's numbers as this peer was sent them (Score.summary)
 var rules: MissionRules  ## the objective list being played (host runs it; see `mission_view` for what peers know)
 ## The mission as this peer was last told it (MissionRules.state); the clock is counted along locally.
 var mission_view := { "index": -1, "status": MissionRules.Status.IDLE, "reason": "", "id": "", "kind": "", "text": "",
 	"left": -1.0, "counting": false, "wave": 0, "has_marker": false, "marker": Vector3.ZERO }
 var remotes := {}        ## peer id -> RemotePlayer
+var _drips := BleedTrail.new() ## where bleeding players last dropped blood
+var pings := {}          ## player id -> { node: the marker, left: seconds }
+var tracers: Tracers      ## every bullet's streak (cosmetic, local)
+var casings: Casings      ## spent cases on the floor (cosmetic, local)
+var whizzes := 0          ## near misses heard (tests)
+var _own_shots := 0
+var _seen_shots := 0
+var heli: Helicopter = null ## the extraction helicopter, while one is coming, down or leaving
+var heli_flight: HeliFlight = null
+var heli_t := 0.0        ## seconds into its flight (every peer counts it itself)
+var _wash_t := 0.0
+var _gunner_t := 0.0
 var names := {}          ## peer id -> player name, on every peer (sent when someone joins or leaves)
 var zombies := {}        ## zombie id -> Zombie
 var zombie_list: Array[Zombie] = [] ## same zombies as an array, refreshed each host tick
@@ -52,10 +71,13 @@ var environment: Environment  ## the world's look; post effects follow the graph
 var rng := RandomNumberGenerator.new() ## recoil, bullet scatter, shotgun pellets (tests seed it)
 
 # Host-only
-var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve }
+var players := {}        ## peer id -> { slot, name, pos, yaw, health: Health, kills, ignore_until, last_shot, weapon, loadout: Loadout, swap_rounds, reserve, inventory: Inventory, status: PlayerStatus }
 var _pending_shots: Array = []
 var _next_zombie := 1
 var _step_t := 0.0       ## seconds since players were last checked for sprinting footsteps
+var _reviving := 0         ## the downed teammate the local player is holding use on
+var _snap_tick := 0         ## snapshots sent so far (the far zombies are sent in turn by it)
+var _zombie_seen := {}      ## client: zombie id -> when (msec) a snapshot last had it
 var _next_drop := 0      ## how many things have been dropped (their iids count up from Config.DROP_IID_BASE)
 var _snapshot_timer := 0.0
 var _now := 0.0
@@ -68,6 +90,8 @@ var _send_timer := 0.0
 func _ready() -> void:
 	name = "Game"
 	Controls.setup()
+	for path in Characters.model_paths():
+		CharacterModel.load_model(path) # now, not as a hitch when the first one spawns
 	hooks = GameHooks.new()
 	hooks.name = "Hooks"
 	hooks.game = self
@@ -76,6 +100,10 @@ func _ready() -> void:
 	rules = MissionRules.new(self)
 	gore = Gore.new()
 	add_child(gore)
+	tracers = Tracers.new()
+	add_child(tracers)
+	casings = Casings.new()
+	add_child(casings)
 	fx = Fx.new()
 	add_child(fx)
 	Settings.changed.connect(_on_setting_changed)
@@ -94,7 +122,7 @@ func start_host(player_name_: String) -> void:
 	_build_world()
 	map.roll_weapons(rng)
 	_add_player(1, player_name_)
-	rules.start(map.objective_defs, map.data.respawn)
+	rules.start(map.objective_defs, map.data.respawn, map.data.respawn_after, map.data.respawn_checkpoint)
 	if mission != "":
 		hooks.on_mission_started(mission)
 	if not Net.peer_left.is_connected(_on_peer_left):
@@ -104,15 +132,18 @@ func start_host(player_name_: String) -> void:
 func start_client(player_name_: String) -> void:
 	is_host = false
 	my_id = multiplayer.get_unique_id()
-	request_join.rpc_id(1, player_name_)
+	request_join.rpc_id(1, player_name_, Config.PROTOCOL_VERSION)
 
 
 func _build_world() -> void:
 	map = GameMap.create(map_name)
 	map.mission = mission
+	if GameModes.valid(mode):
+		GameModes.apply(mode, map) # the mode's zones and objectives, made from the same town on every peer
 	if limited_ammo:
 		map.infinite_ammo = false
 	gore.ground = map.ground_y
+	casings.ground = map.ground_y
 	fx.ground = map.ground_y
 	world = map.root
 	add_child(world)
@@ -126,44 +157,16 @@ func _build_world() -> void:
 	if door != null:
 		door.smashed.connect(_on_door_smashed)
 
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("0b0d10")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("7f8fa6")
-	env.ambient_light_energy = 0.35
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	# The background stays black, but shiny things (guns, wet blood) reflect a dim night sky.
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("141c2b")
-	sky_mat.sky_horizon_color = Color("5a6680")
-	sky_mat.ground_horizon_color = Color("3a4252")
-	sky_mat.ground_bottom_color = Color("0b0d10")
-	var sky := Sky.new()
-	sky.sky_material = sky_mat
-	sky.radiance_size = Sky.RADIANCE_SIZE_64
-	env.sky = sky
-	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	env.fog_enabled = true
-	env.fog_light_color = Color("0b0d10")
-	env.fog_density = 0.035
-	if map.outdoor: # see the night sky, and far enough to make out the building
-		env.background_mode = Environment.BG_SKY
-		env.ambient_light_energy = 0.6
-		env.fog_light_color = Color("151b28")
-		env.fog_density = 0.011
-	environment = env
-	_apply_tier_look(Settings.get_value("graphics_tier"))
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-
-	var moon := DirectionalLight3D.new()
-	moon.light_color = Color("aabbdd")
-	moon.light_energy = 0.9 if map.outdoor else 0.5
-	moon.shadow_enabled = false # lamps cast the shadows; a sun shadow would redraw the horde 4 more times
-	moon.rotation = Vector3(deg_to_rad(-60), deg_to_rad(35), 0)
-	add_child(moon)
+	if is_host:
+		sky = TimeOfDay.resolve(sky_choice if sky_choice != "" else
+			(Missions.INFO[mission].sky if Missions.INFO.has(mission) else map.data.sky))
+	sky_dome = SkyDome.new()
+	sky_dome.name = "Sky"
+	add_child(sky_dome)
+	sky_dome.setup(map, sky)
+	if mode == "open_world" and map is CityMap:
+		open_world = OpenWorld.new(self, _open_clock)
+		add_child(open_world)
 
 	local_player = LocalPlayer.new()
 	local_player.name = "LocalPlayer"
@@ -171,9 +174,21 @@ func _build_world() -> void:
 	local_player.set_loadout(_starting_loadout())
 	local_player.landed.connect(_on_local_landed)
 	local_player.shoved.connect(_on_local_shove)
+	local_player.item_requested.connect(_on_local_item)
+	local_player.chat_requested.connect(func():
+		local_player.typing = true
+		hud.open_chat())
+	local_player.ping_requested.connect(ping)
+	hud.chat_submitted.connect(say)
+	hud.chat_closed.connect(func(): if local_player: local_player.typing = false)
+	local_player.use_cancelled.connect(_on_local_use_cancelled)
 	if not map.infinite_ammo:
 		local_player.weapons.limit(map.starting_ammo()) # the same data on every peer, so the host's count agrees
 	add_child(local_player)
+	local_player.view.smoke.connect(muzzle_smoke) # (the viewmodel is made when the player enters the tree)
+	local_player.view.eject.connect(casings.spawn)
+	local_player.view.handling.connect(func(what: String): Sfx.play_ui("h_" + what, Config.HANDLING_DB))
+	local_player.view.mag_dropped.connect(func(at: Vector3, vel: Vector3): casings.spawn(at, vel, Weapons.Casing.MAG))
 	local_player.teleport(map.player_spawn())
 	if bot:
 		brain = Bot.new(self)
@@ -183,10 +198,14 @@ func _build_world() -> void:
 # --- RPCs: client -> host -------------------------------------------------------
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_join(player_name_: String) -> void:
+func request_join(player_name_: String, version := 0) -> void:
 	if not is_host:
 		return
 	var id := multiplayer.get_remote_sender_id()
+	var problem := version_problem(version)
+	if problem != "":
+		refuse_join.rpc_id(id, problem)
+		return
 	var states := {}
 	for iid: int in interactables:
 		states[iid] = (interactables[iid] as Interactable).get_state()
@@ -196,7 +215,20 @@ func request_join(player_name_: String) -> void:
 
 ## What a joining player must know about this match beyond the map: sent in `welcome`.
 func welcome_rules() -> Dictionary:
-	return { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty }
+	var r := { "infinite_ammo": map.infinite_ammo, "mission": rules.state(), "difficulty": difficulty, "version": Config.PROTOCOL_VERSION, "sky": sky, "mode": mode }
+	if open_world != null:
+		r.open_clock = open_world.clock
+	if heli != null:
+		r.heli = heli_state()
+	return r
+
+
+## What is wrong when the other side runs build `theirs` ("" when it is the same as this one). A build that
+## sends no version at all is an older one.
+static func version_problem(theirs: int) -> String:
+	if theirs == Config.PROTOCOL_VERSION:
+		return ""
+	return "These two builds of the game do not match (this one is version %d, the other is version %d). Everyone has to run the same build." % [Config.PROTOCOL_VERSION, theirs]
 
 
 ## Are HUD markers shown on this level? (Nightmare: no.)
@@ -209,7 +241,7 @@ func mult(key: String) -> float:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
+func client_state(pos: Vector3, yaw: float, action: int = 0, mag: int = 0, pitch: float = 0.0) -> void:
 	if not is_host:
 		return
 	var p = players.get(multiplayer.get_remote_sender_id())
@@ -217,7 +249,9 @@ func client_state(pos: Vector3, yaw: float, action: int = 0) -> void:
 		return
 	p.pos = pos
 	p.yaw = yaw
-	p.action = action
+	p.action = action & PlayerWire.ACTION_BODY # the host adds bleeding and healing itself
+	p.mag = clampi(mag, 0, 255) # only shown to whoever spectates them
+	p.pitch = clampf(pitch, -PlayerWire.PITCH_RANGE, PlayerWire.PITCH_RANGE)
 
 
 ## The sender swung a shove from `origin` along `dir`.
@@ -249,6 +283,8 @@ func _on_local_shove(origin: Vector3, dir: Vector3) -> void:
 func host_shove(id: int, origin: Vector3, dir: Vector3) -> int:
 	if not players.has(id) or _now - float(players[id].last_shove) < Config.SHOVE_TIME * 0.8:
 		return 0
+	if (players[id].status as PlayerStatus).downed or (players[id].status as PlayerStatus).dead:
+		return 0 # no shoving from the floor, or from beyond
 	players[id].last_shove = _now
 	var flat := Vector3(dir.x, 0, dir.z).normalized()
 	if flat == Vector3.ZERO:
@@ -296,21 +332,62 @@ func client_interact(iid: int, weapon: int = -1, rounds: int = -1) -> void:
 		host_interact(multiplayer.get_remote_sender_id(), iid, weapon, rounds)
 
 
+## The sender holds use on a downed teammate (`on`) or let go.
+@rpc("any_peer", "call_remote", "reliable")
+func client_revive(target: int, on: bool) -> void:
+	if not is_host:
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if on:
+		start_revive(id, target)
+	elif players.has(id) and (players[id].status as PlayerStatus).using == &"revive":
+		cancel_use(id)
+
+
+## The sender started something that stops them using an item (a sprint).
+@rpc("any_peer", "call_remote", "reliable")
+func client_cancel_use() -> void:
+	if is_host:
+		cancel_use(multiplayer.get_remote_sender_id())
+
+
+## A player used an item from their inventory (Inventory ids travel as strings).
+@rpc("any_peer", "call_remote", "reliable")
+func client_use_item(item: String) -> void:
+	if is_host:
+		use_item(multiplayer.get_remote_sender_id(), StringName(item))
+
+
 # --- RPCs: host -> clients ------------------------------------------------------
+
+## The host will not have this client (a different build): the message says why.
+@rpc("authority", "call_remote", "reliable")
+func refuse_join(message: String) -> void:
+	join_refused.emit(message)
+
 
 @rpc("authority", "call_remote", "reliable")
 func welcome(map_name_: String, mission_: String, interactable_states: Dictionary, match_rules: Dictionary = {}) -> void:
+	var problem := version_problem(int(match_rules.get("version", 0)))
+	if problem != "":
+		join_refused.emit(problem)
+		return
 	if not GameMap.NAMES.has(map_name_):
 		return
 	map_name = map_name_
 	mission = mission_
 	limited_ammo = not match_rules.get("infinite_ammo", true)
 	difficulty = match_rules.get("difficulty", "normal")
+	sky = TimeOfDay.resolve(match_rules.get("sky", "night"))
+	mode = match_rules.get("mode", "")
+	_open_clock = float(match_rules.get("open_clock", 0.0))
 	if match_rules.has("mission"):
 		mission_state(match_rules.mission)
 	_build_world()
 	for iid: int in interactable_states:
 		_apply_interact_state(iid, interactable_states[iid])
+	if match_rules.has("heli"):
+		apply_heli_state(match_rules.heli)
 	print("[client %d] joined host" % my_id)
 
 
@@ -321,6 +398,7 @@ func mission_state(state: Dictionary) -> void:
 	mission_view = state.duplicate() # counted down here; never the sender's own copy
 	if state.get("kind", "") == "survive" and int(state.get("wave", 0)) > before:
 		Sfx.play_ui("siren", -4.0) # a new wave is on its way
+		Sfx.play_ui("wave_horn", -6.0)
 
 
 ## Host: tell everyone where the mission stands. Called by MissionRules whenever something changes.
@@ -349,38 +427,6 @@ func _update_extraction() -> void:
 		world.add_child(extraction)
 
 
-## The helicopter of a map whose data has a `heli` spot: on its way in while the last wave's
-## helicopter clock runs, over its spot while the extraction runs, flying off once it is won.
-## Every peer works it out from `mission_view` alone; nothing about it is sent.
-func _update_helicopter(delta: float) -> void:
-	var spot: Dictionary = map.data.raw.get("heli", {}) if map != null else {}
-	if spot.is_empty():
-		return
-	var status: int = mission_view.get("status", MissionRules.Status.IDLE)
-	var kind: String = mission_view.get("kind", "")
-	var want := ""
-	if status == MissionRules.Status.RUNNING and kind == "survive" and mission_view.get("heli", false):
-		want = "arrive"
-	elif status == MissionRules.Status.RUNNING and kind == "extract":
-		want = "hover"
-	elif status == MissionRules.Status.WON and helicopter != null:
-		want = "depart"
-	if want == "":
-		if helicopter != null:
-			helicopter.queue_free()
-			helicopter = null
-		return
-	if helicopter == null:
-		var at: Vector3 = spot.at
-		helicopter = Helicopter.new()
-		helicopter.setup(Transform3D(Basis(Vector3.UP, spot.get("yaw", 0.0)), at), fx, spot.get("floor", at.y))
-		world.add_child(helicopter)
-	match want:
-		"arrive": helicopter.arrive(Config.HELI_FLIGHT - float(mission_view.get("left", 0.0)))
-		"hover": helicopter.hover(delta)
-		"depart": helicopter.depart(delta)
-
-
 ## Between two messages from the host every peer counts the objective's clock down itself.
 func _tick_mission_view(delta: float) -> void:
 	var left: float = mission_view.left
@@ -392,6 +438,8 @@ func _tick_mission_view(delta: float) -> void:
 func respawn_at(pos: Vector3, reason: String) -> void:
 	if local_player:
 		local_player.teleport(pos)
+		if reason != "spawn":
+			local_player.arrive()
 	if reason == "died":
 		hud.toast("YOU DIED", Color("ff4444"))
 
@@ -425,9 +473,38 @@ func got_ammo(type: int, rounds: int) -> void:
 		hud.gain("+%d  %s" % [rounds, Weapons.ammo_name(type)])
 
 
+## What you carry changed: this is all of it now. `popup` is the "+1  Medkit" that rises on the HUD.
 @rpc("authority", "call_remote", "reliable")
-func hit_confirm(_killed: bool) -> void:
+func inventory_changed(state: Dictionary, popup := "") -> void:
+	if local_player:
+		local_player.inventory.apply_state(state)
+		if popup != "":
+			hud.gain(popup)
+
+
+## Your wounds and what you are using changed (PlayerStatus.get_state).
+@rpc("authority", "call_remote", "reliable")
+func status_changed(state: Dictionary) -> void:
+	if local_player:
+		local_player.status.apply_state(state)
+
+
+## A short line for one player (the HUD's rising text): "Can't carry any more".
+@rpc("authority", "call_remote", "reliable")
+func notice(text: String) -> void:
+	if hud:
+		hud.gain(text)
+
+
+@rpc("authority", "call_remote", "reliable")
+func hit_confirm(killed: bool, headshot := false, severed := false, dist := 99.0) -> void:
 	hud.hit_marker()
+	hud.hitmarker.show_hit(HitMarker.Kind.HEADSHOT if killed and headshot else (HitMarker.Kind.KILL if killed else HitMarker.Kind.HIT))
+	if severed:
+		hud.hitmarker.show_sever()
+		Sfx.play_ui("sever_wet", -4.0)
+	if killed and dist < Config.LENS_DIST:
+		hud.lens.splash()
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -440,6 +517,37 @@ func zombie_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> vo
 @rpc("authority", "call_remote", "reliable", 2)
 func world_fx(kind: int, pos: Vector3, dir: Vector3, arg: float) -> void:
 	fx.play(kind, pos, dir, arg)
+	_fx_shake(kind, pos, arg)
+
+
+## An explosion shakes whoever is near it.
+func _fx_shake(kind: int, pos: Vector3, arg: float) -> void:
+	if kind == Fx.Kind.BLAST:
+		shake_near(pos, Config.CAM_SHAKE_BLAST * maxf(arg, 0.3), Config.CAM_SHAKE_BLAST_RADIUS * maxf(arg, 0.3))
+
+
+## Every peer: a jolt for the local player if they are within `radius` of `pos`, weaker farther off.
+@rpc("authority", "call_remote", "reliable")
+func shake_near(pos: Vector3, amp: float, radius: float) -> void:
+	if local_player == null:
+		return
+	var d := local_player.global_position.distance_to(pos)
+	if d < radius:
+		local_player.feel.add_shake(amp * (1.0 - d / radius), 0.5)
+
+
+## The local player was hit: a jolt.
+@rpc("authority", "call_remote", "reliable")
+func got_hit(amount: int, from := Vector3.INF) -> void:
+	if local_player == null:
+		return
+	var lp := local_player
+	lp.feel.add_shake(Config.CAM_SHAKE_HIT * clampf(amount / 15.0, 0.4, 1.5), 0.25)
+	Sfx.muffle(Config.MUFFLE_TIME)
+	if from.is_finite(): # a red arc on that side, and the view knocked away from it
+		var rel := wrapf(Compass.bearing_of(from - lp.global_position) - (-lp.yaw), -PI, PI)
+		hud.arcs.add(rel)
+		lp.punch_vel += Vector2(0.4, sin(rel)) * Config.HIT_PUNCH * clampf(amount / 15.0, 0.4, 1.5)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -463,6 +571,11 @@ func _after_state(iid: int) -> void:
 	if gun != null and gun.dynamic and gun.weapon < 0: # a dropped gun was taken: nothing is left of it
 		interactables.erase(iid)
 		gun.queue_free()
+	var pack := interactables.get(iid) as Backpack
+	if pack != null and pack.taken_by >= 0: # emptied: nothing is left of it
+		interactables.erase(iid)
+		pack.queue_free()
+		return
 	var box := interactables.get(iid) as AmmoBox
 	if box == null or box.taken_by < 0:
 		return
@@ -486,7 +599,11 @@ func _player_pos(id: int) -> Vector3:
 ## Build something that was dropped during the match from its state: a gun or an ammo carton.
 func _add_drop(iid: int, state: Dictionary) -> Interactable:
 	var it: Interactable
-	if state.has("weapon"):
+	if state.has("pack"):
+		var pack := Backpack.new()
+		pack.rotation.y = state.get("yaw", 0.0)
+		it = pack
+	elif state.has("weapon"):
 		var gun := WeaponPickup.new()
 		gun.kind = "drop"
 		gun.dynamic = true
@@ -545,11 +662,11 @@ func _add_player(id: int, player_name_: String) -> void:
 	players[id] = { "slot": slot, "name": n if n != "" else "Survivor", "pos": map.player_spawn(), "yaw": 0.0,
 		"health": health, "kills": 0, "ignore_until": 0.0, "last_shot": -100.0,
 		"weapon": _starting_loadout().guns()[0] if not _starting_loadout().everything else Weapons.DEFAULT,
-		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "last_shove": -100.0, "step_pos": map.player_spawn(),
-		"reserve": map.starting_ammo() }
+		"loadout": _starting_loadout(), "swap_rounds": -1, "action": 0, "mag": 0, "pitch": 0.0, "last_push": Vector3.ZERO, "boarded": false, "last_shove": -100.0, "step_pos": map.player_spawn(),
+		"reserve": map.starting_ammo(), "inventory": Inventory.new(), "status": PlayerStatus.new() }
 	health.low.connect(func(): hooks.on_low_hp(id))
 	score.join(id, players[id].name)
-	health.died.connect(func(): hooks.on_player_died(id))
+	health.died.connect(func(): _hp_zero(id))
 	respawn_player(id, "spawn")
 	_send_names()
 	hooks.on_player_joined(id)
@@ -581,9 +698,15 @@ func respawn_player(id: int, reason: String) -> void:
 		var at := Vector3(c.x + cos(a) * 1.2, 0, c.z + sin(a) * 1.2)
 		p.pos = Vector3(at.x, map.ground_y(at) + 0.1, at.z)
 	p.step_pos = p.pos
+	p.boarded = false
 	(p.health as Health).reset()
+	clear_status(id)
+	rules.set_out(id, false) # (a downed player who bled out is back in the fight)
 	p.ignore_until = _now + 0.3 # drop in-flight positions from before the teleport
 	_send_to(id, &"respawn_at", [p.pos, reason])
+	if reason != "spawn":
+		play_fx(Fx.Kind.ARRIVAL, p.pos, Vector3.UP) # dust where they jump down
+	hooks.on_player_respawned(id, reason)
 
 
 ## What a player carries when they arrive: every gun on a test map or in free play, just the
@@ -651,6 +774,411 @@ func _ammo_used(id: int, type: int, rounds: int) -> void:
 		return
 	var have: int = players[id].reserve.get(type, 0)
 	players[id].reserve[type] = maxi(0, have - rounds)
+
+
+# --- Host: inventory --------------------------------------------------------------
+
+## How many more of an item a player can carry (0 for nobody).
+func inventory_room(id: int, item: StringName) -> int:
+	return (players[id].inventory as Inventory).room(item) if players.has(id) else 0
+
+
+## Put `n` of an item in a player's inventory (a pickup, a lootbox, a hook's reward). Returns how many fitted.
+func give_item(id: int, item: StringName, n := 1) -> int:
+	if not players.has(id):
+		return 0
+	var got := (players[id].inventory as Inventory).add(item, n)
+	if got > 0:
+		_sync_inventory(id, "+%d  %s" % [got, Inventory.item_name(item)])
+		hooks.on_item_picked_up(id, item, got)
+	return got
+
+
+## Hand a player the key or keycard `key`. False if they had it already.
+func give_key(id: int, key: StringName) -> bool:
+	if not players.has(id) or not (players[id].inventory as Inventory).add_key(key):
+		return false
+	_sync_inventory(id, "Key  %s" % key)
+	hooks.on_key_picked_up(id, key)
+	return true
+
+
+## Tell a player what they carry (the whole inventory, whenever it changed).
+func _sync_inventory(id: int, popup := "") -> void:
+	if players.has(id):
+		_send_to(id, &"inventory_changed", [(players[id].inventory as Inventory).get_state(), popup])
+
+
+## Could this player start using `item` right now? They must be alive, have one and not be busy with
+## another; a heal is for the hurt or the bleeding, painkillers for when the last dose is wearing off.
+func can_use_item(id: int, item: StringName) -> bool:
+	if not players.has(id) or rules.out.has(id) or not Inventory.valid(item):
+		return false
+	var health: Health = players[id].health
+	var status: PlayerStatus = players[id].status
+	if health.is_dead() or status.is_using() or (players[id].inventory as Inventory).count(item) <= 0:
+		return false
+	match Inventory.kind_of(item):
+		Inventory.Kind.MATERIAL:
+			return false # planks go up on a barricade, they are not used from the pack
+		Inventory.Kind.MEDICAL:
+			if item == Inventory.PAINKILLERS:
+				return health.temp < Config.PAINKILLERS_TEMP * Config.PAINKILLERS_REUSE
+			return health.hp < health.max_hp or status.bleed > 0
+	return true
+
+
+## A player starts using an item. A throw is at once; the medical things take their time
+## (`Inventory.use_time`) and only leave the pack when they are done: a hit or a sprint cancels them.
+func use_item(id: int, item: StringName) -> bool:
+	if not can_use_item(id, item):
+		return false
+	var seconds := Inventory.use_time(item)
+	if seconds <= 0.0:
+		_finish_use(id, item)
+	else:
+		(players[id].status as PlayerStatus).begin_use(item, seconds)
+		_sync_status(id)
+	return true
+
+
+## What a player was using is cancelled (a hit, a sprint). The item stays in the pack. False if they were not using anything.
+func cancel_use(id: int) -> bool:
+	if not players.has(id):
+		return false
+	var status: PlayerStatus = players[id].status
+	var item := status.using
+	var helping := status.revive_target
+	if not status.cancel_use():
+		return false
+	if item == &"revive":
+		status.revive_target = 0
+		if players.has(helping): # the downed one goes back to waiting
+			var down: PlayerStatus = players[helping].status
+			down.revive_left = 0.0
+			down.revive_total = 0.0
+			_sync_status(helping)
+	_sync_status(id)
+	hooks.on_item_use_cancelled(id, item)
+	return true
+
+
+## The item is on: it leaves the pack and `on_item_used` does what it does.
+func _finish_use(id: int, item: StringName) -> void:
+	if not (players[id].inventory as Inventory).remove(item):
+		return
+	_sync_inventory(id)
+	hooks.on_item_used(id, item)
+
+
+## Tell a player their wounds and what they are using.
+func _sync_status(id: int) -> void:
+	if players.has(id):
+		_send_to(id, &"status_changed", [(players[id].status as PlayerStatus).get_state()])
+
+
+## A new life (or a death with no way back): no wounds, nothing being used.
+func clear_status(id: int) -> void:
+	if players.has(id):
+		(players[id].status as PlayerStatus).reset()
+		_sync_status(id)
+
+
+## Host, every physics tick: wounds bleed, painkillers wear off, what is being used gets nearer done,
+## the downed bleed out or are got up.
+func tick_status(delta: float) -> void:
+	for id: int in players.keys():
+		if not players.has(id):
+			continue # (one of the others died a moment ago and was taken out)
+		var p: Dictionary = players[id]
+		var health: Health = p.health
+		var status: PlayerStatus = p.status
+		status.invuln = maxf(0.0, status.invuln - delta)
+		if status.dead:
+			if status.respawn_left >= 0.0: # a timer brings them back; otherwise a checkpoint does, or nothing
+				status.respawn_left -= delta
+				if status.respawn_left <= 0.0:
+					respawn_player(id, "respawn")
+			continue
+		if status.downed:
+			_tick_downed(id, delta)
+			continue
+		if health.is_dead() or rules.out.has(id):
+			continue
+		health.decay_temp(delta)
+		var lost: int = status.bleed_damage(delta)
+		if lost > 0:
+			hooks.on_player_damaged(id, lost, null)
+			health.damage(lost) # (not damage_player: bleeding must not cancel the bandage)
+			if health.is_dead():
+				continue # it knocked them down or killed them: they have a new state
+		if status.using == &"revive" and not _in_reach_of_downed(id, status.revive_target):
+			cancel_use(id) # walked off, or the one they were helping is gone
+			continue
+		var done: StringName = status.step_use(delta)
+		if done == &"revive":
+			_finish_revive(id)
+		elif done != &"":
+			_sync_status(id)
+			_finish_use(id, done)
+
+
+## A downed player: bleeding out, unless someone is getting them up (then the clock waits).
+func _tick_downed(id: int, delta: float) -> void:
+	var status: PlayerStatus = players[id].status
+	if status.revive_left > 0.0:
+		status.revive_left = maxf(0.0, status.revive_left - delta)
+		return
+	status.down_left -= delta
+	if status.down_left <= 0.0:
+		kill_player(id)
+
+
+## HP reached 0. With a teammate still standing who could get them up, a player goes down; the last
+## one standing just dies.
+func _hp_zero(id: int) -> void:
+	for other: int in players:
+		if other != id and not rules.out.has(other):
+			down_player(id)
+			return
+	kill_player(id)
+
+
+## Host: down on the floor for `Config.DOWNED_TIME` seconds, out of the fight until got up.
+func down_player(id: int) -> void:
+	var status: PlayerStatus = players[id].status
+	cancel_use(id)
+	status.stop_bleeding()
+	status.downed = true
+	status.down_left = Config.DOWNED_TIME
+	status.down_total = Config.DOWNED_TIME
+	rules.set_out(id, true)
+	_sync_status(id)
+	hooks.on_player_downed(id)
+
+
+## Host: a player dies for good (and respawns or stays out, as the mission says): HP ran out with nobody
+## to help, or a downed player bled out or was finished.
+func kill_player(id: int) -> void:
+	(players[id].health as Health).hp = 0
+	_leave_body(id)
+	for other: int in players: # whoever was getting them up stops
+		if other != id and (players[other].status as PlayerStatus).revive_target == id:
+			cancel_use(other)
+	hooks.on_player_died(id)
+
+
+## Host: dead with no way back yet (`rules.respawn` off): out of the fight, watching, until the timer or
+## the next checkpoint (or the end of the mission) says otherwise.
+func mark_dead(id: int) -> void:
+	var status: PlayerStatus = players[id].status
+	status.dead = true
+	status.respawn_left = rules.respawn_after
+	status.respawn_checkpoint = rules.respawn_checkpoint
+	rules.set_out(id, true)
+	_sync_status(id)
+
+
+## Host: `id` starts getting the downed player `target` up (the use key held beside them).
+func start_revive(id: int, target: int) -> bool:
+	if id == target or not players.has(id) or not players.has(target):
+		return false
+	var helper: PlayerStatus = players[id].status
+	var down: PlayerStatus = players[target].status
+	if not down.downed or helper.downed or rules.out.has(id) or helper.is_using() or down.revive_left > 0.0:
+		return false
+	if not _in_reach_of_downed(id, target):
+		return false
+	helper.begin_use(&"revive", Config.REVIVE_SECONDS)
+	helper.revive_target = target
+	down.revive_left = Config.REVIVE_SECONDS
+	down.revive_total = Config.REVIVE_SECONDS
+	_sync_status(id)
+	_sync_status(target)
+	return true
+
+
+func _in_reach_of_downed(id: int, target: int) -> bool:
+	if not players.has(target) or not (players[target].status as PlayerStatus).downed:
+		return false
+	return (players[id].pos as Vector3).distance_to(players[target].pos) <= Config.REVIVE_RANGE + 1.5
+
+
+func _finish_revive(id: int) -> void:
+	var helper: PlayerStatus = players[id].status
+	var target := helper.revive_target
+	helper.revive_target = 0
+	_sync_status(id)
+	if players.has(target) and (players[target].status as PlayerStatus).downed:
+		revive_player(target, id)
+
+
+## Host: up again at `Config.REVIVE_HP`, safe for a moment.
+func revive_player(id: int, by: int) -> void:
+	var status: PlayerStatus = players[id].status
+	status.downed = false
+	status.down_left = 0.0
+	status.down_total = 0.0
+	status.revive_left = 0.0
+	status.revive_total = 0.0
+	status.invuln = Config.REVIVE_INVULN
+	(players[id].health as Health).revive(Config.REVIVE_HP)
+	rules.set_out(id, false)
+	_sync_status(id)
+	hooks.on_player_revived(id, by)
+
+
+## Who the local player can watch: the other players standing (not downed, not dead), by id.
+func spectate_candidates() -> Array:
+	var ids := []
+	for id: int in remotes:
+		var bits := int((remotes[id] as RemotePlayer).action)
+		if (remotes[id] as RemotePlayer).hp > 0 and bits & (PlayerWire.ACTION_DOWNED | PlayerWire.ACTION_DEAD) == 0:
+			ids.append(id)
+	ids.sort()
+	return ids
+
+
+## While dead: keep following someone who is still standing and tell the camera where they are.
+func _update_spectating(_delta: float) -> void:
+	var lp := local_player
+	lp.spectate_candidates = spectate_candidates()
+	lp.spectator.update(lp.spectate_candidates)
+	var target := lp.spectator.target
+	lp.spectate_following = target != 0 and remotes.has(target)
+	if lp.spectate_following:
+		lp.spectate_focus = (remotes[target] as Node3D).global_position
+		lp.spectate_yaw = (remotes[target] as Node3D).rotation.y
+
+
+## What a dead player's screen says: who they are watching and when (if ever) they come back.
+func spectate_text() -> String:
+	if local_player == null or not local_player.status.dead:
+		return ""
+	var lines: Array[String] = []
+	var target := local_player.spectator.target
+	if target != 0 and remotes.has(target):
+		var r := remotes[target] as RemotePlayer
+		lines.append("SPECTATING  %s   ♥ %d   %s  %d" % [names.get(target, "Survivor"), r.hp,
+			Weapons.def(r.weapon_id).name if Weapons.valid(r.weapon_id) else "", r.mag])
+	var status := local_player.status
+	if status.respawn_left >= 0.0:
+		lines.append("Respawn in %d s" % ceili(status.respawn_left))
+	elif status.respawn_checkpoint:
+		lines.append("Respawn at the next checkpoint")
+	else:
+		lines.append("You are out for this mission")
+	return "\n".join(lines)
+
+
+## The downed teammate within reach of the local player, as this peer sees them (0 for none).
+func downed_teammate_near() -> int:
+	if local_player == null or local_player.status.downed:
+		return 0
+	for id: int in remotes:
+		if int((remotes[id] as RemotePlayer).action) & PlayerWire.ACTION_DOWNED != 0 \
+				and _player_pos(id).distance_to(local_player.global_position) <= Config.REVIVE_RANGE:
+			return id
+	return 0
+
+
+## Host: everything a player carries goes on the ground where they stand, for the others to loot.
+## Nothing carried means no backpack. Returns it, or null.
+func drop_backpack(id: int) -> Backpack:
+	if not is_host or not players.has(id):
+		return null
+	var inv: Inventory = players[id].inventory
+	if inv.is_empty():
+		return null
+	var lying: Array[int] = []
+	for iid: int in interactables:
+		if iid >= Config.DROP_IID_BASE and interactables[iid] is Backpack:
+			lying.append(iid)
+	if lying.size() >= Config.BACKPACKS_MAX: # the oldest one makes room
+		lying.sort()
+		(interactables[lying[0]] as Backpack).discard()
+	var at: Vector3 = players[id].pos
+	var state := inv.get_state()
+	state.merge({ "by": -1, "drop": true, "pack": true, "yaw": fposmod(_next_drop * 2.399963, TAU),
+		"at": Vector3(at.x, map.ground_y(at), at.z) })
+	var iid := Config.DROP_IID_BASE + _next_drop
+	_next_drop += 1
+	var pack := _add_drop(iid, state) as Backpack
+	interact_state.rpc(iid, pack.get_state())
+	inv.clear()
+	_sync_inventory(id)
+	hooks.on_backpack_dropped(id, pack)
+	return pack
+
+
+## A player takes what fits from a backpack. Returns how many things they took.
+func loot_backpack(id: int, pack: Backpack) -> int:
+	if not players.has(id) or pack.taken_by >= 0:
+		return 0
+	var inv: Inventory = players[id].inventory
+	var before := {}
+	for item: StringName in Inventory.ITEMS:
+		before[item] = inv.count(item)
+	var had_keys := inv.keys()
+	var moved := pack.loot(inv, id)
+	if moved == 0:
+		refuse_to(id, "Can't carry any more")
+		return 0
+	_sync_inventory(id, "+%d  from the backpack" % moved)
+	for item: StringName in Inventory.ITEMS:
+		if inv.count(item) > before[item]:
+			hooks.on_item_picked_up(id, item, inv.count(item) - before[item])
+	for key in inv.keys():
+		if not had_keys.has(key):
+			hooks.on_key_picked_up(id, key)
+	return moved
+
+
+## Say something short to one player (the host included).
+func notice_to(id: int, text: String) -> void:
+	_send_to(id, &"notice", [text])
+
+
+## Tell one player no (a full pack): the line and the interface's error buzz.
+func refuse_to(id: int, text: String) -> void:
+	notice_to(id, text)
+	ui_sound_to(id, "ui_error")
+
+
+## Host: a sound in the world that every peer hears where it happened (a door, a pickup, a latch).
+## Only the name and the place travel; each peer plays its own copy.
+func play_sound(sound: String, pos: Vector3, jitter := Config.WORLD_SOUND_JITTER, volume_db := 0.0) -> void:
+	world_sound.rpc(sound, pos, jitter, volume_db)
+	world_sound(sound, pos, jitter, volume_db)
+
+
+@rpc("authority", "call_remote", "reliable", 2)
+func world_sound(sound: String, pos: Vector3, jitter: float, volume_db: float) -> void:
+	Sfx.play(sound, pos, jitter, volume_db)
+
+
+## Host: an interface sound in one player's head (a refusal).
+func ui_sound_to(id: int, sound: String) -> void:
+	_send_to(id, &"ui_sound", [sound])
+
+
+@rpc("authority", "call_remote", "reliable")
+func ui_sound(sound: String) -> void:
+	Sfx.play_ui(sound, -6.0)
+
+
+func _on_local_use_cancelled() -> void:
+	if is_host:
+		cancel_use(my_id)
+	else:
+		client_cancel_use.rpc_id(1)
+
+
+func _on_local_item(item: StringName) -> void:
+	if is_host:
+		use_item(my_id, item)
+	else:
+		client_use_item.rpc_id(1, String(item))
 
 
 # --- Host: noise ------------------------------------------------------------------
@@ -729,11 +1257,35 @@ func _on_local_landed(height: float) -> void:
 		client_fell.rpc_id(1, height)
 
 
-func damage_player(id: int, amount: int, by: Zombie = null) -> void:
+## `bleed_roll` (0..1) decides whether a zombie's hit also opens a wound; -1 rolls it (tests pin it).
+func damage_player(id: int, amount: int, by: Zombie = null, bleed_roll := -1.0) -> void:
 	if not players.has(id):
 		return
+	var status: PlayerStatus = players[id].status
+	if status.invuln > 0.0 or status.dead:
+		return # just got up (nothing can hurt them yet), or there is nothing left to hurt
 	hooks.on_player_damaged(id, amount, by)
+	if by != null and is_instance_valid(by): # the way a blow pushes them (a death falls that way)
+		var away: Vector3 = players[id].pos - by.global_position
+		players[id].last_push = Vector3(away.x, 0, away.z).normalized()
+	_send_to(id, &"got_hit", [amount, by.global_position if by != null and is_instance_valid(by) else Vector3.INF]) # their view jolts
+	if status.downed: # on the floor: the hit costs time, and can finish them
+		if amount > 0:
+			status.down_left -= amount * Config.DOWNED_DAMAGE_SECONDS
+			if status.down_left <= 0.0:
+				kill_player(id)
+			else:
+				_sync_status(id)
+		return
+	var bleeds := false
+	if amount > 0:
+		cancel_use(id) # a hit knocks the bandage off
+		if by != null:
+			bleeds = status.hurt(rng.randf() if bleed_roll < 0.0 else bleed_roll)
 	(players[id].health as Health).damage(amount)
+	if bleeds and status.bleed > 0: # (a hit that killed them leaves a clean new life, no wound)
+		_sync_status(id)
+		hooks.on_player_bleeding(id, status.bleed)
 
 
 func heal_player(id: int, amount: int) -> void:
@@ -745,14 +1297,20 @@ func heal_player(id: int, amount: int) -> void:
 func nearest_player(from: Vector3) -> int:
 	var best := 0
 	var best_d := Config.ZOMBIE_AGGRO_RANGE
+	var down := 0
+	var down_d := Config.DOWNED_FINISH_RANGE
 	for id: int in players:
-		if rules.out.has(id):
-			continue # dead or down: the living are more interesting
 		var pos: Vector3 = players[id].pos
 		var d := Vector2(pos.x - from.x, pos.z - from.z).length()
-		if d < best_d:
+		if (players[id].status as PlayerStatus).downed:
+			if d < down_d: # a downed player is only a target when nobody else is as near
+				down_d = d
+				down = id
+		elif not rules.out.has(id) and d < best_d:
 			best_d = d
 			best = id
+	if down != 0 and (best == 0 or best_d > Config.DOWNED_FINISH_RANGE):
+		return down
 	return best
 
 
@@ -762,7 +1320,8 @@ func nearest_player(from: Vector3) -> int:
 ## `weapon`: the gun in the player's hands as they clicked (the host otherwise only learns it from shots).
 ## `rounds`: what is in the magazine of the gun they would drop to take this one (-1 = not said).
 func host_interact(player_id: int, iid: int, weapon: int = -1, rounds: int = -1) -> bool:
-	if not players.has(player_id) or not interactables.has(iid):
+	if not players.has(player_id) or not interactables.has(iid) or (players[player_id].status as PlayerStatus).downed \
+			or (players[player_id].status as PlayerStatus).dead:
 		return false
 	if Weapons.valid(weapon) and players[player_id].loadout.has(weapon):
 		players[player_id].weapon = weapon
@@ -832,12 +1391,15 @@ func zombie_attack_lands(z: Zombie, target_id: int) -> void:
 		damage_player(target_id, roundi(z.attack_damage() * mult("damage")), z)
 
 
-func zombie_bashes_door(_z: Zombie, d: Door) -> void:
-	d.take_hit(Config.DOOR_BASH_DAMAGE)
+func zombie_bashes_door(z: Zombie, d: Door) -> void:
+	if not d.take_hit(Config.DOOR_BASH_DAMAGE) and not d.broken:
+		hooks.on_door_bashed(d, z)
 
 
 func zombie_leap_lands(z: Zombie) -> void:
 	hooks.on_zombie_leap_landed(z)
+	shake_near.rpc(z.global_position, Config.CAM_SHAKE_LEAP, Config.CAM_SHAKE_LEAP_RADIUS)
+	shake_near(z.global_position, Config.CAM_SHAKE_LEAP, Config.CAM_SHAKE_LEAP_RADIUS)
 	for id: int in players:
 		var pos: Vector3 = players[id].pos
 		if pos.distance_to(z.global_position) < Config.LEAP_HIT_RADIUS:
@@ -848,6 +1410,10 @@ func _queue_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Weap
 	var p = players.get(shooter)
 	if p == null or not Weapons.valid(weapon) or not p.loadout.has(weapon):
 		return
+	if (p.status as PlayerStatus).dead:
+		return
+	if (p.status as PlayerStatus).downed and weapon != (p.loadout as Loadout).sidearm():
+		return # only the pistol is within reach
 	var interval: float = Weapons.def(weapon).interval
 	if _now - p.last_shot < interval * 0.8:
 		return # rate limit: nobody fires faster than their gun can
@@ -863,16 +1429,107 @@ func resolve_shot(shooter: int, origin: Vector3, dir: Vector3, weapon: int = Wea
 	var pellets: int = d.pellets
 	var cone: float = d.pellet_spread
 	var landed := false
+	var impacts := []
 	for i in pellets:
-		landed = _trace_bullet(shooter, origin, Weapons.scatter(dir, cone, rng), d) or landed
+		landed = _trace_bullet(shooter, origin, Weapons.scatter(dir, cone, rng), d, impacts) or landed
+	if pellets > 1 and not impacts.is_empty(): # a pattern: a hole per pellet, one puff for the lot
+		var mid := Vector3.ZERO
+		for im: Array in impacts:
+			play_fx(Fx.Kind.IMPACT, im[0], im[1], im[2] + Fx.IMPACT_HOLE_ONLY)
+			mid += im[0]
+		play_fx(Fx.Kind.IMPACT, mid / impacts.size(), impacts[0][1], impacts[0][2] + Fx.IMPACT_PUFF_ONLY)
+	elif not impacts.is_empty():
+		play_fx(Fx.Kind.IMPACT, impacts[0][0], impacts[0][1], impacts[0][2])
 	score.add(shooter, "shots")
 	if landed:
 		score.add(shooter, "hits")
+	_tell_shot(shooter, weapon, origin, _bullet_end(origin, dir, float(d.range)))
+
+
+## Where a bullet from `origin` along `dir` stops: the first wall or body, or its reach.
+func _bullet_end(origin: Vector3, dir: Vector3, reach: float) -> Vector3:
+	if not is_inside_tree():
+		return origin + dir * reach
+	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * reach, Config.LAYER_WORLD | Config.LAYER_HITBOX)
+	q.collide_with_areas = true
+	var hit := get_viewport().get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.position if not hit.is_empty() else origin + dir * reach
+
+
+## Host: everyone but the shooter sees (and hears) their gun go off.
+func _tell_shot(shooter: int, weapon: int, origin: Vector3, end: Vector3) -> void:
+	for peer in multiplayer.get_peers():
+		if peer != shooter:
+			shot_seen.rpc_id(peer, shooter, weapon, origin, end)
+	if shooter != my_id:
+		shot_seen(shooter, weapon, origin, end)
+
+
+## Someone else fired: their gun flashes, a puff of smoke, the shot heard where they are. (`end` is
+## where the bullet went, for the tracers to come.)
+@rpc("authority", "call_remote", "unreliable")
+func shot_seen(shooter: int, weapon: int, origin: Vector3, end: Vector3) -> void:
+	if not remotes.has(shooter):
+		return
+	var r: RemotePlayer = remotes[shooter]
+	r.fired(rng)
+	var at := r.muzzle_world()
+	tracers.fire(at, end, weapon)
+	_near_miss(origin, end)
+	if Weapons.flash_shape(weapon) == Weapons.Flash.NONE:
+		muzzle_smoke(at, 1, true)
+	else:
+		muzzle_smoke(at, 1, false)
+	var d := Weapons.def(weapon)
+	_seen_shots += 1
+	var vary := GunVoice.variation(_seen_shots)
+	var far := local_player != null and origin.distance_to(local_player.camera.global_position) > Config.SHOT_FAR_DIST
+	Sfx.play(GunVoice.sound(weapon) + ("_far" if far else ""), at, 0.0, d.volume + vary[1], vary[0])
+	Sfx.play(GunVoice.tail(place_at(at)), at, 0.0, d.volume - Config.TAIL_DB, vary[0])
+
+
+## What answers a shot fired at `pos`: a room, the street between buildings, the open hill.
+func place_at(pos: Vector3) -> int:
+	if not map.outdoor:
+		return GunVoice.Place.INDOOR
+	if map.ground_y(pos) > Config.HILL_OPEN_Y:
+		return GunVoice.Place.OPEN
+	return GunVoice.Place.STREET
+
+
+## Someone else's bullet from `origin` to `end`: if it passed close by your head, you hear it go by
+## and flinch.
+func _near_miss(origin: Vector3, end: Vector3) -> void:
+	var lp := local_player
+	if lp == null or lp.status.dead:
+		return
+	var ear := lp.camera.global_position
+	var line := end - origin
+	var length := line.length()
+	if length < 0.01:
+		return
+	var u := (ear - origin).dot(line) / (length * length)
+	if u <= 0.0 or u >= 1.0: # behind the shooter or short of you
+		return
+	if (origin + line * u).distance_to(ear) > Config.WHIZ_RADIUS:
+		return
+	whizzes += 1
+	Sfx.play("whiz", origin + line * u, 0.1)
+	lp.punch += Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)).normalized() * Config.WHIZ_FLINCH
+
+
+## Puffs of smoke from a muzzle at `at`, drifting up and with the wind; `thin` for a suppressed gun or a
+## hot barrel's wisp.
+func muzzle_smoke(at: Vector3, count: int, thin: bool) -> void:
+	var drift := (Vector3.UP + Config.MUZZLE_WIND * 0.6).normalized()
+	fx.burst(Fx.Layer.SMOKE, at, drift, count, { "speed": 0.35 if thin else 0.6, "spread": 0.5,
+		"life": Config.MUZZLE_SMOKE_LIFE * (1.4 if thin else 1.0), "size": 0.03 if thin else 0.06,
+		"size_end": 0.14 if thin else 0.28, "color": Color(0.62, 0.62, 0.64, 0.16 if thin else 0.22), "gravity": -0.5 })
 
 
 ## Trace a bullet and apply it. Body-part hitboxes are Area3Ds; walls and closed doors block.
 ## True if it hit a zombie.
-func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -> bool:
+func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary, impacts: Array = []) -> bool:
 	var space := get_viewport().get_world_3d().direct_space_state
 	var reach: float = d.range
 	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * reach,
@@ -889,6 +1546,7 @@ func _trace_bullet(shooter: int, origin: Vector3, dir: Vector3, d: Dictionary) -
 		if is_instance_valid(z) and zombies.has(z.zid):
 			hit_zombie(shooter, z, collider.get_meta("part"), hit.position, dir, d.damage)
 			return true
+	impacts.append([hit.position, hit.normal, Surface.of_hit(hit)]) # a wall, a floor, a door: what it is made of
 	return false
 
 
@@ -937,7 +1595,8 @@ func hit_zombie(shooter: int, z: Zombie, part: int, pos: Vector3, dir: Vector3,
 			players[shooter].kills += 1
 		_broadcast_fx(z.zid, GoreFx.DIE, part, pos, dir)
 	if players.has(shooter):
-		_send_to(shooter, &"hit_confirm", [result.killed])
+		var dist := (players[shooter].pos as Vector3).distance_to(z.global_position)
+		_send_to(shooter, &"hit_confirm", [result.killed, result.headshot, severed >= 0, dist])
 
 
 func _broadcast_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -> void:
@@ -950,6 +1609,7 @@ func _broadcast_fx(zid: int, kind: int, part: int, pos: Vector3, dir: Vector3) -
 func play_fx(kind: int, pos: Vector3, dir: Vector3, arg := 1.0) -> void:
 	world_fx.rpc(kind, pos, dir, arg)
 	fx.play(kind, pos, dir, arg)
+	_fx_shake(kind, pos, arg)
 
 
 func _on_setting_changed(key: String) -> void:
@@ -1029,10 +1689,9 @@ func _physics_process(delta: float) -> void:
 	if not is_host or local_player == null:
 		return
 	_now += delta
-	players[1].pos = local_player.global_position
-	players[1].yaw = local_player.yaw
-	players[1].action = local_player.action_bits()
+	_record_own_player()
 	_footsteps(delta)
+	tick_status(delta)
 
 	director.step(delta)
 	rules.step(delta)
@@ -1047,8 +1706,39 @@ func _physics_process(delta: float) -> void:
 	if _snapshot_timer <= 0.0:
 		_snapshot_timer += 1.0 / Config.TICK_RATE
 		var snap := build_snapshot()
-		snapshot.rpc(PlayerWire.pack(snap[0]), ZombieWire.pack(snap[1]))
+		var player_bytes := PlayerWire.pack(snap[0])
+		if snap[1].size() <= Interest.budget(players.size()):
+			snapshot.rpc(player_bytes, ZombieWire.pack(snap[1])) # it all fits: one packet for everyone
+		else:
+			for peer: int in multiplayer.get_peers(): # too many zombies: each client gets the ones that matter to it
+				if players.has(peer):
+					snapshot.rpc_id(peer, player_bytes, zombie_bytes_for(peer, snap[1], _snap_tick))
+		_snap_tick += 1
 		_apply_snapshot(snap[0], snap[1])
+
+
+## What a player's body is doing as everyone else sees it: what their own game said plus what the host knows.
+func _action_bits(p: Dictionary) -> int:
+	var bits: int = p.action
+	if (p.status as PlayerStatus).bleed > 0:
+		bits |= PlayerWire.ACTION_BLEED
+	if (p.status as PlayerStatus).is_using():
+		bits |= PlayerWire.ACTION_HEAL
+	if (p.status as PlayerStatus).downed:
+		bits |= PlayerWire.ACTION_DOWNED
+	if (p.status as PlayerStatus).dead:
+		bits |= PlayerWire.ACTION_DEAD
+	return bits
+
+
+## The zombie block of the snapshot for client `peer`: all of `list` while it fits in the packet, otherwise
+## the nearest to that player every time and the far ones in turn (Interest).
+func zombie_bytes_for(peer: int, list: Array, tick: int) -> PackedByteArray:
+	var budget := Interest.budget(players.size())
+	if list.size() <= budget:
+		return ZombieWire.pack(list)
+	var at: Vector3 = players[peer].pos if players.has(peer) else Vector3.ZERO
+	return ZombieWire.pack(Interest.pick(list, at, tick, budget))
 
 
 ## Host: where everyone and everything is right now, as [players, zombies] (see PlayerWire and
@@ -1057,11 +1747,11 @@ func build_snapshot() -> Array:
 	var pd := []
 	for id: int in players:
 		var p: Dictionary = players[id]
-		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).hp, "kills": p.kills, "weapon": p.weapon, "action": p.action })
+		pd.append({ "id": id, "pos": p.pos, "yaw": p.yaw, "hp": (p.health as Health).total(), "kills": p.kills, "weapon": p.weapon, "action": _action_bits(p), "mag": p.mag, "pitch": p.pitch })
 	var zd := []
 	for z: Zombie in zombies.values():
 		zd.append({ "zid": z.zid, "pos": z.global_position, "yaw": z.rotation.y, "state": z.state,
-			"type": z.type, "mask": z.rig.severed_mask })
+			"type": z.type, "mask": z.rig.severed_mask, "flags": ZombieWire.FLAG_CRAWLING if z.is_crawling() else 0 })
 	return [pd, zd]
 
 
@@ -1073,6 +1763,7 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		var id: int = e.id
 		if id == my_id:
 			hud.set_hp(e.hp)
+			hud.set_vitals(mini(e.hp, Config.PLAYER_HP), maxi(0, e.hp - Config.PLAYER_HP), local_player.status)
 			hud.set_info(players_data.size(), zombies_data.size(), e.kills)
 			continue
 		seen[id] = true
@@ -1083,6 +1774,10 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 		(remotes[id] as RemotePlayer).buffer.push(e.pos, e.yaw)
 		(remotes[id] as RemotePlayer).set_weapon(e.weapon)
 		(remotes[id] as RemotePlayer).set_action(e.get("action", 0))
+		(remotes[id] as RemotePlayer).hp = e.hp
+		(remotes[id] as RemotePlayer).mag = e.get("mag", 0)
+		(remotes[id] as RemotePlayer).look_pitch = e.get("pitch", 0.0)
+		(remotes[id] as RemotePlayer).visible = int(e.get("action", 0)) & PlayerWire.ACTION_DEAD == 0 # (no ghost left standing)
 	for id: int in remotes.keys():
 		if not seen.has(id):
 			(remotes[id] as Node).queue_free()
@@ -1090,12 +1785,12 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 
 	if is_host:
 		return # the host's zombies are the real ones
-	var zseen := {}
+	var now := Time.get_ticks_msec()
 	for e: Dictionary in zombies_data:
 		var zid: int = e.zid
 		if _dead_zombies.has(zid):
 			continue
-		zseen[zid] = true
+		_zombie_seen[zid] = now
 		var z: Zombie = zombies.get(zid)
 		if z == null:
 			z = Zombie.create(zid, e.type, false, e.pos, e.mask)
@@ -1103,10 +1798,13 @@ func _apply_snapshot(players_data: Array, zombies_data: Array) -> void:
 			add_child(z)
 		z.buffer.push(e.pos, e.yaw)
 		z.state = e.state
-	for zid: int in zombies.keys():
-		if not zseen.has(zid):
+	for zid: int in zombies.keys(): # one that has been missing from the snapshots for a while is gone
+		if now - int(_zombie_seen.get(zid, 0)) > Config.ZOMBIE_STALE * 1000.0:
 			(zombies[zid] as Node).queue_free()
 			zombies.erase(zid)
+	for zid: int in _zombie_seen.keys():
+		if not zombies.has(zid):
+			_zombie_seen.erase(zid)
 
 
 func _process(delta: float) -> void:
@@ -1117,18 +1815,36 @@ func _process(delta: float) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	_update_looked_at()
-	hud.set_prompt(looked_at.prompt() if looked_at else "")
+	var downed_near := downed_teammate_near() if looked_at == null else 0
+	hud.set_prompt(looked_at.prompt() if looked_at else ("Hold: revive %s" % names.get(downed_near, "them") if downed_near != 0 else ""), "interact")
+	_update_compass_and_markers()
 	if captured and Input.is_action_just_pressed("interact") and right_click_is_use(looked_at):
 		interact_with(looked_at)
 		local_player.aim_blocked = true
 	elif not Input.is_action_pressed("interact"):
 		local_player.aim_blocked = false
+	_update_revive(captured and downed_near != 0 and Input.is_action_pressed("interact"), downed_near)
 
 	_tick_mission_view(delta)
 	hud.set_objective(mission_view, zombies.size())
+	local_player.status.tick_view(delta)
+	hud.set_inventory(local_player.inventory)
+	hud.set_status(local_player.status)
+	update_drips(delta)
+	update_reach()
+	Sfx.step_muffle(delta)
+	Sfx.step_spots(Sfx.pool().ears(), delta)
+	step_pings(delta)
+	step_heli(delta)
+	var cam := get_viewport().get_camera_3d()
+	sky_dome.step(delta, cam.global_position if cam else Vector3.INF)
+	if local_player.status.dead:
+		_update_spectating(delta)
+	hud.set_spectate(spectate_text())
+	hud.set_director(director.debug_text() if director_overlay and is_host else "")
+	hud.set_wheel(local_player.wheel)
 	hud.set_countdown(mission_view)
 	_update_extraction()
-	_update_helicopter(delta)
 	var status: int = mission_view.status
 	if status == MissionRules.Status.WON or status == MissionRules.Status.FAILED:
 		hud.show_end(status == MissionRules.Status.WON, mission_view.reason)
@@ -1142,7 +1858,322 @@ func _process(delta: float) -> void:
 		_send_timer -= delta
 		if _send_timer <= 0.0:
 			_send_timer = 1.0 / 30.0
-			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits())
+			client_state.rpc_id(1, local_player.global_position, local_player.yaw, local_player.action_bits(), local_player.weapons.rounds(), local_player.pitch)
+
+
+## Every bleeding player, you and the others, leaves drops on the floor behind them (drawn by each peer).
+func update_drips(delta: float) -> void:
+	var me := local_player.status
+	if _drips.step(my_id, local_player.global_position, me.bleed > 0 and not me.dead, delta):
+		gore.splat(local_player.global_position, Vector3.ZERO, Config.BLEED_DRIP_SIZE)
+	for id: int in remotes:
+		var r: RemotePlayer = remotes[id]
+		var bleeding := r.action & PlayerWire.ACTION_BLEED != 0 and r.action & PlayerWire.ACTION_DEAD == 0
+		if _drips.step(id, r.global_position, bleeding, delta):
+			gore.splat(r.global_position, Vector3.ZERO, Config.BLEED_DRIP_SIZE)
+
+
+## The host's own player, as its local game sees it.
+func _record_own_player() -> void:
+	players[1].pos = local_player.global_position
+	players[1].yaw = local_player.yaw
+	players[1].action = local_player.action_bits()
+	players[1].mag = local_player.weapons.rounds()
+	players[1].pitch = local_player.pitch
+
+
+## Host: a player just died. Their body falls on every peer, and zombies near it go to feed.
+func _leave_body(id: int) -> void:
+	var at: Vector3 = players[id].pos
+	player_body.rpc(id, at, float(players[id].yaw), players[id].last_push)
+	player_body(id, at, float(players[id].yaw), players[id].last_push)
+	for z: Zombie in zombies.values():
+		if z.global_position.distance_to(at) <= Config.FEED_RANGE:
+			z.feed_at(at)
+
+
+## Every peer: a dead player's body (their own look) crumples where they fell.
+@rpc("authority", "call_remote", "reliable")
+func player_body(id: int, at: Vector3, yaw: float, push := Vector3.ZERO) -> void:
+	var rig := Characters.survivor(id)
+	add_child(rig)
+	rig.global_position = Vector3(at.x, map.ground_y(at), at.z)
+	rig.rotation.y = yaw
+	rig.update(0.0, 0.0)
+	var away := push if push.length() > 0.1 else -rig.global_transform.basis.z # (no blow: forward on their face)
+	gore.ragdoll(rig.take_all(), Vector3.ZERO, Vector3(0, 0.5, 0) + away * Config.DEATH_PUSH, Humanoid.Part.TORSO)
+	rig.queue_free()
+
+
+# --- Chat and pings (the dead keep both) ------------------------------------------------
+
+## What the local player typed: through the host, which sends it to everyone.
+func say(text: String) -> void:
+	if is_host:
+		host_chat(my_id, text)
+	else:
+		client_chat.rpc_id(1, text)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func client_chat(text: String) -> void:
+	if is_host:
+		host_chat(multiplayer.get_remote_sender_id(), text)
+
+
+## Host: `id` says `text` (trimmed, cut to `Config.CHAT_MAX_CHARS`); false if there was nothing to say.
+func host_chat(id: int, text: String) -> bool:
+	var line := text.strip_edges().left(Config.CHAT_MAX_CHARS)
+	if line == "" or not players.has(id):
+		return false
+	chat_line.rpc(id, line)
+	hooks.on_chat(id, line)
+	return true
+
+
+@rpc("authority", "call_local", "reliable")
+func chat_line(id: int, text: String) -> void:
+	hud.push_chat("%s: %s" % [player_name(id), text])
+
+
+## The local player marks where they look.
+func ping(spot: Vector3) -> void:
+	if is_host:
+		host_ping(my_id, spot)
+	else:
+		client_ping.rpc_id(1, spot)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func client_ping(spot: Vector3) -> void:
+	if is_host:
+		host_ping(multiplayer.get_remote_sender_id(), spot)
+
+
+## Host: `id` marks `spot` for everyone for `Config.PING_TIME` (one each: a new one replaces the old).
+func host_ping(id: int, spot: Vector3) -> bool:
+	if not players.has(id) or not spot.is_finite():
+		return false
+	ping_at.rpc(id, spot)
+	hooks.on_ping(id, spot)
+	return true
+
+
+@rpc("authority", "call_local", "reliable")
+func ping_at(id: int, spot: Vector3) -> void:
+	if pings.has(id):
+		(pings[id].node as Node).queue_free()
+	var mark := Label3D.new()
+	mark.text = "▼
+%s" % player_name(id)
+	mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	mark.no_depth_test = true
+	mark.fixed_size = true
+	mark.pixel_size = 0.0012
+	mark.font_size = 28
+	mark.outline_size = 8
+	mark.modulate = Color("ffd24a")
+	add_child(mark)
+	mark.global_position = spot
+	mark.offset = Vector2(0, 30) # the arrow's point just over the spot
+	pings[id] = { "node": mark, "left": Config.PING_TIME }
+	Sfx.play_ui("beep", -10.0, 1.5)
+
+
+## Pings fade out and go.
+func step_pings(delta: float) -> void:
+	for id: int in pings.keys():
+		var pg: Dictionary = pings[id]
+		pg.left = float(pg.left) - delta
+		var mark := pg.node as Label3D
+		if pg.left <= 0.0:
+			mark.queue_free()
+			pings.erase(id)
+		else:
+			mark.modulate.a = clampf(float(pg.left) / 1.0, 0.0, 1.0)
+
+
+# --- The helicopter ---------------------------------------------------------------------
+
+## Host: send the helicopter to land at `lz` in `eta` seconds (sooner than a whole flight: it joins it
+## part way). Every peer flies the same path from the same numbers.
+func call_heli(lz: Vector3, eta: float) -> void:
+	var heading := fposmod(lz.x * 0.37 + lz.z * 0.11 + 0.8, TAU) # from the spot, so it is the same every run
+	var state := { "lz": lz, "yaw": heading, "t": HeliFlight.LAND_AT - eta, "depart": INF }
+	heli_started.rpc(state)
+	apply_heli_state(state)
+
+
+@rpc("authority", "call_remote", "reliable")
+func heli_started(state: Dictionary) -> void:
+	apply_heli_state(state)
+
+
+## Where the flight stands now (for late joiners).
+func heli_state() -> Dictionary:
+	return { "lz": heli_flight.lz, "yaw": heli_flight.yaw, "t": heli_t, "depart": heli_flight.depart_at }
+
+
+func apply_heli_state(state: Dictionary) -> void:
+	if heli != null:
+		heli.queue_free()
+	heli_flight = HeliFlight.new(state.lz, state.yaw)
+	heli_flight.depart_at = state.get("depart", INF)
+	heli_t = state.t
+	heli = Helicopter.new()
+	heli.ground_y = (state.lz as Vector3).y
+	add_child(heli)
+	_wash_t = 0.0
+	_gunner_t = 0.0
+	step_heli(0.0)
+
+
+@rpc("authority", "call_remote", "reliable")
+func heli_departs(at: float) -> void:
+	if heli_flight != null:
+		heli_flight.depart_at = at
+
+
+## Every peer, every frame: fly it on, kick up dust under it; the host also runs the door gunner and
+## sees who has climbed in.
+func step_heli(delta: float) -> void:
+	if heli == null:
+		return
+	heli_t += delta
+	var pose := heli_flight.pose(heli_t)
+	heli.apply(pose, delta, heli_t)
+	if pose.phase == HeliFlight.Phase.GONE:
+		local_player.seat = null
+		local_player.wash_shake = 0.0
+		heli.queue_free()
+		heli = null
+		return
+	var alt := float(pose.pos.y) - heli_flight.lz.y
+	_heli_wash(delta, pose.pos, alt)
+	if is_host:
+		var low: bool = pose.phase == HeliFlight.Phase.LANDED or (pose.phase == HeliFlight.Phase.DESCEND and alt < Config.HELI_GUNNER_ALT)
+		if low:
+			_heli_gunner(delta)
+		if pose.phase == HeliFlight.Phase.LANDED:
+			_heli_boarding()
+
+
+func _heli_wash(delta: float, at: Vector3, alt: float) -> void:
+	var lp := local_player
+	if alt > Config.HELI_WASH_HEIGHT:
+		lp.wash_shake = 0.0
+		return
+	var strength := 1.0 - alt / Config.HELI_WASH_HEIGHT * 0.6
+	_wash_t -= delta
+	if _wash_t <= 0.0:
+		_wash_t = Config.HELI_WASH_EVERY
+		var ground := Vector3(at.x, heli_flight.lz.y + 0.1, at.z)
+		for k in 10:
+			var a := k * TAU / 10.0 + heli_t
+			var out := Vector3(cos(a), 0.05, sin(a))
+			fx.burst(Fx.Layer.SMOKE, ground + out * 2.0, out, 1, { "speed": 9.0 * strength, "spread": 0.2, "life": 0.9,
+				"size": 0.3, "size_end": 1.4, "color": Color(0.52, 0.5, 0.46, 0.35), "gravity": -0.3 })
+	var d := Vector2(lp.global_position.x - at.x, lp.global_position.z - at.z).length()
+	lp.wash_shake = Config.HELI_WASH_SHAKE * strength * (1.0 - d / Config.HELI_WASH_RADIUS) if d < Config.HELI_WASH_RADIUS else 0.0
+
+
+func _heli_gunner(delta: float) -> void:
+	_gunner_t -= delta
+	while _gunner_t <= 0.0:
+		_gunner_t += Config.HELI_GUNNER_INTERVAL
+		var muzzle := heli.gun_muzzle()
+		var best: Zombie = null
+		var best_d := Config.HELI_GUNNER_RANGE
+		for z: Zombie in zombies.values():
+			var dd := z.global_position.distance_to(muzzle)
+			if dd < best_d:
+				best = z
+				best_d = dd
+		if best == null:
+			return
+		var target := best.global_position + Vector3(0, 1.2, 0)
+		var dir := (target - muzzle).normalized()
+		play_fx(Fx.Kind.TRACER, muzzle, dir, muzzle.distance_to(target))
+		Sfx.play(Helicopter.SOUNDS.gunner, muzzle)
+		hit_zombie(0, best, Humanoid.Part.TORSO, target, dir, Config.HELI_GUNNER_DAMAGE)
+
+
+## Players at the door are in; once everyone still standing is, it lifts off.
+func _heli_boarding() -> void:
+	var door := heli.door_point()
+	var standing := 0
+	var aboard := 0
+	for id: int in players:
+		var p: Dictionary = players[id]
+		if rules.out.has(id):
+			continue
+		standing += 1
+		if not p.boarded and Vector2(p.pos.x - door.x, p.pos.z - door.z).length() <= Config.HELI_BOARD_RADIUS:
+			p.boarded = true
+			_send_to(id, &"heli_boarded", [])
+			hooks.on_heli_boarded(id)
+		if p.boarded:
+			aboard += 1
+	if standing > 0 and aboard == standing and heli_flight.depart_at == INF:
+		heli_flight.depart_at = heli_t
+		heli_departs.rpc(heli_t)
+		var ids := []
+		for id: int in players:
+			if players[id].boarded:
+				ids.append(id)
+		hooks.on_heli_departed(ids)
+
+
+@rpc("authority", "call_remote", "reliable")
+func heli_boarded() -> void:
+	if heli != null:
+		local_player.seat = heli.seat
+
+
+## The compass strip and the markers over the world: the objective (unless the difficulty hides it) and
+## teammates.
+func _update_compass_and_markers() -> void:
+	var lp := local_player
+	var here := lp.global_position
+	var ticks := []
+	var marked: bool = mission_view.get("has_marker", false) and show_markers()
+	hud.markers.objective = mission_view.marker if marked else Vector3.INF
+	if marked:
+		ticks.append({ "bearing": Compass.bearing_of(mission_view.marker - here), "kind": "objective" })
+	for id: int in remotes:
+		var r := remotes[id] as RemotePlayer
+		if r.visible:
+			ticks.append({ "bearing": Compass.bearing_of(r.global_position - here), "kind": "mate" })
+	hud.set_compass(Compass.bearing_of(-lp.camera.global_basis.z), ticks)
+	hud.markers.update_from(self)
+
+
+## A downed teammate reaches out when you, standing, come within `Config.REACH_RANGE`.
+func update_reach() -> void:
+	var me := local_player.status
+	var standing := not me.downed and not me.dead
+	for id: int in remotes:
+		var r: RemotePlayer = remotes[id]
+		r.helper_near = standing and r.global_position.distance_to(local_player.global_position) <= Config.REACH_RANGE
+
+
+## Holding use beside a downed teammate gets them up: say so to the host once, and again when you let go.
+func _update_revive(holding: bool, target: int) -> void:
+	if holding:
+		local_player.aim_blocked = true
+		if _reviving == 0 and not local_player.status.is_using():
+			_reviving = target
+			if is_host:
+				start_revive(my_id, target)
+			else:
+				client_revive.rpc_id(1, target, true)
+	elif _reviving != 0:
+		if is_host:
+			if (players[my_id].status as PlayerStatus).using == &"revive":
+				cancel_use(my_id)
+		else:
+			client_revive.rpc_id(1, _reviving, false)
+		_reviving = 0
 
 
 ## Right mouse uses what you're looking at; with nothing in reach it aims instead.
@@ -1173,17 +2204,24 @@ func _update_weapon() -> void:
 		else:
 			client_ammo_used.rpc_id(1, type, spent[type])
 	var scoped: bool = d.scoped
-	var through_scope := scoped and lp.view.aim > 0.9
-	lp.view.visible = not through_scope and not lp.hide_view
+	var through_scope := scoped and lp.view.aim > 0.9 and lp.view.scope_break < 0.3
+	lp.view.visible = not through_scope and not lp.hide_view and not lp.status.dead
 	hud.set_scope(through_scope)
 	hud.set_aiming(lp.view.aim > 0.5)
-	hud.set_weapon(d.name, ws.rounds(), ws.is_reloading(), ws.reserve_rounds())
+	hud.set_gun(d, ws.rounds(), ws.is_reloading(), ws.reserve_rounds())
 
 
 func _fire(d: Dictionary) -> void:
 	var lp := local_player
 	lp.view.fire()
-	Sfx.play_ui("gunshot", d.volume, d.pitch * rng.randf_range(0.96, 1.04))
+	if d.scoped:
+		lp.feel.pinch()
+	var vary := GunVoice.variation(_own_shots)
+	var thin := lp.weapons.rounds() <= Config.LOW_AMMO_ROUNDS and int(d.mag) > 5 # the last of the magazine
+	Sfx.play_ui(GunVoice.sound(lp.weapons.current), d.volume + vary[1] - (2.5 if thin else 0.0), vary[0] * (1.04 if thin else 1.0))
+	if thin:
+		Sfx.play_ui("low_ammo_click", d.volume - 4.0)
+	Sfx.play_ui(GunVoice.tail(place_at(lp.global_position)), d.volume - Config.TAIL_DB, vary[0])
 	var cam := lp.camera
 	var origin := cam.global_position
 	var cone := 0.0 if bot else Weapons.spread(d, lp.aiming, lp.move_speed / Config.SPRINT_SPEED, lp.move.crouch)
@@ -1192,6 +2230,10 @@ func _fire(d: Dictionary) -> void:
 		_queue_shot(1, origin, dir, lp.weapons.current)
 	else:
 		client_shoot.rpc_id(1, origin, dir, lp.weapons.current)
+	_own_shots += 1
+	var streak := _own_shots % Config.TRACER_OWN_EVERY == 0 # a clean view: only some of your own
+	if streak or d.scoped: # (a sniper's vapour line shows every time)
+		tracers.fire(lp.view.muzzle_world(), _bullet_end(origin, dir, float(d.range)), lp.weapons.current, streak)
 	if not bot:
 		lp.kick_view(Weapons.kick(d, rng, lp.aiming))
 

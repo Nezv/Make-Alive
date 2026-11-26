@@ -19,8 +19,8 @@ Legend: [x] exists, [ ] not built.
 - [ ] Defend objective: timer until the helicopter arrives, escalating hordes, helicopter fly-in.
 - [x] Limited ammo, ammo pickups, reserve ammo per calibre (built; both maps still play with infinite ammo, try it with `--limited-ammo`).
 - [ ] Loadout: carry 2-3 weapons instead of all nine, weapon pickups already exist (`weapon_pickup.gd`).
-- [ ] Inventory: medkits, grenades, keys, barricade materials.
-- [ ] Health: bleeding, healing items, downed state and revive by teammates.
+- [ ] Inventory: medkits, bandages, planks, keys, throwable slots, item wheel (H heal, G throw, hold Tab) and dead players' backpacks are built; grenades themselves come with the throwables step, the wheel's icons are still names.
+- [ ] Health: bleeding and healing items are built (timed use, temporary HP from painkillers; no animations or look yet), downed state and revive by teammates are built too (logic and a text line; no camera, rig or get-up animation yet).
 - [ ] Respawn / spectator after death.
 - [ ] Stamina for sprinting.
 - [ ] Melee on every weapon (shove), plus dedicated melee weapons.
@@ -51,7 +51,7 @@ Legend: [x] exists, [ ] not built.
 
 - Not all of it: keep each map reduced to the POI surroundings.
 - Streets, sidewalks, cars (wrecks as cover), lamp posts, bus stops, trash, barricades.
-- Day / dusk / night variants, fog for cheap draw distance.
+- Day / dusk / night variants, fog for cheap draw distance. (S050: five sky presets, one per mission, depth fog and a painted backdrop past the far plane.)
 - Interiors only for the mission buildings; other buildings are solid blocks with doors that do not open.
 - Zombie spawn points hidden behind corners, never in sight.
 
@@ -81,7 +81,7 @@ Legend: [x] exists, [ ] not built.
 - [ ] Reload: mag out, mag in, bolt, pump shell.
 - [ ] Footsteps by surface, sprint breathing, low-hp heartbeat.
 - [ ] Zombie groans, runner screeches, leaper snarl, per-type death, limb tear, squelch.
-- [ ] Doors: open, close, break. Lootbox open, pickup.
+- [x] Doors: open, close, break. Lootbox open, pickup. (S084: `WorldSounds`, with glass, vehicles, the interface and hums)
 - [ ] Horde warning siren, helicopter approach, extraction countdown beeps.
 - [ ] Ambient: wind, distant gunfire, city hum.
 - [ ] Positional audio for teammates and zombies.

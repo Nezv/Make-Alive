@@ -17,9 +17,13 @@ const RATE := 22050
 const BUSES := ["Master", "Guns", "Zombies", "World", "UI", "Music"]
 
 static var stats := { "played": 0, "stolen": 0, "dropped": 0 }
-static var _defs := {}    ## name -> { bus, build }
+static var last: Array[String] = [] ## the names of the last sounds asked for (tests)
+static var _muffle_left := 0.0
+static var _muffle_total := 1.0
+static var _defs := {}    ## name -> { bus, build, loop }
 static var _streams := {} ## name -> AudioStreamWAV
 static var _pool: Pool
+static var _spots: Array = [] ## the SoundSpots in the world (capped by Config.SOUND_SPOTS_MAX)
 
 
 ## Make the audio buses (in code: there is no bus layout file). Safe to call more than once.
@@ -34,8 +38,9 @@ static func ensure_buses() -> void:
 
 # --- Named sounds -----------------------------------------------------------------
 
-static func register(sound: String, bus: String, build: Callable) -> void:
-	_defs[sound] = { "bus": bus, "build": build }
+## `loop`: the stream plays round and round (a SoundSpot's hum); its samples must join their own start.
+static func register(sound: String, bus: String, build: Callable, loop := false) -> void:
+	_defs[sound] = { "bus": bus, "build": build, "loop": loop }
 	_streams.erase(sound)
 
 
@@ -57,6 +62,23 @@ static func _builtin() -> void:
 		register("beep", "UI", _beep)
 	if not _defs.has("breath"):
 		register("breath", "World", _breath)
+	if not _defs.has("heartbeat"):
+		register("heartbeat", "UI", _heartbeat)
+	if not _defs.has("whiz"):
+		register("whiz", "Guns", _whiz)
+	if not _defs.has("tink"):
+		register("tink", "World", _tink)
+	if not _defs.has(GunVoice.sound(0)):
+		GunVoice.register_all()
+	if not _defs.has("sever_wet"):
+		register("sever_wet", "Zombies", _sever_wet)
+	if not _defs.has(WorldSounds.ONE_SHOTS.keys()[0]):
+		WorldSounds.register_all()
+	if not _defs.has("low_ammo_click"):
+		register("low_ammo_click", "Guns", _low_ammo_click)
+		for what in ["mag_release", "mag_out", "mag_in", "mag_slap", "bolt_rack", "shell_in", "pump_back", "pump_fwd",
+				"bolt_up", "bolt_back", "bolt_fwd", "bolt_down", "holster", "draw", "inspect"]:
+			register("h_" + what, "Guns", func(): return _handling(what))
 
 
 ## The cached stream of a registered sound (null if there is no such sound).
@@ -66,21 +88,65 @@ static func stream(sound: String) -> AudioStreamWAV:
 		if not _defs.has(sound):
 			return null
 		var samples: PackedFloat32Array = (_defs[sound].build as Callable).call()
-		_streams[sound] = to_stream(samples)
+		var s := to_stream(samples)
+		if _defs[sound].get("loop", false):
+			s.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			s.loop_begin = 0
+			s.loop_end = samples.size()
+		_streams[sound] = s
 	return _streams[sound]
 
 
 ## Play `sound` at `position` in the world. `pitch_jitter` 0.05 means each play is up to 5% higher or lower.
 ## Returns false if the sound is unknown or was dropped because the pool is full of nearer sounds.
 static func play(sound: String, position: Vector3, pitch_jitter := 0.0, volume_db := 0.0, pitch := 1.0) -> bool:
+	_note(sound)
 	var s := stream(sound)
 	return s != null and pool().play_3d(s, _defs[sound].bus, position, pitch_jitter, volume_db, pitch)
 
 
 ## Play `sound` with no position: interface sounds and the local player's own gun.
 static func play_ui(sound: String, volume_db := 0.0, pitch := 1.0) -> bool:
+	_note(sound)
 	var s := stream(sound)
 	return s != null and pool().play_2d(s, _defs[sound].bus, volume_db, pitch)
+
+
+static func _note(sound: String) -> void:
+	last.append(sound)
+	if last.size() > 16:
+		last.pop_front()
+
+
+## The world goes dull for `seconds` (a hit taken): a low-pass on the Master bus that opens back up.
+static func muffle(seconds: float) -> void:
+	_muffle_left = maxf(_muffle_left, seconds)
+	_muffle_total = maxf(seconds, 0.01)
+	step_muffle(0.0)
+
+
+static func muffle_amount() -> float:
+	return clampf(_muffle_left / _muffle_total, 0.0, 1.0)
+
+
+static func step_muffle(delta: float) -> void:
+	_muffle_left = maxf(0.0, _muffle_left - delta)
+	var bus := AudioServer.get_bus_index(&"Master")
+	if bus < 0:
+		return
+	var fx_i := -1
+	for i in AudioServer.get_bus_effect_count(bus):
+		if AudioServer.get_bus_effect(bus, i) is AudioEffectLowPassFilter:
+			fx_i = i
+	if fx_i < 0:
+		if muffle_amount() <= 0.0:
+			return
+		AudioServer.add_bus_effect(bus, AudioEffectLowPassFilter.new())
+		fx_i = AudioServer.get_bus_effect_count(bus) - 1
+	var lp := AudioServer.get_bus_effect(bus, fx_i) as AudioEffectLowPassFilter
+	var a := muffle_amount()
+	lp.cutoff_hz = lerpf(20000.0, Config.MUFFLE_CUTOFF, a * a)
+	AudioServer.set_bus_effect_enabled(bus, fx_i, a > 0.0)
 
 
 ## The node that owns the voices. Made on first use, lives under the scene tree's root.
@@ -97,9 +163,45 @@ static func pool() -> Pool:
 static func reset() -> void:
 	if _pool != null and is_instance_valid(_pool):
 		_pool.free()
+	_spots = _spots.filter(func(s: Node) -> bool: return is_instance_valid(s))
 	_pool = null
 	_streams.clear()
 	stats = { "played": 0, "stolen": 0, "dropped": 0 }
+
+
+# --- Sounds that stay in one place ----------------------------------------------------
+
+## A SoundSpot came into the world: it is heard from now on (false: the cap is reached, it stays silent).
+static func add_spot(spot: Node) -> bool:
+	if _spots.size() >= Config.SOUND_SPOTS_MAX:
+		return false
+	_spots.append(spot)
+	return true
+
+
+static func remove_spot(spot: Node) -> void:
+	_spots.erase(spot)
+
+
+static func spot_count() -> int:
+	return _spots.size()
+
+
+## Every frame: the spots' clocks run, and only the nearest few sounding ones within their range
+## play (Config.SOUND_SPOTS_AUDIBLE); the rest are stopped, so a street of hums costs a few voices.
+static func step_spots(ears: Vector3, delta := 0.0) -> void:
+	var near := []
+	for s: SoundSpot in _spots:
+		s.clock += delta
+		var d := ears.distance_to(s.global_position)
+		if d <= s.reach and s.sounding():
+			near.append([d, s])
+	near.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	var keep := {}
+	for i in mini(near.size(), Config.SOUND_SPOTS_AUDIBLE):
+		keep[near[i][1]] = true
+	for s: SoundSpot in _spots:
+		s.set_heard(keep.has(s))
 
 
 # --- Sounds -----------------------------------------------------------------------
@@ -159,6 +261,72 @@ static func _breath() -> PackedFloat32Array:
 		if at + i < buf.size():
 			buf[at + i] += breath_out[i] * 2.6
 	return soft_clip(buf)
+
+
+## A heartbeat heard from inside: lub-dub, two low thumps, the second softer.
+static func _heartbeat() -> PackedFloat32Array:
+	var lub := low_pass(exp_tail(sweep(0.16, 75.0, 42.0), 22.0), 220.0)
+	var dub := low_pass(exp_tail(sweep(0.14, 68.0, 40.0), 26.0), 200.0)
+	var buf := _blank(0.42)
+	for i in lub.size():
+		buf[i] = lub[i] * 1.6
+	var at := int(0.2 * RATE)
+	for i in dub.size():
+		if at + i < buf.size():
+			buf[at + i] += dub[i] * 1.1
+	return soft_clip(buf, 1.4)
+
+
+## A bullet going past your ear: a bright hiss that drops in pitch as it goes by.
+static func _whiz() -> PackedFloat32Array:
+	var hiss := band_pass(noise(0.22, Hiss.WHITE, 41), 1800.0, 6500.0)
+	var tone_ := sweep(0.22, 3200.0, 900.0)
+	var buf := mix([hiss, tone_], [0.9, 0.25])
+	var n := buf.size()
+	for i in n:
+		var x := float(i) / n
+		buf[i] *= sin(minf(x * 3.0, 1.0) * PI * 0.5) * (1.0 - x) * (1.0 - x) * 1.6
+	return soft_clip(buf)
+
+
+## A spent case hitting the floor: a short bright metallic ring.
+static func _tink() -> PackedFloat32Array:
+	var ring := exp_tail(fm(0.12, 4200.0, 6100.0, 2.2), 55.0)
+	var tick := exp_tail(high_pass(noise(0.03, Hiss.WHITE, 61), 3000.0), 160.0)
+	return soft_clip(mix([ring, tick], [0.6, 0.5]))
+
+
+## Handling sounds ("h_" + what): magazines, bolts, pumps, shells, cloth and sling.
+static func _handling(what: String) -> PackedFloat32Array:
+	var seed_ := what.hash() & 0xFFFF
+	var click := exp_tail(fm(0.05, 1800.0 + float(seed_ % 900), 2600.0, 1.8), 90.0)
+	var slide := envelope(band_pass(noise(0.16, Hiss.WHITE, seed_), 900.0, 4200.0), 0.02, 0.05, 0.5, 0.06)
+	var thump := exp_tail(sweep(0.12, 160.0, 70.0), 30.0)
+	var cloth := envelope(band_pass(noise(0.35, Hiss.PINK, seed_), 300.0, 2400.0), 0.08, 0.1, 0.6, 0.12)
+	match what:
+		"mag_release", "bolt_up", "bolt_down", "inspect":
+			return soft_clip(mix([click], [0.9]))
+		"mag_out", "mag_in", "bolt_back", "bolt_fwd", "pump_back", "pump_fwd", "bolt_rack":
+			return soft_clip(mix([slide, click], [0.7, 0.6]))
+		"mag_slap":
+			return soft_clip(mix([thump, click], [1.0, 0.7]), 1.4)
+		"shell_in":
+			return soft_clip(mix([exp_tail(fm(0.04, 900.0, 1400.0, 1.2), 80.0), slide], [0.7, 0.35]))
+		"holster", "draw":
+			return soft_clip(mix([cloth, click], [0.8, 0.35 if what == "draw" else 0.0]))
+	return click
+
+
+## A limb torn off: a wet tearing slap.
+static func _sever_wet() -> PackedFloat32Array:
+	var tear := envelope(band_pass(noise(0.22, Hiss.PINK, 71), 300.0, 2600.0), 0.005, 0.06, 0.4, 0.1)
+	var slap := exp_tail(low_pass(noise(0.1, Hiss.BROWN, 72), 500.0), 40.0)
+	return soft_clip(mix([tear, slap], [0.8, 1.0]), 1.5)
+
+
+## The last rounds of a magazine: a thin, bright ping.
+static func _low_ammo_click() -> PackedFloat32Array:
+	return soft_clip(exp_tail(fm(0.08, 3600.0, 5200.0, 1.0), 60.0))
 
 
 # --- Sources ----------------------------------------------------------------------
@@ -294,6 +462,24 @@ static func band_pass(buf: PackedFloat32Array, low_hz: float, high_hz: float) ->
 
 
 ## Feed the sound back into itself after `delay` seconds: metallic ring (short) or echo (long).
+## A two-pole resonance at `hz`, `width_hz` wide: an impulse through it rings like a struck body.
+static func resonate(buf: PackedFloat32Array, hz: float, width_hz: float) -> PackedFloat32Array:
+	var r := exp(-PI * width_hz / RATE)
+	var a1 := -2.0 * r * cos(TAU * hz / RATE)
+	var a2 := r * r
+	var g := 1.0 - r
+	var out := PackedFloat32Array()
+	out.resize(buf.size())
+	var y1 := 0.0
+	var y2 := 0.0
+	for i in buf.size():
+		var y := g * buf[i] - a1 * y1 - a2 * y2
+		out[i] = y
+		y2 = y1
+		y1 = y
+	return out
+
+
 static func comb(buf: PackedFloat32Array, delay: float, feedback: float) -> PackedFloat32Array:
 	var out := buf.duplicate()
 	var d := maxi(int(delay * RATE), 1)

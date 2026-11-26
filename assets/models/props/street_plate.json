@@ -1,0 +1,40 @@
+{
+ "name": "street_plate",
+ "family": "signs_street",
+ "size": [
+  0.74,
+  0.567454938847348,
+  0.033
+ ],
+ "min": [
+  -0.37,
+  -0.008727469423673993,
+  -0.033
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  564,
+  172,
+  40
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  0.25,
+  0.0
+ ]
+}

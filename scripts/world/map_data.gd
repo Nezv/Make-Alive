@@ -12,6 +12,8 @@ extends RefCounted
 ##   zombie_closets  [{ id, at, radius, waves }]     where zombies appear; `waves` lists the wave
 ##                                                   numbers that use it (missing = every wave)
 ##   horde_routes    [{ closet, points }]            the way a horde walks from a closet to the fight
+##   zombie_wanderers [{ at, count, radius }]        zombies that stand about there from the start
+##                                                   (ahead of the players) until something wakes them
 ##   zones           [{ id, kind, box | polygon, y }] kind: extraction, checkpoint, trigger
 ##                     box: [centre, size]           an upright box
 ##                     polygon: [Vector2(x, z), ...]  with an optional floor range y: [low, high]
@@ -24,7 +26,9 @@ extends RefCounted
 ##                                                   missing = a full carton of that calibre
 ##   starting_ammo   { "9 mm": 45, "12 gauge": 16 }  the reserve a player starts with, by calibre name
 ##                                                   (Weapons.AMMO); a missing calibre uses its own default
-##   respawn         true                            the dead come back (false: a dead player is out)
+##   respawn         true                            how the dead come back: true at once · false never (out for the
+##                                                   mission) · "checkpoint" at the next checkpoint · seconds (a timer)
+##   sky             "night"                         the time of day when no mission or host says (TimeOfDay)
 ##   objectives      [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]  in order;
 ##                                                   kind: reach, hold, survive, interact, extract
 ##                     reach: `who` "any" (default) or "all" players still in the fight
@@ -53,10 +57,14 @@ var blocked_exits: Array = []
 var spawns: Array = []      ## [{ at, yaw }]
 var closets: Array = []     ## [{ id, at, radius, waves }]
 var routes: Array = []      ## [{ closet, points }]
+var wanderers: Array = []   ## [{ at, count, radius }]
 var zones := {}             ## id -> { id, kind, box | polygon, y }
 var objectives: Array = []  ## [{ id, kind, zone, seconds, waves, text, who, target, time_limit }]
-var respawn := true         ## the dead come back
+var respawn := true         ## the dead come back at once
+var respawn_after := -1.0   ## ...or after this many seconds (-1: no timer)
+var respawn_checkpoint := false ## ...or when the next checkpoint is reached
 var starting_ammo := {}     ## Weapons.Ammo -> rounds in reserve at the start
+var sky := "night"          ## TimeOfDay preset, unless the mission or the host says otherwise
 var errors: Array = []
 
 
@@ -65,9 +73,11 @@ func _init(dict: Dictionary = {}) -> void:
 	name = dict.get("name", "")
 	bounds = PackedVector2Array(dict.get("bounds", []))
 	blocked_exits = dict.get("blocked_exits", [])
-	respawn = dict.get("respawn", true)
+	sky = TimeOfDay.resolve(dict.get("sky", "night"))
+	_read_respawn(dict.get("respawn", true))
 	_read_spawns(dict)
 	_read_closets(dict)
+	_read_wanderers(dict)
 	_read_zones(dict)
 	_read_objectives(dict)
 	_read_interactables(dict)
@@ -97,6 +107,25 @@ func _read_spawns(dict: Dictionary) -> void:
 		var e: Dictionary = list[i]
 		if _need(e, "at", "player_spawns[%d]" % i):
 			spawns.append({ "at": e.at, "yaw": e.get("yaw", 0.0) })
+
+
+func _read_respawn(value: Variant) -> void:
+	if value is bool:
+		respawn = value
+	elif value is String and value == "checkpoint":
+		respawn = false
+		respawn_checkpoint = true
+	elif (value is float or value is int) and float(value) >= 0.0:
+		respawn = false
+		respawn_after = float(value)
+	else:
+		_error("respawn must be true, false, \"checkpoint\" or a number of seconds, not %s" % str(value))
+
+
+func _read_wanderers(dict: Dictionary) -> void:
+	for e: Dictionary in dict.get("zombie_wanderers", []):
+		if _need(e, "at", "a zombie wanderer"):
+			wanderers.append({ "at": e.at, "count": int(e.get("count", 1)), "radius": float(e.get("radius", 2.0)) })
 
 
 func _read_closets(dict: Dictionary) -> void:
@@ -311,6 +340,8 @@ func check(map: GameMap) -> Array:
 		var points: Array = r.points
 		for i in points.size():
 			stand.call(points[i], "route from '%s', point %d" % [r.closet, i])
+	for i in wanderers.size():
+		stand.call(wanderers[i].at, "zombie_wanderers[%d]" % i)
 	for id: String in zones:
 		var c := zone_center(id)
 		var z: Dictionary = zones[id]

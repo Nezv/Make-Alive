@@ -21,7 +21,9 @@ var wave := 0             ## SURVIVE: how many of the objective's waves have bee
 var calm_left := -1.0     ## SURVIVE: seconds of calm left before the next wave (-1 = not calm)
 var heli_left := -1.0     ## SURVIVE: seconds until the helicopter is down, once the last wave began (-1 = not coming)
 var _topup := 0.0
-var respawn := true       ## the dead come back; off, a dead player is out until something brings them back
+var respawn := true       ## the dead come back at once; off, a dead player is out until something brings them back
+var respawn_after := -1.0 ## ...a timer does (seconds, -1: none)
+var respawn_checkpoint := false ## ...or the next checkpoint
 var out := {}             ## player id -> true: dead (no respawn) or downed, so not counted and not needed
 var checkpoint := ""      ## the last checkpoint zone reached: where the dead come back
 var reached := {}         ## checkpoint zone id -> true, each counts once
@@ -33,12 +35,14 @@ func _init(owner_game: Game) -> void:
 
 
 ## Begin (or begin again) with this list. An empty list is free play: nothing runs.
-func start(defs: Array, respawn_ := true) -> void:
+func start(defs: Array, respawn_ := true, after := -1.0, at_checkpoint := false) -> void:
 	objectives = defs
 	for o: Dictionary in objectives: # waves written as bare sizes (tests, hand-made lists) read like the data's
 		if o.has("waves"):
 			o.waves = (o.waves as Array).map(func(w: Variant) -> Dictionary: return MapData.wave(w))
 	respawn = respawn_
+	respawn_after = after
+	respawn_checkpoint = at_checkpoint
 	out = {}
 	reason = ""
 	checkpoint = ""
@@ -171,6 +175,13 @@ func _send_wave(o: Dictionary) -> void:
 	if wave == waves.size() and heli > 0.0:
 		heli_left = heli
 		_topup = Config.LAST_WAVE_TOPUP
+		var zone: String = o.get("zone", "")
+		var spot: Dictionary = game.map.data.raw.get("heli", {})
+		if spot.has("at"): # a pad of its own, up on a roof or a deck (the map's data says where)
+			game.call_heli(spot.at, heli)
+		else:
+			var lz := game.map.data.zone_center(zone) if zone != "" and game.map.data.zones.has(zone) else game.map.player_spawn()
+			game.call_heli(Vector3(lz.x, game.map.ground_y(lz), lz.z), heli)
 	_changed()
 
 

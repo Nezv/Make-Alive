@@ -1,0 +1,40 @@
+{
+ "name": "fountain_wall",
+ "family": "street_small",
+ "size": [
+  0.96,
+  1.9500000000000002,
+  0.35
+ ],
+ "min": [
+  -0.48,
+  0.0,
+  -0.35
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  1276,
+  652,
+  284
+ ],
+ "emission": false,
+ "close": [
+  0.0,
+  1.4000000000000001,
+  -0.1
+ ]
+}

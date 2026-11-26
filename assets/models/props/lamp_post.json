@@ -1,0 +1,40 @@
+{
+ "name": "lamp_post",
+ "family": "lamps",
+ "size": [
+  0.8,
+  3.5799999999999996,
+  0.8
+ ],
+ "min": [
+  -0.4,
+  0.0,
+  -0.4
+ ],
+ "states": [
+  "clean",
+  "abandoned",
+  "damaged",
+  "burnt"
+ ],
+ "parts": {
+  "body": {
+   "pivot": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ },
+ "tris": [
+  2124,
+  432,
+  248
+ ],
+ "emission": true,
+ "close": [
+  0.0,
+  3.08,
+  0.0
+ ]
+}
