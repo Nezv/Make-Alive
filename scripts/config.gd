@@ -489,3 +489,15 @@ const INTERIOR_LIGHT_BIG := 17.0 # m²: a room larger than this, or long, has tw
 const INTERIOR_SWITCH := 1.1    # m: a light switch's height
 const INTERIOR_GRID := 0.1      # m: the cells furniture's way-through check works in
 const INTERIOR_TRIES := 16      # layouts tried per floor before giving up
+
+# --- Open houses in the town (S246: HouseStreamer builds HousePlan floors near the camera) ---
+const HOUSE_OPEN_SHARE := 0.25          # share of the eligible row houses whose street door opens
+const HOUSE_OPEN_CLASSES := ["core", "main", "rue", "faubourg"]
+const HOUSE_OPEN_FLOORS_MAX := 5
+const HOUSE_OPEN_WIDTH := Vector2(4.8, 13.0)  # metres along the street a house HousePlan can lay out
+const HOUSE_OPEN_DEPTH := Vector2(8.5, 15.0)  # metres from the street
+const HOUSE_STREAM_RADIUS := 55.0       # metres from the camera within which an open house's floors are built
+const HOUSE_STREAM_KEEP := 75.0         # ...and beyond which they are taken down again
+const HOUSE_STREAM_MAX := 12            # houses standing built at once (the shell shader holds this many holes)
+const HOUSE_STREAM_EVERY := 0.25        # seconds between looks around
+const HOUSE_LAYOUT_TRIES := 3           # simpler specs tried when a house's layout fails

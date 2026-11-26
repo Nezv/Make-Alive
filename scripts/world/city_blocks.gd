@@ -73,6 +73,7 @@ const GARDEN := Color("2a3322")
 var ilots: Array = []    ## { outline (x, z, turning positive), area, cls, centre, street_edge, fronted, silhouette, eave }
 var houses: Array = []   ## { foot, shape (row / corner / back / hotel / small), cls, floors, eave, roof, pitch, roof_colour, wall, plinth, width, out, lean, faces_street, ilot }
 var walls: Array = []    ## { a, b, height, gate, ilot }: garden walls and hôtels' gate walls on the street
+var open_houses: Array = [] ## indices into `houses` of the ones you can walk into (S246): HouseStreamer builds their floors
 var triangles := 0
 var built_ilots := 0     ## îlots with a collision shape
 
@@ -114,6 +115,7 @@ func plan() -> void:
 			_rows(i, rng)
 	_backs()
 	_fill_courts()
+	_pick_open()
 
 
 ## One label per 4-connected run of BLOCK cells.
@@ -809,11 +811,103 @@ func paint_floors(floors: PackedByteArray) -> void:
 					floors[r * _map.gw + c] = maxi(floors[r * _map.gw + c], int(h.floors))
 
 
+# --- Open houses (S246: the room producer in the town) ---------------------------------------
+
+## Which houses you can walk into: plain row houses on a street, in an îlot built in detail, of a
+## size HousePlan lays out, a seeded share of them (the same on every peer). Their lean is taken
+## off so the floors inside stand straight under the walls.
+func _pick_open() -> void:
+	open_houses.clear()
+	for i in houses.size():
+		var h: Dictionary = houses[i]
+		if h.shape != "row" or not h.faces_street or ilots[h.ilot].silhouette:
+			continue
+		if not Config.HOUSE_OPEN_CLASSES.has(h.cls) or int(h.floors) > Config.HOUSE_OPEN_FLOORS_MAX:
+			continue
+		var foot: PackedVector2Array = h.foot
+		if foot.size() != 4:
+			continue
+		var width := foot[0].distance_to(foot[1])
+		var depth := foot[0].distance_to(foot[3])
+		if width < Config.HOUSE_OPEN_WIDTH.x or width > Config.HOUSE_OPEN_WIDTH.y or depth < Config.HOUSE_OPEN_DEPTH.x or depth > Config.HOUSE_OPEN_DEPTH.y:
+			continue
+		if posmod(hash([18510309, i, "open"]), 1000) >= int(Config.HOUSE_OPEN_SHARE * 1000.0):
+			continue
+		h.open = true
+		h.lean = Vector2.ZERO
+		h.lit = false
+		open_houses.append(i)
+
+
+## What HousePlan needs to lay out open house `i` (see HousePlan.sample for the keys). `attempt`
+## > 0 asks for a simpler house when the first layout fails.
+func house_spec(i: int, attempt := 0) -> Dictionary:
+	var h: Dictionary = houses[i]
+	var foot: PackedVector2Array = h.foot
+	var width := foot[0].distance_to(foot[1])
+	var depth := foot[0].distance_to(foot[3])
+	var bays := clampi(roundi(width / ((Config.CITY_BAY.x + Config.CITY_BAY.y) * 0.5)), 2, 5)
+	bays = maxi(2, bays - attempt)
+	var seed := hash([18510309, i, "house", attempt])
+	return { "width": width, "depth": depth, "bays": bays, "back_bays": bays, "floors": int(h.floors),
+		"storey": float(h.eave) / float(h.floors), "door": "left" if seed % 2 == 0 else "right",
+		"shop": attempt == 0 and (h.cls == "main" or h.cls == "core") and (seed / 2) % 3 != 0, "seed": seed }
+
+
+## Where open house `i`'s plan sits in the town: plan x runs from the party wall's inner face along
+## the street, plan z from the street facade's inner face into the block (HousePlan's axes), so the
+## street door lands on the street.
+func house_transform(i: int, y: float) -> Transform3D:
+	var h: Dictionary = houses[i]
+	var foot: PackedVector2Array = h.foot
+	var a := foot[0]
+	var u := (foot[1] - foot[0]).normalized()
+	var inward := (foot[3] - foot[0]).normalized()
+	# Right-handed: x × y must be z. If the row runs the other way, start from the other corner.
+	if Vector3(u.x, 0, u.y).cross(Vector3.UP).dot(Vector3(inward.x, 0, inward.y)) < 0.0:
+		a = foot[1]
+		u = -u
+	var origin := a + u * Config.INTERIOR_PARTY + inward * Config.INTERIOR_FACADE
+	var basis := Basis(Vector3(u.x, 0, u.y), Vector3.UP, Vector3(inward.x, 0, inward.y))
+	return Transform3D(basis, Vector3(origin.x, y, origin.y))
+
+
+## The middle of open house `i`'s footprint and its half sizes along and across the street
+## (x, z of the centre; the street axis; half width, half depth).
+func house_box(i: int) -> Array:
+	var foot: PackedVector2Array = houses[i].foot
+	var c := (foot[0] + foot[1] + foot[2] + foot[3]) * 0.25
+	var u := (foot[1] - foot[0]).normalized()
+	return [c, u, foot[0].distance_to(foot[1]) * 0.5, foot[0].distance_to(foot[3]) * 0.5]
+
+
+## An open house's street front as its own collision box: stands while its floors are not built,
+## off while they are (the floors have their own facade with the door in it).
+func _open_front(body: StaticBody3D, h: Dictionary) -> void:
+	var foot: PackedVector2Array = h.foot
+	var a := foot[0]
+	var b := foot[1]
+	var inward := (foot[3] - foot[0]).normalized()
+	var mid := (a + b) * 0.5 + inward * 0.25
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(a.distance_to(b), float(h.eave) + 0.5, 0.5)
+	cs.shape = shape
+	var u := (b - a).normalized()
+	cs.transform = Transform3D(Basis(Vector3(u.x, 0, u.y), Vector3.UP, Vector3(-u.y, 0, u.x)),
+		Vector3(mid.x, float(h.eave) * 0.5 - 0.25, mid.y))
+	Surface.tag(cs, Surface.Kind.BRICK)
+	body.add_child(cs)
+	h.front_shape = cs
+
+
 # --- Building it -------------------------------------------------------------------------------
 
 ## Walls and roofs into `b`, lit windows into `glow`, courts into `ground`, one collision shape
 ## per îlot into `body`.
-func build(b: MeshKit.Builder, ground: MeshKit.Builder, glow: MeshKit.Builder, body: StaticBody3D) -> void:
+## The open houses' outer walls go into `shells` instead (HouseStreamer hides each one while its
+## floors stand there), and each gets its own street-front collision box (`open_collision`).
+func build(b: MeshKit.Builder, ground: MeshKit.Builder, glow: MeshKit.Builder, body: StaticBody3D, shells: MeshKit.Builder = null) -> void:
 	var faces: Array = []
 	faces.resize(ilots.size())
 	for k in ilots.size():
@@ -826,6 +920,11 @@ func build(b: MeshKit.Builder, ground: MeshKit.Builder, glow: MeshKit.Builder, b
 	for h: Dictionary in houses:
 		eaves[h.ilot].append(float(h.eave))
 		if ilots[h.ilot].silhouette:
+			continue
+		if h.get("open", false) and shells != null:
+			_house_walls(shells, h)
+			_house_roof(b, h)
+			_open_front(body, h)
 			continue
 		_house_mesh(b, h)
 		if h.lit and int(h.floors) > 1 and h.shape == "row" and h.faces_street:
@@ -881,6 +980,12 @@ func _face(b: MeshKit.Builder, pts: Array, colour: Color, hint: Vector3) -> void
 
 
 func _house_mesh(b: MeshKit.Builder, h: Dictionary) -> void:
+	_house_walls(b, h)
+	_house_roof(b, h)
+
+
+## The house's outer walls, from the ground to the eave.
+func _house_walls(b: MeshKit.Builder, h: Dictionary) -> void:
 	var foot: PackedVector2Array = h.foot
 	var eave: float = h.eave
 	var wall: Color = h.wall
@@ -899,6 +1004,11 @@ func _house_mesh(b: MeshKit.Builder, h: Dictionary) -> void:
 			_face(b, [_v(p, PLINTH, h), _v(q, PLINTH, h), _v(q, eave, h), _v(p, eave, h)], wall, hint)
 		else:
 			_face(b, [_v(p, 0.0, h), _v(q, 0.0, h), _v(q, eave, h), _v(p, eave, h)], wall if front or h.shape != "row" else wall.darkened(0.12), hint)
+
+
+func _house_roof(b: MeshKit.Builder, h: Dictionary) -> void:
+	var foot: PackedVector2Array = h.foot
+	var eave: float = h.eave
 	match h.roof:
 		"gable":
 			_gable(b, h)

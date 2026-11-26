@@ -75,6 +75,8 @@ var _b := MeshKit.Builder.new()      # buildings, walls, POIs
 var _g := MeshKit.Builder.new()      # ground and paint
 var _trees := MeshKit.Builder.new()
 var _glow := MeshKit.Builder.new()   # lit windows and lamps
+var _shells := MeshKit.Builder.new() # the open houses' outer walls (HouseStreamer cuts each away while its floors stand)
+var houses: HouseStreamer = null     ## builds the open houses' floors near the camera (S246)
 var _body := StaticBody3D.new()
 var _rng := RandomNumberGenerator.new()
 
@@ -116,6 +118,12 @@ func _init(full := true, detail := PackedVector2Array()) -> void:
 	root.add_child(_b.instance(null, false))
 	root.add_child(_trees.instance(null, false))
 	root.add_child(_glow.instance(MeshKit.emissive(Color("ffd9a0"), 2.5), false))
+	if not blocks.open_houses.is_empty():
+		var shells := _shells.instance(HouseStreamer.shell_material(), false)
+		shells.name = "OpenHouseShells"
+		root.add_child(shells)
+		houses = HouseStreamer.new(self, shells.material_override)
+		root.add_child(houses)
 
 
 # --- GameMap ------------------------------------------------------------------------
@@ -477,7 +485,7 @@ func _buildings() -> void:
 	building_count = blocks.houses.size()
 	blocks.paint_floors(_floors)
 	if _full:
-		blocks.build(_b, _g, _glow, _body)
+		blocks.build(_b, _g, _glow, _body, _shells)
 
 
 # --- Building blocks --------------------------------------------------------------------
