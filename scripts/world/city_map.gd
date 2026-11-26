@@ -43,12 +43,17 @@ const PLAN_SURFACE := { "setts": Color("9a8a72"), "asphalt": Color("3a3c42"), "f
 const PLAN_COVERED := Color("c08a3a")
 const LAYER_Y := [0.03, 0.05]   ## height of each StreetNet layer over the ground
 const GROUND := Color("302d2a")              ## unpaved ground between the streets and the houses
-const VERGE := Color("26291f")               ## the hill road's sides
 const FACADES := [Color("7b7469"), Color("6d7078"), Color("8a8377"), Color("5f5a55"), Color("77706a"),
 	Color("6a6e66"), Color("807a80"), Color("8d8a82")]
 const ASPHALT := Color("242528")
 const SHOPFRONT := Color("2a2b2f")
 const PAINT := Color("b8b8a8")
+const HILL_ROAD := "telegraphe" # the chemin du Télégraphe (CityData.HAND_STREETS)
+const KERB := Color("8a8983")        ## the flush concrete edging of the road up the hill
+const VERGE := Color("2e2b21")       ## packed earth and fallen leaves between the kerb and the trees
+const HILL_LANE := 2.2               ## the red brick walking lane on the right going up the hill
+const HILL_LINE := 0.14              ## the white line beside it, HILL_LINE_GAP in from the lane
+const HILL_LINE_GAP := 0.03
 const LEAVES := [Color("1c3320"), Color("23402a"), Color("182b1c"), Color("2a4a2c")]
 
 var nav: NavGrid
@@ -71,6 +76,10 @@ var hospital := {}                   ## the Hospital's lot frame (-Z to Rua Blum
 var prefeitura := {}                 ## the Prefeitura's lot frame (-Z to the avenue), its door and its pad (world)
 var mirante := {}                    ## where the Mirante's pieces stand (world): gate, gate_yaw, tower, deck, poles, rails
 var roadside_trees: Array = []       ## [{ at, kind }]: the real trees (Vegetation) lining the forest's roads
+var hill_line := PackedVector2Array() ## the road up Morro da Boa Vista as drawn: straightened, smoothed, a point every CITY_ROAD_STEP m (x, z)
+var hill_corners := PackedVector2Array() ## the traced points of that road left after straightening (where it really bends)
+var hill_width := 0.0
+var hill_length := 0.0
 
 var heights := PackedFloat32Array()  ## ground height at every cell corner, (gw + 1) x (gh + 1)
 var _raised := PackedByteArray()     # 1 where any corner of the cell is above 0
@@ -362,6 +371,12 @@ func _layout() -> void:
 		var sp: Dictionary = streets.specs[i]
 		var w: float = sp.road * widest + sp.walk[0] + sp.walk[1]
 		_stamp(streets.lines[i].pts, maxf(w, CityData.NAV_MIN_WIDTH), STREET, inside, 2 if streets.streets[i].kind == "principale" else 1)
+	_smooth_hill_road()
+	if hill_line.size() >= 2:
+		# Through the forest the open cells reach well past the paving, so no forest cell (a
+		# solid block) pokes into the road or its verge.
+		_stamp(hill_line, hill_width, STREET, inside)
+		_stamp(hill_line, hill_width + cell * 1.5, STREET, _mask([FOREST]))
 	for id: String in CityData.POIS:
 		var poi: Dictionary = CityData.POIS[id]
 		_fill(_plan(poi.lot), LOT, _mask([BLOCK, FOREST, PARK, WATER]))
@@ -415,6 +430,7 @@ func _hill() -> void:
 			var at := lo + Vector2(c, r) * cell
 			var w := smoothstep(0.0, float(fade), float(near))
 			heights[r * (gw + 1) + c] = CityHeights.at_px(at / CityData.M_PER_PX + CityData.ORIGIN_PX) * w
+	_level_hill_road()
 	for r in gh:
 		for c in gw:
 			var i := r * (gw + 1) + c
@@ -471,13 +487,19 @@ func _hill_ground() -> void:
 			for rr in range(r, r + B):
 				for cc in range(c, c + B):
 					done[rr * gw + cc] = 1
+	# The road's own paving is one smooth band (_hill_paving): the open cells round it are
+	# forest floor, or the clearing's ground on the summit.
+	var summit := _plan(CityData.POIS["mirante"].lot)
 	for r in range(r0, r1 + 1):
 		for c in range(c0, c1 + 1):
 			var i := r * gw + c
 			if _raised[i] == 0 or done[i] == 1:
 				continue
 			var t := grid[i]
-			var color: Color = VERGE if t == STREET else GROUND_COLORS.get(t, GROUND_COLORS[LOT])
+			var color: Color = GROUND_COLORS.get(t, GROUND_COLORS[LOT])
+			if t == STREET:
+				var mid := Vector2(lo.x + (c + 0.5) * cell, lo.y + (r + 0.5) * cell)
+				color = GROUND_COLORS[LOT] if Geometry2D.is_point_in_polygon(mid, summit) else GROUND_COLORS[FOREST]
 			_g.ground_quad(_corner(r, c), _corner(r, c + 1), _corner(r + 1, c + 1), _corner(r + 1, c), color)
 	# One height-map collider over the raised area, scaled up from 1 m to one cell.
 	var w := c1 - c0 + 2
@@ -896,33 +918,36 @@ func _put_free(colliders: Array, t: Transform3D) -> void:
 
 
 ## The road up Morro da Boa Vista from the gate at the forest's edge: grey pavers (drawn by
-## _hill_ground) with a red brick walking lane on the right going up and a white line beside it,
+## _hill_paving) with a red brick walking lane on the right going up and a white line beside it,
 ## concrete power poles with sagging cables and a few lamps, guard rails round the outside of
-## the bends, and the gate itself where the road enters the forest.
+## the bends, and the gate itself where the road enters the forest. It all follows hill_line,
+## the smoothed road (_smooth_hill_road), which _hill has already levelled into the hillside.
 func _hill_road() -> void:
-	var line := PackedVector2Array()
-	var width := 0.0
-	var hill: Dictionary = CityData.street("telegraphe") # the chemin du Télégraphe up the hill
-	if not hill.is_empty():
-		line = _plan(hill.pts)
-		width = CityData.width(hill)
+	if hill_line.size() < 2:
+		return
+	var width := hill_width
 	var forest := _plan(CityData.FOREST)
-	var total := 0.0
-	for i in line.size() - 1:
-		total += line[i].distance_to(line[i + 1])
+	var total := hill_length
 	var gate_at := -1.0
 	var step := 2.0
 	var d := 0.0
 	while d < total:
-		if Geometry2D.is_point_in_polygon(_along(line, d), forest):
+		if Geometry2D.is_point_in_polygon(hill_at(d), forest):
 			gate_at = d + 6.0
 			break
 		d += step
 	if gate_at < 0.0:
 		return
+	# Kerbs and verges up to the summit's clearing, then just the pavers across it.
+	var summit := _plan(CityData.POIS["mirante"].lot)
+	var clearing := total
+	while clearing > gate_at and Geometry2D.is_point_in_polygon(hill_at(clearing), summit):
+		clearing -= step
+	_hill_paving(gate_at - 7.0, clearing, true)
+	_hill_paving(clearing, total, false)
 	# The gate: its sign faces the way you come from.
-	var g := _along(line, gate_at)
-	var dir := _heading(line, gate_at)
+	var g := hill_at(gate_at)
+	var dir := hill_heading(gate_at)
 	var yaw := atan2(dir.x, dir.y)
 	var gate := Transform3D(Basis(Vector3.UP, yaw), Vector3(g.x, ground_y(Vector3(g.x, 0, g.y)), g.y))
 	_put_free(MiranteSet.gate(_b, gate, width), gate)
@@ -942,21 +967,15 @@ func _hill_road() -> void:
 		var at := gate * (bush[0] as Vector3)
 		at.y = ground_y(at)
 		Vegetation.plant(_trees, Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), at), bush[1], _rng)
-	# Lane, line, poles, cables and rails, from the gate to the summit.
-	var lane := 2.2
+	# Poles, cables and rails, from the gate to the summit (the lane and its line are paving).
 	var poles: Array = []
 	var rails := 0
 	d = gate_at - 10.0
 	var next_pole := gate_at + 12.0
 	while d < total - 4.0:
 		var e := minf(d + step, total - 4.0)
-		var a := _along(line, d)
-		var b := _along(line, e)
-		var ra := _right(line, d)
-		var rb := _right(line, e)
-		var off := width * 0.5 - lane * 0.5
-		_strip(a + ra * off, b + rb * off, ra, rb, lane, MiranteSet.BRICK)
-		_strip(a + ra * (off - lane * 0.5 - 0.1), b + rb * (off - lane * 0.5 - 0.1), ra, rb, 0.14, PAINT)
+		var a := hill_at(d)
+		var ra := hill_right(d)
 		if d >= next_pole:
 			next_pole += 36.0
 			var at := a + ra * (width * 0.5 + 0.7)
@@ -981,21 +1000,13 @@ func _hill_road() -> void:
 				continue
 			_b.tube(MeshKit.sag(a, b, (mid.y - (a.y + b.y) * 0.5) * -1.0, 10), thick * 0.5, Props.DARK, 5)
 	# Guard rails round the outside of every sharp bend on the hill.
-	var walked := 0.0
-	for i in range(1, line.size() - 1):
-		walked += line[i - 1].distance_to(line[i])
-		if walked < gate_at:
-			continue
-		var din := (line[i] - line[i - 1]).normalized()
-		var dout := (line[i + 1] - line[i]).normalized()
-		var turn := din.angle_to(dout)
-		if absf(turn) < 0.35:
-			continue
-		var outer := -1.0 if turn > 0.0 else 1.0 # turning right (+ in this x, z plane): the outside is the left
+	for bend: Array in RoadScatter._bends(hill_corners, hill_line, gate_at):
+		var walked: float = bend[0]
+		var outer: float = bend[1]
 		var k := maxf(gate_at, walked - 14.0)
 		while k < minf(total - 6.0, walked + 14.0):
-			var a := _along(line, k) + _right(line, k) * outer * (width * 0.5 + 0.4)
-			var b := _along(line, k + 4.0) + _right(line, k + 4.0) * outer * (width * 0.5 + 0.4)
+			var a := hill_at(k) + hill_right(k) * outer * (width * 0.5 + 0.4)
+			var b := hill_at(k + 4.0) + hill_right(k + 4.0) * outer * (width * 0.5 + 0.4)
 			var pa := Vector3(a.x, ground_y(Vector3(a.x, 0, a.y)), a.y)
 			var pb := Vector3(b.x, ground_y(Vector3(b.x, 0, b.y)), b.y)
 			var t := Transform3D(Basis.looking_at((pb - pa).normalized(), Vector3.UP), pa)
@@ -1004,6 +1015,229 @@ func _hill_road() -> void:
 			k += 4.0
 	mirante.poles = poles.size()
 	mirante.rails = rails
+
+
+# --- The road up the hill -----------------------------------------------------------------
+
+## The road up Morro da Boa Vista as it is drawn and walked: the traced points (pixels of the
+## plan, so a road that wobbles a little every few metres) with every wobble under
+## CITY_ROAD_STRAIGHTEN straightened out, then a smooth curve through what is left, a point every
+## CITY_ROAD_STEP metres.
+func _smooth_hill_road() -> void:
+	var hill: Dictionary = CityData.street(HILL_ROAD)
+	if not hill.is_empty():
+		hill_width = CityData.width(hill)
+		hill_corners = simplify(_plan(hill.pts), Config.CITY_ROAD_STRAIGHTEN)
+	hill_line = smooth_line(hill_corners, Config.CITY_ROAD_STEP)
+	hill_length = 0.0
+	if hill_line.size() >= 2:
+		hill_length = (hill_line.size() - 2) * Config.CITY_ROAD_STEP + hill_line[hill_line.size() - 2].distance_to(hill_line[hill_line.size() - 1])
+
+
+## The point `d` metres along the road up the hill (x, z). hill_line is evenly spaced, so this
+## is a lookup, not a walk along it.
+func hill_at(d: float) -> Vector2:
+	var n := hill_line.size()
+	var i := clampi(floori(d / Config.CITY_ROAD_STEP), 0, n - 2)
+	var a := hill_line[i]
+	var b := hill_line[i + 1]
+	return a.lerp(b, clampf((d - i * Config.CITY_ROAD_STEP) / maxf(a.distance_to(b), 0.001), 0.0, 1.0))
+
+
+## The way the road up the hill runs `d` metres along it, (x, z), unit length.
+func hill_heading(d: float) -> Vector2:
+	return (hill_at(d + 1.0) - hill_at(d - 1.0)).normalized()
+
+
+## Its right-hand side going up at `d`.
+func hill_right(d: float) -> Vector2:
+	var h := hill_heading(d)
+	return Vector2(-h.y, h.x)
+
+
+## The road up the hill climbs without bumps and lies level from side to side: its height is the
+## hillside's under its centre averaged CITY_ROAD_SMOOTH metres either way (twice), every corner
+## of its open cells takes the height of the road beside it, and past them the bench eases back
+## into the hillside over CITY_ROAD_BLEND metres, a cutting above the road and a bank below it.
+## Only the hill moves: the flat city stays at 0.
+func _level_hill_road() -> void:
+	var n := hill_line.size()
+	if n < 2:
+		return
+	var raw := PackedFloat32Array()
+	raw.resize(n)
+	for i in n:
+		raw[i] = ground_y(Vector3(hill_line[i].x, 0.0, hill_line[i].y))
+	var reach := maxi(1, roundi(Config.CITY_ROAD_SMOOTH / Config.CITY_ROAD_STEP))
+	var level := _average(_average(raw, reach), reach)
+	# Open cells reach (width + 1.5 cells) / 2 from the centre (_layout), their corners
+	# up to a cell's half diagonal further: all of those lie level.
+	var flat := hill_width * 0.5 + cell * 1.5
+	var far := flat + Config.CITY_ROAD_BLEND
+	var best := PackedFloat32Array()
+	best.resize(heights.size())
+	best.fill(INF)
+	var best_h := PackedFloat32Array()
+	best_h.resize(heights.size())
+	var span := ceili(far / cell)
+	for i in n:
+		var p := hill_line[i]
+		var c0 := floori((p.x - lo.x) / cell)
+		var r0 := floori((p.y - lo.y) / cell)
+		for r in range(maxi(0, r0 - span), mini(gh, r0 + span + 1) + 1):
+			for c in range(maxi(0, c0 - span), mini(gw, c0 + span + 1) + 1):
+				var k := r * (gw + 1) + c
+				var d2 := p.distance_squared_to(Vector2(lo.x + c * cell, lo.y + r * cell))
+				if d2 < best[k]:
+					best[k] = d2
+					best_h[k] = level[i]
+	for k in heights.size():
+		if heights[k] <= 0.0 or best[k] >= far * far:
+			continue
+		heights[k] = lerpf(best_h[k], heights[k], smoothstep(flat, far, sqrt(best[k])))
+
+
+## Each value the mean of itself and `reach` neighbours either side (fewer at the ends).
+static func _average(values: PackedFloat32Array, reach: int) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(values.size())
+	for i in values.size():
+		var sum := 0.0
+		var count := 0
+		for j in range(maxi(0, i - reach), mini(values.size(), i + reach + 1)):
+			sum += values[j]
+			count += 1
+		out[i] = sum / count
+	return out
+
+
+## The paving of the road up the hill from `from` to `to` metres along it, one smooth band across:
+## pavers, the red brick lane on the right going up with a white line beside it and, with
+## `edges`, a flush concrete kerb either side and a strip of packed earth out to the trees. Every
+## edge is a clean curve instead of the cells' staircase, and the bands share their edges rather
+## than lie one over another, so none can show through the next.
+func _hill_paving(from: float, to: float, edges: bool) -> void:
+	var half := hill_width * 0.5
+	var kerb := half + Config.CITY_ROAD_KERB
+	var verge := kerb + Config.CITY_ROAD_VERGE
+	var lane := half - HILL_LANE
+	var line := lane - HILL_LINE_GAP
+	var offsets := [-half, line - HILL_LINE, line, lane, half]
+	var colors := [MiranteSet.PAVERS, PAINT, MiranteSet.PAVERS, MiranteSet.BRICK]
+	if edges:
+		offsets = [-verge, -kerb] + offsets + [kerb, verge]
+		colors = [VERGE, KERB] + colors + [KERB, VERGE]
+	var lifts := []
+	for c: Color in colors:
+		lifts.append(0.03 if c == VERGE else 0.04)
+	var d := maxf(0.0, from)
+	var a := _cross_section(d, offsets)
+	while d < to - 0.01:
+		var e := minf(d + Config.CITY_ROAD_STEP, to)
+		var b := _cross_section(e, offsets)
+		for k in colors.size():
+			var up := Vector3(0, lifts[k], 0)
+			_g.ground_quad(a[k] + up, b[k] + up, b[k + 1] + up, a[k + 1] + up, colors[k])
+		a = b
+		d = e
+
+
+## Points on the ground across the road up the hill at `d`, `offsets` metres to its right. On
+## the inside of a bend tighter than they reach, they are pulled in so the band never folds over.
+func _cross_section(d: float, offsets: Array) -> PackedVector3Array:
+	var p := hill_at(d)
+	var right := hill_right(d)
+	var h0 := hill_heading(d - 2.0)
+	var h1 := hill_heading(d + 2.0)
+	var turn := absf(h0.angle_to(h1))
+	var radius := 4.0 / turn if turn > 0.001 else INF
+	var inner := signf((h1 - h0).dot(right)) # the side the bend's centre is on
+	var out := PackedVector3Array()
+	for o: float in offsets:
+		var off := o
+		if signf(o) == inner:
+			off = inner * minf(absf(o), radius * 0.85)
+		var q := p + right * off
+		out.append(Vector3(q.x, ground_y(Vector3(q.x, 0.0, q.y)), q.y))
+	return out
+
+
+## `line` with every point closer than `tolerance` to the straight line past it dropped
+## (Douglas-Peucker): the wobbles go, the real bends stay.
+static func simplify(line: PackedVector2Array, tolerance: float) -> PackedVector2Array:
+	if line.size() < 3:
+		return line
+	var keep := PackedByteArray()
+	keep.resize(line.size())
+	keep[0] = 1
+	keep[line.size() - 1] = 1
+	var spans := [Vector2i(0, line.size() - 1)]
+	while not spans.is_empty():
+		var span: Vector2i = spans.pop_back()
+		var worst := 0.0
+		var at := -1
+		for i in range(span.x + 1, span.y):
+			var off := Geometry2D.get_closest_point_to_segment(line[i], line[span.x], line[span.y]).distance_to(line[i])
+			if off > worst:
+				worst = off
+				at = i
+		if at >= 0 and worst > tolerance:
+			keep[at] = 1
+			spans.append(Vector2i(span.x, at))
+			spans.append(Vector2i(at, span.y))
+	var out := PackedVector2Array()
+	for i in line.size():
+		if keep[i] == 1:
+			out.append(line[i])
+	return out
+
+
+## A smooth curve through every point of `points` (centripetal Catmull-Rom: no loops, no
+## overshoot at a tight bend), returned as points `step` metres apart along it.
+static func smooth_line(points: PackedVector2Array, step: float) -> PackedVector2Array:
+	var n := points.size()
+	if n < 2:
+		return points
+	var dense := PackedVector2Array()
+	for i in n - 1:
+		var p1 := points[i]
+		var p2 := points[i + 1]
+		var p0 := points[i - 1] if i > 0 else p1 * 2.0 - p2
+		var p3 := points[i + 2] if i + 2 < n else p2 * 2.0 - p1
+		var pieces := maxi(1, ceili(p1.distance_to(p2) / (step * 0.25)))
+		for k in pieces:
+			dense.append(_catmull_rom(p0, p1, p2, p3, float(k) / pieces))
+	dense.append(points[n - 1])
+	var out := PackedVector2Array([dense[0]])
+	var carry := 0.0 # metres walked since the last point out
+	for i in dense.size() - 1:
+		var a := dense[i]
+		var b := dense[i + 1]
+		var length := a.distance_to(b)
+		var s := step - carry
+		while s <= length:
+			out.append(a.lerp(b, s / length))
+			s += step
+		carry = length - (s - step)
+	if carry > step * 0.05:
+		out.append(dense[dense.size() - 1])
+	else:
+		out[out.size() - 1] = dense[dense.size() - 1]
+	return out
+
+
+## The point `u` (0..1) of the way from p1 to p2 on a centripetal Catmull-Rom curve.
+static func _catmull_rom(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, u: float) -> Vector2:
+	var t1 := sqrt(maxf(p0.distance_to(p1), 0.001))
+	var t2 := t1 + sqrt(maxf(p1.distance_to(p2), 0.001))
+	var t3 := t2 + sqrt(maxf(p2.distance_to(p3), 0.001))
+	var t := lerpf(t1, t2, u)
+	var a1 := p0.lerp(p1, t / t1)
+	var a2 := p1.lerp(p2, (t - t1) / (t2 - t1))
+	var a3 := p2.lerp(p3, (t - t2) / (t3 - t2))
+	var b1 := a1.lerp(a2, t / t2)
+	var b2 := a2.lerp(a3, (t - t1) / (t3 - t1))
+	return b1.lerp(b2, (t - t1) / (t2 - t1))
 
 
 ## The point `d` metres along a polyline.
@@ -1025,15 +1259,6 @@ func _heading(line: PackedVector2Array, d: float) -> Vector2:
 func _right(line: PackedVector2Array, d: float) -> Vector2:
 	var h := _heading(line, d)
 	return Vector2(-h.y, h.x)
-
-
-## A strip of paint `w` wide over the ground from `a` to `b` (centre line), hugging the slope.
-func _strip(a: Vector2, b: Vector2, ra: Vector2, rb: Vector2, w: float, color: Color) -> void:
-	var corners := [a - ra * w * 0.5, b - rb * w * 0.5, b + rb * w * 0.5, a + ra * w * 0.5]
-	var pts := []
-	for q: Vector2 in corners:
-		pts.append(Vector3(q.x, ground_y(Vector3(q.x, 0, q.y)) + 0.06, q.y))
-	_g.ground_quad(pts[0], pts[1], pts[2], pts[3], color)
 
 
 # --- Set pieces -------------------------------------------------------------------------------
@@ -1145,6 +1370,8 @@ func _on_ground(p: Vector2, lift: float) -> Vector3:
 ## surface is a shade off its neighbours'.
 func _street_surfaces() -> void:
 	for piece: Dictionary in streets.pieces_in(detail_area):
+		if piece.street >= 0 and hill_line.size() >= 2 and streets.streets[piece.street].id == HILL_ROAD:
+			continue # the road up the hill is its own smooth band with kerbs (_hill_paving)
 		var tris: PackedVector2Array = piece.tris
 		var color: Color = SURFACE_COLORS[piece.surface]
 		var id: int = piece.street if piece.street >= 0 else 1000 + int(piece.node)

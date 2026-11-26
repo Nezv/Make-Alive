@@ -366,6 +366,12 @@ const CITY_BACK_MIN := 60.0        # m²: a traced footprint smaller than this i
 const CITY_HALL_AREA := 1200.0     # m²: a traced footprint larger than this is a hall
 const CITY_LIT_SHARE := 0.1        # houses with a window still lit
 const CITY_BLOCK_TRIANGLES := 1500000 # the whole town's walls and roofs
+const CITY_ROAD_STEP := 1.0      # metres between the points of the smoothed road up the hill (CityMap.hill_line)
+const CITY_ROAD_STRAIGHTEN := 4.0 # metres of wobble in the traced road that are straightened out before it is smoothed
+const CITY_ROAD_SMOOTH := 12.0    # metres either side over which the road's rise is averaged, so it climbs without bumps
+const CITY_ROAD_BLEND := 10.0     # metres over which the level road bench eases back into the hillside
+const CITY_ROAD_KERB := 0.25      # the flush concrete edging along both sides of the road up
+const CITY_ROAD_VERGE := 2.2      # then a strip of packed earth and leaves before the trees
 const DOOR_HP := 120
 const DOOR_BASH_DAMAGE := 10
 
