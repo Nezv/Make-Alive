@@ -3,9 +3,11 @@
 The build order for everything in `TODO.md`, cut into steps one agent can finish in one session.
 Finishing every step leaves a LAN co-op zombie extraction game set in an invented French town in the style of Paris around 1800, laid out on the bones of central Joinville.
 
+**Direction (26 Nov 2026): five maps, not a city.** Building and running the whole town is not feasible, so each mission is its own map: its POI and the streets round it (S051), dressed with the element library that already exists (S247, S249). The rest of the town is backdrop (the sky's roofscape, S050). The town in detail everywhere waits in P14 until the five maps ship. Work that was built on the old real-Joinville look (the Mirante, the Prefeitura and the Hospital sets, PRs 2 to 7) is the starting point of each area's first playable step (S250 to S254), not thrown away.
+
 ## How to use this file
 
-- **Pick:** the lowest-numbered step that is `[ ]` and whose `needs` are all `[x]`. One step per session. Exception: S140 and S141 (the element pipeline and its kit) go first, since most open steps wait on them.
+- **Pick:** the lowest-numbered step that is `[ ]` and whose `needs` are all `[x]`. One step per session. Exception: S247, S248 and S051 go first, then the five areas' first playable steps (S250 to S254), then S255 and S258: they make the five maps playable with what is already built. Element steps keep going alongside, for the parts each area still lacks.
 - **Do:** follow `CLAUDE.md` (failing test first, numbers in `Config`, gameplay reactions in `hooks.gd`, host decides, gore is local, everything is code, no imported assets).
 - **Elements:** a step that makes something people look at (a building part, a family of props, a vehicle, a plant, the hands, a gun) is an element step: it makes that one thing, or one small family that shares one design, and nothing else, and it iterates in rounds (see "Detail and iteration" below). A step that places finished elements (a street, a square, a POI) is an assembly step and models nothing new.
 - **Prove:** the step's `test` passes in the whole suite, and the `see` command's screenshots were read and look right. A step with `rounds` also has every round written on its element's card, and its last review sheet shown in chat.
@@ -23,6 +25,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 ## Rules every step obeys
 
 - **A French town on Joinville's plan:** Joinville is the plan, not the look. `references/joinville.png`, the OpenStreetMap tiles `references/1.png` to `9.png` and `joinville_topography.png` give the bones: the river's line, the hill and its height, where the five places stand, the streets, how dense each part is. The streets are Joinville's own, traced off the map (S040: the main ones where its bus routes run), and everything people see is dressed as a French town in the style of Paris around 1800, before Haussmann: narrow crooked streets of setts between tall plastered houses with shutters, mansards and chimney stacks, timber-framed houses in the old core, quays along the river, a few post-war blocks at the edge. Life is today's (cars, buses, a hospital tower, an army), set in that old fabric. Every name, sign and word on a wall is French. The Joinville photos (`terminal1.png`, `hospital*.png`, `prefeitura*.jpg`, `batalhao*.jpg`, `mirante_*.jpg`, `praça_da_bandeira.jpg`) give only arrangement and scale; no building, sign or name is copied from them, and every name is invented. Only the five POIs have interiors. Every other building is a solid block with a believable facade and doors that do not open.
+- **Five maps:** a mission builds only its area (S051). Nothing in P05 is built town-wide any more: every town step works inside the mission areas, and its town-wide part is S259 (P14).
 - **Budget:** 144 fps on a laptop. Two shadow-casting lamps. Every effect has a cap in `Config` and a pool. Watch "draws".
 - **Network:** new effects travel as *what happened* (kind, position, direction, one argument), never as particles or physics. Zombie snapshots stay 13 bytes each unless the step says otherwise and the packet test still passes.
 - **Looks are deterministic:** seeded from ids or the map's own RNG, never `randf`, so every peer sees the same city.
@@ -635,7 +638,34 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ---
 
-## P05 · The town
+## P05 · The town round the five places
+
+- Every step here is built inside the mission areas first (S051); the rest of the town waits for S259.
+
+### [ ] S247 · Place the element library in maps
+> needs: S140 | size: M | test: `tests/test_placement.gd` | see: `--host --mission=hospital --shot-at=2`
+- The library (`assets/models/props`, about 140 elements, each with LODs, states and parts) is built but nothing places it: props in the maps are still GDScript boxes.
+- [ ] Map data `props`: `{ name, at, yaw, state, open }` per placed element, and `scatter` rules (an element along a line or over an area, seeded by the map)
+- [ ] `PropModel` instances for few, one `MultiMesh` per element and state for many, LOD visibility ranges from `Elements.ALL`
+- [ ] Collision from each element's `.json` (boxes per part), nav cells closed under solid ones, moving parts (doors, lids, drawers) as interactables where the data says so
+- [ ] Budget: draws and triangles of a placed set counted by `Budget`, `tests/test_placement.gd` holds a full area under `Config.BUDGET`
+- [ ] `--place-rack` lays a sample of every family on a street to look at
+
+### [ ] S248 · Library triage
+> needs: S140 | size: S | test: `python tools/models/props.py --list` | see: `references/elements/library.md`
+- [ ] `references/elements/library.md`: every element by family, its round, whether its card has photos, its states, and which area uses it
+- [ ] Each marked ready to place, or the round it still needs (a draft at round 1 is placed and improved in place)
+- [ ] The elements each area needs and nobody has made yet, listed per area, so element steps are picked from that list first
+
+### [ ] S249 · Area dressing from the library
+> needs: S051, S247, S248 | size: L | rounds: 2 | test: `tests/test_area_dressing.gd` | see: `--mission=<each> --shot-cam`
+- The area version of S046, S047 and S048, with the elements that exist: lamps, signs, small furniture, bus stops, kiosks, trees and shrubs, remains, checkpoint gear, wrecks. Seeded per area, the same on every peer.
+- [ ] Along the area's streets: lamps and signs at their spacing, furniture by the doors and corners, trees where the plan has them
+- [ ] The evacuation that failed: remains, abandoned cars, checkpoint gear, by the area's own story (the hospital's triage, the barracks' gate)
+- [ ] The area's edge closed by placed barricades, wrecks and fences (S051's edge rules)
+- [ ] Round 1 · each area's street views at eye height against the town's references
+- [ ] Round 2 · night: lamps that work and those that don't
+- [ ] Review: one sheet per area
 
 ### [x] S039 · Trace the OpenStreetMap tiles
 > needs: none | size: L | test: `tests/test_city_osm.gd` | see: redraw `references/city_plan.png`
@@ -664,6 +694,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S041 · Road surface
 > needs: S040, S155 | size: L | asset: complex | rounds: 3 | test: `tests/test_road_surface.gd` | see: `--host --shot-cam` over the rue du Marché, `--street-rack`
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - [ ] Surfaces as vertex colour and one shared material, no textures
   - [ ] Pavés: square sandstone and granite setts in rows on the old streets, the squares and the quays, slightly domed each, the joints dark; drawn in vertex colour with height noise
   - [ ] The old lanes dished to a gutter (ruisseau) down the middle, as before pavements
@@ -682,6 +713,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S042 · Sidewalks
 > needs: S040, S156 | size: M | asset: complex | rounds: 3 | test: `tests/test_sidewalks.gd` | see: `--host --shot-cam` on a street corner, `--street-rack`
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - [ ] Kerb as a real 12 to 15 cm step of long granite blocks, players and zombies walk it without a jump
 - [ ] Paving kinds by street
   - [ ] Poured grey asphalt pavements with the granite kerb, the Parisian kind
@@ -715,6 +747,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S044 · Facades
 > needs: S043, S157, S158, S159, S160, S161, S162, S163, S164 | size: L | rounds: 2 | test: `tests/test_facades.gd` | see: `--host --shot-cam` street level, day and night
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - Assembly: the blocks of S043 dressed from the facade kits; nothing modelled here.
 - [ ] Facade grammar per block class: which kit, how many floors, where the shops, carriage gates and signs go, seeded per building
   - [ ] Timber-framed houses (S161) in the old core; plastered stone houses (S162) on the main streets with wooden shopfronts (S158) under French windows (S157); the few post-war blocks (S163) at the edge; ateliers (S164) by the river
@@ -729,6 +762,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S045 · The river
 > needs: S040, S004, S165, S174 | size: L | asset: complex | rounds: 3 | test: `tests/test_river.gd` | see: `--host --shot-cam` on a bridge
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - The river runs where Joinville's does; its banks are Paris's quays.
 - [ ] Channel cut below street level: high stone quay walls with mooring rings, cobbled ramps (ports) and stairs down to a lower quay at the water, the quay road above with its parapet; grass banks and willows out of the centre
 - [ ] Water: one mesh, shader in code with slow flow along the river line, small ripples, dark green-brown, sky and lamp reflections as stretched streaks
@@ -744,6 +778,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S046 · Street furniture placement
 > needs: S041, S042, S166, S167, S168, S169, S170, S171, S172, S173 | size: M | rounds: 2 | test: `tests/test_street_furniture.gd` | see: `--furniture-rack`, `--host --shot-cam` on a street corner
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - Assembly: places the finished street furniture; nothing modelled here.
 - [ ] Rules along streets, seeded, merged per block: réverbères hung on ropes over the old streets and lanterns on wall brackets, cast-iron candelabra on the main streets and quays, the ropes and wires of S167, traffic lights at the bigger junctions, street names carved in the corner stones and on blue plates, bus stops where the lines run, a colonne Morris and a kiosk now and then, benches, bins, bornes and railings by the squares and shops
 - [ ] Lamps follow the two-shadow rule: emission and a cheap light, shadows only from the manager (S108)
@@ -756,6 +791,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S047 · Vegetation placement and wind
 > needs: S042, S174, S175, S176, S177, S178 | size: M | rounds: 2 | test: `tests/test_vegetation.gd` | see: `--tree-rack`, `--host --shot-cam` on a main street
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - Assembly and the shared systems: places the finished plants of S174 to S178.
 - [ ] Planting rules: rows of plane trees and elms on the main streets and the quays, the old chestnuts on the squares, limes trained flat in the courts, box parterres in the formal gardens, window boxes and climbing ivy on the old houses, the forest wall where the hill rises
 - [ ] Wind: vertex sway in a shader, stronger at the tips, gusts that travel across a street
@@ -768,6 +804,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S048 · Apocalypse dressing
 > needs: S046, S180, S181, S182, S183, S184, S185, S186, S203 | size: M | rounds: 2 | test: `tests/test_dressing.gd` | see: `--host --shot-cam` on the avenue
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - Assembly: places the finished vehicles and leftovers; the set pieces of `scenery.gd` are rebuilt from them.
 - [ ] Vehicles in their states (S179's generator): parked, abandoned with doors open, crashed into a pole, rolled over, burnt out; hazard lights still blinking on a few, a dome light on, a wiper still moving
 - [ ] Traffic jam generator along a street: a queue toward the way out of town, buses (S203) among the cars, gaps to walk through
@@ -783,6 +820,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S049 · Squares and landmarks
 > needs: S044, S047, S166, S173, S187, S188, S189, S190 | size: M | rounds: 3 | test: `tests/test_landmarks.gd` | see: `--host --shot-cam` on the place du marché
+- Inside the mission areas first (S051, S249); the rest of the town is S259.
 - Assembly of the finished landmarks, exterior only. They stand where the plan of S040 puts them (the place du marché where Praça da Bandeira is, the church near it), not on traced footprints.
 - [ ] The place du marché: setts, the fountain (S187) in the middle, old chestnuts, lanterns (S166), benches and bins (S173), the empty market stalls, tall plastered houses with shops closing it
 - [ ] The church (S188) on its parvis off the market
@@ -809,13 +847,15 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - Done: `TimeOfDay` (five presets as data: clear, overcast, dusk, night, storm; `Missions.INFO[..].sky`, `MapData.sky`, the host's `--time=`, sent in `welcome`), `SkyDome` (environment, sun or moon, depth fog to `fog_max` at the far plane, lightning) and one sky shader (`SkyShader`) that also paints the backdrop past the far plane (`Config.VIEW_FAR` 1200 m): the hill and the roofscape from a horizon profile worked out from the map's heights for where the camera stands, the town from above out of `CityPicture` with its lamps at night, the fires' smoke columns, and the church, campanile, telegraph tower and mill as silhouettes until S188, S214 and S230 build them. No draw call; measured 8.2 ms with 60 zombies in the city, the same as a plain sky. Card and rounds: `references/elements/sky.md`, sheets `sky_r1..r4`, `sky_rfinal`. Left: plaster reads light (the town's vertex colours are linear; the exposure makes up for it at night), the mission starts hide the backdrop behind their placeholder buildings, no drawn lightning bolt.
 
 ### [ ] S051 · Mission areas
-> needs: S002, S043, S048 | size: L | test: `tests/test_mission_areas.gd` | see: `--mission=<each>`
+> needs: S002, S043 | size: L | test: `tests/test_mission_areas.gd` | see: `--mission=<each>`
 - [ ] Each mission builds only its area: the POI and the streets around it, bounds polygon in map data
 - [ ] Edges closed believably, never an invisible wall in the open: bus across the road, collapsed facade, burning pile-up, military fence, flood water
 - [ ] Beyond the edge: low-detail blocks and the backdrop
 - [ ] Build time per area under a limit, measured in the test
 - [ ] Visibility ranges on small props, block meshes split so culling works
-- [ ] The whole-city map stays available as free play
+- [ ] Each area is a map of its own (`GameMap` for one POI, from the same plan and data): a mission loads only it, never the whole town
+- [ ] The whole-town map stays behind `--map=town` for tools and screenshots, not as the default
+- [ ] The menu's pins start their area
 
 ### [ ] S052 · City navigation 2
 > needs: S051, S028 | size: M | test: `tests/test_city_nav.gd`
@@ -1353,7 +1393,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: in a bay and at 1 m outside and inside
 
 ### [ ] S056 · The bus station
-> needs: S053, S048, S049, S197, S198, S199, S200, S201, S202, S203 | size: L | rounds: 3 | test: `tests/test_poi_terminal.gd` | see: `--mission=terminal --shot-at=2`
+> needs: S053, S253, S249, S197, S198, S199, S200, S201, S202, S203 | size: L | rounds: 3 | test: `tests/test_poi_terminal.gd` | see: `--mission=terminal --shot-at=2`
 - Assembly of the finished elements where the plan puts the gare routière (`--mission=terminal`); nothing modelled here.
 - [ ] The slab (S197) on its columns (S198) with the skylight (S199), over the platforms and bays (S200), the ticket office, kiosks and toilets (S201) and the boards (S202)
 - [ ] City buses (S203): some in the bays, one jack-knifed across the exit, one with its doors open and lights on
@@ -1460,7 +1500,8 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - Under way: family `tools/models/props/generator.py`: `genset` (skid, engine, radiator and guard, alternator, exhaust with bellows and silencer, control box), `fuel_tank` (GAZOLE, gauge, feed and valve) and `switchgear` (three cabinets, meters and lamps, the start lever as a part) have round 1, built (no photos yet). Left: photos, the running state (shaking, smoke, lamps), rounds 2 and 3.
 
 ### [ ] S058 · The hospital, outside
-> needs: S053, S048, S182, S228, S204, S205, S206, S207, S208 | size: L | rounds: 3 | test: `tests/test_poi_hospital.gd` | see: `--mission=hospital --shot-at=2`
+> needs: S053, S251, S249, S182, S228, S204, S205, S206, S207, S208 | size: L | rounds: 3 | test: `tests/test_poi_hospital.gd` | see: `--mission=hospital --shot-at=2`
+- Built on the old look (PR 7): `scripts/world/hospital_set.gd` (tower in three bodies, bay, old wing, annex, fire stair to the roof pad) and its mission. S251 brings it into its area; this step takes it to the bar with the hospital's elements.
 - Assembly along the hospital's street of the finished wings and street front; nothing modelled here.
 - [ ] The Hôtel-Dieu round its court (S204), the post-war wing and the house (S205), the new tower (S206), the street front (S207) and the helipad on the tower's roof (S208), where the plan puts them
 - [ ] Night look: the tower lit from below, the sign glowing, most windows dark, a few flickering
@@ -1557,7 +1598,8 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: both rooms at eye height
 
 ### [ ] S061 · Town hall, outside
-> needs: S053, S045, S047, S213, S214, S215, S216, S217, S218 | size: L | rounds: 3 | test: `tests/test_poi_prefeitura.gd` | see: `--mission=prefeitura --shot-at=2`
+> needs: S053, S252, S249, S213, S214, S215, S216, S217, S218 | size: L | rounds: 3 | test: `tests/test_poi_prefeitura.gd` | see: `--mission=prefeitura --shot-at=2`
+- Built on the old look (PR 7): `scripts/world/prefeitura_set.gd` (the block, lawn, pad, flags) and a defend mission. S252 brings it into its area.
 - Assembly between the river and the hill of the finished parts; nothing modelled here.
 - [ ] The front from its bays (S213) with the campanile (S214), the office wing behind (S215), the roofs (S216)
 - [ ] The garden (S217) with the name and arms over the door (S218); the open lawn is the landing zone
@@ -1679,7 +1721,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: each room at eye height
 
 ### [ ] S064 · The barracks, outside
-> needs: S053, S048, S220, S221, S222, S223, S224, S225, S226, S227, S228 | size: L | rounds: 3 | test: `tests/test_poi_batalhao.gd` | see: `--mission=batalhao --shot-at=2`
+> needs: S053, S254, S249, S220, S221, S222, S223, S224, S225, S226, S227, S228 | size: L | rounds: 3 | test: `tests/test_poi_batalhao.gd` | see: `--mission=batalhao --shot-at=2`
 - Assembly where the plan puts the caserne of the finished parts; nothing modelled here.
 - [ ] The quadrangle of barrack blocks (S220) round the cour d'honneur (S222), the gate pavilion (S221), the riding hall and court (S224), the field behind
 - [ ] The perimeter, gate and guard tower (S223); the searchlight still turns
@@ -1743,7 +1785,8 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: walking it at eye height
 
 ### [ ] S066 · Lookout, the summit
-> needs: S053, S047, S230, S231 | size: L | rounds: 2 | test: `tests/test_poi_mirante.gd` | see: `--mission=mirante --shot-at=2`
+> needs: S053, S250, S249, S230, S231 | size: L | rounds: 2 | test: `tests/test_poi_mirante.gd` | see: `--mission=mirante --shot-at=2`
+- Built on the old look (PRs 2, 4 to 6): `scripts/world/mirante_set.gd` (gate, poles, guard rails, the tower with walkable stairs, snack bar, radio masts), `vegetation.gd`, the smooth hill road band. S250 brings it into its area.
 - [ ] The telegraph tower and the windmill (S230) and the summit's clearing with its furniture (S231): car park, railings, coin binoculars, the guinguette, antenna masts with red lights
 - [ ] The view: the whole town backdrop below, the church tower and the campanile, lit windows, fires, the river as a pale line
 - [ ] Wind up here: stronger sway, louder, the windmill's sails turning, cloud wisps passing through the deck at night
@@ -1753,7 +1796,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Review: the deck's view and the summit at eye height
 
 ### [ ] S067 · Lookout, the road down
-> needs: S066, S041, S167, S178, S232, S233, S234 | size: L | rounds: 3 | test: `tests/test_poi_mirante_road.gd` | see: `--mission=mirante --shot-cam` on the hairpin
+> needs: S066, S250, S167, S178, S232, S233, S234 | size: L | rounds: 3 | test: `tests/test_poi_mirante_road.gd` | see: `--mission=mirante --shot-cam` on the hairpin
 - [ ] The hill road (S233) along the road of the plan, the hairpin and the grade from `CityHeights`; everything placed with `map.ground_y`
 - [ ] Forest walls both sides (S178), canopy closing overhead; wooden poles with their wires following the road (S167)
 - [ ] The park gate at the foot (S232)
@@ -1766,12 +1809,51 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ### [ ] S068 · Mission: down from the lookout
 > needs: S067, S052, S022 | size: M | test: `tests/test_mission_mirante.gd` | see: `--mission=mirante --bot`
+- As built (PR 2) the mission runs the other way: from the gate up the road to the helicopter on the tower. Decide here whether it stays a climb or becomes the descent below.
 - [ ] Descend the tower: tight stairs, leapers
 - [ ] The road: leapers drop out of the trees, runners come up the road in packs, fog between the trunks
 - [ ] Checkpoint at the hairpin
 - [ ] Choice: the lit road or the dark trail
 - [ ] Extraction at the park gate at the foot, a truck instead of the helicopter
 - [ ] Bot scenario finishes it on easy
+
+---
+
+### [ ] S250 · Lookout area, first playable
+> needs: S051, S247 | size: L | test: `tests/test_mission_mirante.gd` | see: `--mission=mirante --bot`
+- From what is built: the Mirante set, the vegetation and the smooth hill road (PRs 2, 4 to 6), in the lookout's own area map.
+- [ ] The area: the hill from the park gate to the summit, its edge the forest; the town below as backdrop
+- [ ] Names and signs French (S245): the telegraph tower, the chemin du Télégraphe
+- [ ] Placed elements where the library has them (summit furniture, poles, lamps, signs, remains)
+- [ ] The mission end to end on the area, bot scenario on easy
+
+### [ ] S251 · Hospital area, first playable
+> needs: S051, S247 | size: L | test: `tests/test_mission_hospital.gd` | see: `--mission=hospital --bot`
+- From what is built: `hospital_set.gd` and its mission (PR 7).
+- [ ] The area: the hospital's block and the streets round it, edges closed
+- [ ] The hospital's elements placed (wheelchairs, gurneys, IV stands, oxygen, genset, helipad) instead of box props
+- [ ] The mission end to end on the area, bot scenario on easy
+
+### [ ] S252 · Town hall area, first playable
+> needs: S051, S247 | size: L | test: `tests/test_mission_prefeitura.gd` | see: `--mission=prefeitura --bot`
+- From what is built: `prefeitura_set.gd` and its defend mission (PR 7).
+- [ ] The area: the town hall, its lawn and garden, the quay along the river (a simple bank until S045)
+- [ ] Elements placed: townhall name and arms, park furniture, lamps, barricade gear for the defence
+- [ ] The defence end to end on the area, bot scenario on easy
+
+### [ ] S253 · Bus station area, first playable
+> needs: S051, S247 | size: L | test: `tests/test_mission_terminal.gd` | see: `--mission=terminal --bot`
+- Nothing built beyond the placeholder: the station from the library's terminal parts (columns, trusses, signs, departure boards) on a simple slab.
+- [ ] The area: the station, the place du Marché beside it and the streets out
+- [ ] A first objective list (extraction across the area), checkpoint, way out
+- [ ] Bot scenario on easy
+
+### [ ] S254 · Barracks area, first playable
+> needs: S051, S247 | size: L | test: `tests/test_mission_batalhao.gd` | see: `--mission=batalhao --bot`
+- Nothing built beyond the placeholder: the court, the riding hall and the camp gear from the library, blocks as simple masses.
+- [ ] The area: the barracks inside its wall, the gate and the street before it
+- [ ] A first defend objective list with waves and the helicopter
+- [ ] Bot scenario on easy
 
 ---
 
@@ -1923,7 +2005,8 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Attack variety: two-hand grab, wide swipe, lunge bite, each with wind-up, strike and recovery
 - [ ] Losing an arm mid-attack: the swing continues with the stump and sprays
 - [ ] Losing a leg: topple sideways, then the existing lying states
-- [ ] Runner: head-down sprint with arms pumping wrong, skids on turns
+- [x] Runner: head-down sprint with arms pumping wrong, skids on turns
+  - Frantic runner (PR 3): `Humanoid.Anim.SPRINT` / `LUNGE` / `SURGE`, three arm gaits by id, banking into turns, clawing over a jam; `--runner-rack`
 - [ ] Leaper: all-fours scuttle, coil with the back arched, land in a roll
 - [ ] Secondary motion: head and arm lag on stops, jaw and fingers always moving
 
@@ -1948,7 +2031,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Host tick cost at the zombie cap stays in budget (S009)
 
 ### [ ] S074 · Climbing and vaulting
-> needs: S071, S073 | size: L | test: `tests/test_zombie_climb.gd` | see: `--host --demo --climb`
+> needs: S071, S255 | size: L | test: `tests/test_zombie_climb.gd` | see: `--host --demo --climb`
 - [ ] Nav links typed VAULT (waist high), CLIMB (up to a floor), DROP
 - [ ] Vault animation: hands slap the top, belly over, tumble down the other side, get up
 - [ ] Climb animation: jump, grab the edge, feet scrabble, pull up; fingers show on the ledge first
@@ -2014,6 +2097,17 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Corpses settle, then become static corpses as now; caps unchanged
 - [ ] Piles: corpses stack at choke points without jitter
 - [ ] Explosions throw ragdolls and loose limbs
+
+---
+
+### [ ] S255 · Zombies through stairs, doors and floors
+> needs: S051 | size: L | test: `tests/test_zombie_levels.gd` | see: `--mission=mirante --bot`, `--house-rack --zombies`
+- Today zombies can't climb the lookout tower's stairs or the hospital's fire stair, and can't come into the open houses (their grid has the block solid).
+- [ ] The area's navigation has levels: stairs, landings, decks and floors as linked cells, not only the ground grid
+- [ ] Doorways of open houses and the POIs' interiors are links; a shut door blocks until it is broken
+- [ ] Zombies follow players up the tower and the fire stair, into houses and from floor to floor
+- [ ] The director's closets may be inside (a house's court, a stair)
+- [ ] Host tick at the zombie cap stays in budget
 
 ---
 
@@ -2347,7 +2441,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Fire extinguisher: white cloud that puts out fire and blinds for a moment
 
 ### [ ] S115 · Ambient life
-> needs: S048 | size: M | test: `tests/test_ambient_life.gd`
+> needs: S249 | size: M | test: `tests/test_ambient_life.gd`
 - [ ] Crows on wires and corpses that take off when a player comes near or a shot is fired
 - [ ] Crows circling over the barracks, bats round the lamps on the hill road
 - [ ] Rats running along walls into holes, cockroaches scattering from light indoors
@@ -2500,6 +2594,28 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 
 ---
 
+### [ ] S256 · Loot in houses
+> needs: S246, S152, S153 | size: M | test: `tests/test_house_loot.gd` | see: `--house-rack`
+- [ ] Room dressing slots carry loot by room kind (kitchen, bedroom, bathroom cabinet, shop counter), seeded per house so every peer agrees
+- [ ] Lootboxes, ammo cartons and carried things (medkit, bandage, pills, planks) from the library's models
+- [ ] What was taken is part of the house's state (late joiners), capped like drops
+- [ ] Loot found scales with difficulty (`ammo found`)
+
+### [ ] S257 · Open World on the areas
+> needs: S051 | size: M | test: `tests/test_game_modes.gd` | see: `--mode=open_world`
+- PR 8 added the mode on the whole town (day and night clock, hordes by night). It moves onto the areas and gets what it lacks.
+- [ ] Runs on one area, or two joined by a street, not the whole town
+- [ ] Open houses to search (S256) and a safe house to hold through a horde night
+- [ ] A way to leave: any area's extraction ends the run with its score
+
+### [ ] S258 · Area performance pass
+> needs: S051, S247, S249 | size: M | test: `tests/test_budget.gd` | see: `tools\perf.ps1 <area>`
+- [ ] `Config.BUDGET` per area (meshes, surfaces, lights, shapes, triangles) with the library placed
+- [ ] `tools\perf.ps1` on every area with 60 zombies: average and worst frame written to `references/perf.md`
+- [ ] Visibility ranges, LODs and MultiMesh use fixed where an area is over
+
+---
+
 ## P13 · Ship it
 
 ### [ ] S132 · Balance pass
@@ -2511,7 +2627,7 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Notes from human playtests turned into numbers
 
 ### [ ] S133 · Performance pass
-> needs: S118, S126 | size: L | test: `tests/test_budget.gd`
+> needs: S118, S126, S258 | size: L | test: `tests/test_budget.gd`
 - [ ] Every mission inside its budget on every tier, measured at the worst moment (final wave, rain, fire, helicopter)
 - [ ] Profiler findings fixed: merged meshes, MultiMesh where repeated, scripts off the hot path, pooled everything
 - [ ] Host with eight players and a full horde keeps its tick rate
@@ -2533,3 +2649,14 @@ Finishing every step leaves a LAN co-op zombie extraction game set in an invente
 - [ ] Every rough edge found becomes a test and a fix, or a new step appended to this file
 - [ ] Credits and a thank-you screen after the fifth mission
 - [ ] `TODO.md`, `CLAUDE.md` and this file agree with the game
+
+---
+
+## P14 · Later: the whole town
+
+### [ ] S259 · The whole town in detail
+> needs: S258, S044, S045, S046, S047, S048, S049 | size: L | test: `tests/test_city_map.gd` | see: `--map=town --host`
+- Not before the five areas ship. Everything outside the areas at full detail: every îlot with its facades, every street dressed, the river's whole length, the squares and landmarks.
+- [ ] A far LOD for whatever is not near the players, streamed as they move
+- [ ] Free play and the Open World over the whole town
+- [ ] The frame rate holds (`tools\perf.ps1 town`)
