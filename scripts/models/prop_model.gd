@@ -166,6 +166,9 @@ static func set_open(node: Node3D, part_name: String, t: float) -> void:
 	elif motion.has("move"):
 		var m: Array = motion.move
 		p.transform = Transform3D(rest.basis, rest.origin + Vector3(m[0], m[1], m[2]) * t)
+	elif motion.has("roll"):  # gathered up into the pivot: a roller shutter's curtain into its box
+		var k := 1.0 - float(motion.roll) * t
+		p.transform = Transform3D(rest.basis * Basis.from_scale(Vector3(1.0, k, 1.0)), rest.origin)
 
 
 ## Many copies at rest: one MultiMeshInstance3D per piece of every LOD, each in its distance band.

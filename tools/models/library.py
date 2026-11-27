@@ -92,6 +92,10 @@ AREAS = {
     "door_plank": ALL5 + ["town"],
     "fountain_wall": ["mirante", "town"],
     "coin_binoculars": ["mirante"],
+    "window_ribbon": ["terminal", "hospital", "prefeitura"],
+    "window_barracks": ["batalhao"],
+    "window_french": ["town"],
+    "roller_shutter": ["terminal", "hospital", "batalhao", "town"],
 }
 
 # What each area still needs and nobody has made yet, from its element list
@@ -105,29 +109,24 @@ MISSING = {
         ("turnstile_booth", "S201", "ticket booth and turnstile"),
         ("station_clock", "S202", "the station clock on its post"),
         ("soffit_downlight", "S194", "round downlight in a soffit"),
-        ("window_ribbon", "S157", "post-war ribbon glazing (ticket hall)"),
     ],
     "hospital": [
         ("elevator", "S195", "the bed lift: car, landing doors, shaft"),
         ("hospital_bed", "S211", "a ward bed with rails and wheels"),
         ("ward_curtain", "S211", "a curtain track and its curtain"),
         ("samu_van", "S180", "the SAMU ambulance van"),
-        ("window_ribbon", "S157", "the tower's band windows"),
-        ("roller_shutter", "S191", "the service roller shutter of the yard"),
     ],
     "prefeitura": [
         ("barricade_window", "S055", "a window boarded with planks and furniture"),
         ("council_bench", "S193", "the council chamber's benches and dais"),
         ("blind_venetian", "S157", "venetian blinds hanging out of a broken window"),
         ("tent_civil", "S185", "the Defesa Civil tent"),
-        ("window_ribbon", "S157", "the office floors' ribbon glazing"),
     ],
     "batalhao": [
         ("barracks_block", "S221", "the long two-storey block: hipped tile roof, green band, tall windows"),
         ("guard_house", "S223", "the guard house and the gate's barrier arm"),
         ("parade_stand", "S222", "the stepped stand across the ground"),
         ("army_truck", "S180", "the army truck, open and covered"),
-        ("window_green", "S157", "the tall green-framed barracks window"),
         ("mounted_gun", "S225", "the mounted gun on the guard tower"),
     ],
     "mirante": [
@@ -143,7 +142,6 @@ MISSING = {
         ("house_plaster", "S162", "the plastered stone house's modules"),
         ("atelier", "S164", "the riverside atelier hall"),
         ("mansard_ends", "S159", "the mansard's ends and corners"),
-        ("roller_shutter", "S191", "the shop's roller shutter"),
         ("house_plate", "S044", "the blue enamel house number"),
     ],
 }
