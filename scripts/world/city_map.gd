@@ -74,6 +74,7 @@ var landmarks := {}
 var prop_counts := {}               ## set piece props by kind
 var terminal := {}                   ## the terminal lot frame (-Z to the street), gate, platform (the middle island)
 var hospital := {}                   ## the Hospital's lot frame (-Z to Rua Blumenau), door, yard, stair frame, climb (world points), pad
+var batalhao := {}                   ## the barracks lot frame (-Z to the street), gate, ground (the parade ground's middle), pad
 var prefeitura := {}                 ## the Prefeitura's lot frame (-Z to the avenue), its door and its pad (world)
 var mirante := {}                    ## where the Mirante's pieces stand (world): gate, gate_yaw, tower, deck, poles, rails
 var roadside_trees: Array = []       ## [{ at, kind }]: the real trees (Vegetation) lining the forest's roads
@@ -200,6 +201,8 @@ func _mission_changed() -> void:
 		use_data(MapAreas.mirante(self))
 	elif mission == "terminal" and terminal.has("platform") and prefeitura.has("pad") and nav != null:
 		use_data(MapAreas.terminal(self))
+	elif mission == "batalhao" and batalhao.has("pad") and nav != null:
+		use_data(MapAreas.batalhao(self))
 	elif mission == "hospital" and hospital.has("pad") and nav != null:
 		use_data(MapAreas.hospital(self))
 	elif mission == "prefeitura" and prefeitura.has("pad") and nav != null:
@@ -880,27 +883,133 @@ func _patch(t: Transform3D, r: Array, y: float, color: Color) -> void:
 	_g.ground_quad(t * Vector3(x0, y, z0), t * Vector3(x1, y, z0), t * Vector3(x1, y, z1), t * Vector3(x0, y, z1), color)
 
 
-## 62º Batalhão: a walled compound with barracks, headquarters, a parade ground and a motor pool.
-func _batalhao(c: Vector3) -> void:
+## 62º Batalhão de Infantaria (BatalhaoSet), turned to face rue Jules-Ferry to the north-east:
+## the railings and the gate on the street, the lawn with its stars, the long front block with the
+## way through its middle, the side blocks down the parade ground, the headquarters at its head,
+## the gym hall, the emblem bed, the stands, the trucks lined up and the flags.
+## `batalhao` keeps the lot's frame (-Z to the street), the gate, the ground's middle and the pad.
+func _batalhao(_c: Vector3) -> void:
 	var poi: Dictionary = CityData.POIS.batalhao
-	var lot := _plan(poi.lot)
-	var drive := _plan([poi.at, poi.gate])
-	for i in lot.size():
-		_wall(lot[i], lot[(i + 1) % lot.size()], 3.2, Props.CONCRETE_DARK, true, drive)
-	for z in [-60.0, -30.0, 0.0]:
-		_solid(c + Vector3(-125, 3.2, z), Vector3(60, 6.4, 14), Props.OLIVE)
-		_b.box(Vector3(61, 0.5, 15), c + Vector3(-125, 6.6, z), Props.OLIVE_DARK)
-	_solid(c + Vector3(-50, 4.8, 70), Vector3(56, 9.6, 16), Props.TAN)
-	_b.box(Vector3(52, 1.2, 0.12), c + Vector3(-50, 6.4, 61.95), Props.GLASS)
-	_label(poi.name, c + Vector3(-50, 8.4, 61.9), 150, Color("1c2414"), 180)
-	_g.flat(Vector2(70, 90), c + Vector3(60, 0.03, 50), Color("3a4a2a")) # parade ground
-	_b.box(Vector3(0.15, 12.0, 0.15), c + Vector3(24, 6.0, 50), Props.STEEL)
-	_b.box(Vector3(2.0, 1.2, 0.05), c + Vector3(25.1, 11.2, 50), Color("2a7a3a"))
-	for truck: Array in [[150.0, 70.0, 20.0], [160.0, 86.0, 20.0], [140.0, 98.0, 110.0]]:
-		_put(Props.truck(_b, _t(c.x + truck[0], c.z + truck[1], truck[2])), _t(c.x + truck[0], c.z + truck[1], truck[2]))
-	_put(Props.humvee(_b, _t(c.x + 128, c.z + 80, 200), Props.OLIVE), _t(c.x + 128, c.z + 80, 200))
-	_solid(c + Vector3(56, 4.5, -64.5), Vector3(4, 9, 4), Props.CONCRETE) # guard tower by the gate
-	_b.box(Vector3(5.5, 0.3, 5.5), c + Vector3(56, 9.15, -64.5), Props.OLIVE_DARK)
+	var gate := CityData.to_world(poi.gate)
+	var turn := Basis(Vector3.UP, BatalhaoSet.YAW)
+	var o := gate + turn.z * BatalhaoSet.STREET_SET
+	o.y = ground_y(o)
+	var lot := Transform3D(turn, o)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 62041920
+	batalhao.frame = lot
+	batalhao.gate = lot * Vector3(0, 0, 4.0)
+	batalhao.ground = lot * Vector3(0, 0, (BatalhaoSet.GROUND_Z.x + BatalhaoSet.GROUND_Z.y) * 0.5)
+	batalhao.pad = lot * BatalhaoSet.PAD
+	var y := 0.03
+	var gx := BatalhaoSet.GROUND_X
+	var gz := BatalhaoSet.GROUND_Z
+	# the ground: the drive in, the lawn either side with its stars, the parade ground and its lines
+	_patch(lot, [-4.5, -1.0, 4.5, gz.x], y, BatalhaoSet.GROUND)
+	for side in [-1.0, 1.0]:
+		_patch(lot, [-66.0 if side < 0 else 4.5, 1.0, -4.5 if side < 0 else 66.0, 21.5], y, BatalhaoSet.LAWN)
+	for x in [-46.0, -22.0, 22.0, 46.0]:
+		BatalhaoSet.star(_g, lot, Vector3(x, y + 0.01, 11.0), 5.0, BatalhaoSet.LINE)
+		BatalhaoSet.star(_g, lot, Vector3(x, y + 0.02, 11.0), 3.9, BatalhaoSet.BED)
+	_patch(lot, [-gx - 6.0, gz.x - 6.0, gx + 6.0, gz.y + 2.0], y, BatalhaoSet.GROUND)
+	for k in 9: # the drill lines: across every 12 m, two down the length
+		var z := gz.x + 3.0 + k * 12.0
+		_patch(lot, [-gx + 2.0, z - 0.07, gx - 2.0, z + 0.07], y + 0.01, BatalhaoSet.LINE)
+	for x in [-gx + 2.0, gx - 2.0, -16.0, 16.0]:
+		_patch(lot, [x - 0.07, gz.x + 3.0, x + 0.07, gz.x + 99.0], y + 0.01, BatalhaoSet.LINE)
+	BatalhaoSet.disc(_g, lot, BatalhaoSet.PAD + Vector3(0, y + 0.012, 0), 7.0, BatalhaoSet.LINE, 24)
+	BatalhaoSet.disc(_g, lot, BatalhaoSet.PAD + Vector3(0, y + 0.014, 0), 6.4, BatalhaoSet.GROUND, 24)
+	for bar: Array in [[-2.2, 0.0, 0.5, 6.0], [2.2, 0.0, 0.5, 6.0], [0.0, 0.0, 3.9, 0.5]]: # the H
+		var hx: float = bar[0]
+		var hw: float = bar[2]
+		var hd: float = bar[3]
+		_patch(lot, [hx - hw * 0.5, BatalhaoSet.PAD.z - hd * 0.5, hx + hw * 0.5, BatalhaoSet.PAD.z + hd * 0.5], y + 0.016, BatalhaoSet.LINE)
+	BatalhaoSet.emblem(_b, _g, lot)
+	var court := lot * Transform3D(Basis.IDENTITY, BatalhaoSet.GYM + Vector3(0, 0, -42))
+	_patch(court, [-8.0, -15.0, 8.0, 15.0], y, BatalhaoSet.COURT)
+	for r: Array in [[-7.4, -14.4, 7.4, -14.2], [-7.4, 14.2, 7.4, 14.4], [-7.4, -14.4, -7.2, 14.4], [7.2, -14.4, 7.4, 14.4], [-7.4, -0.08, 7.4, 0.08]]:
+		_patch(court, r, y + 0.01, BatalhaoSet.LINE)
+	# the street front, the gate and its guards; walls round the other three sides
+	_put_turned(BatalhaoSet.railings(_b, lot, BatalhaoSet.LOT_X.x, -BatalhaoSet.GATE_HALF - 0.7), lot)
+	_put_turned(BatalhaoSet.railings(_b, lot, BatalhaoSet.GATE_HALF + 0.7, BatalhaoSet.LOT_X.y), lot)
+	_put_free(BatalhaoSet.gate(_b, _glow, lot), lot)
+	var house := lot * Transform3D(Basis.IDENTITY, Vector3(12.5, 0, 6.0))
+	_put_turned(BatalhaoSet.guard_house(_b, _glow, house), house)
+	var tower := lot * Transform3D(Basis.IDENTITY, Vector3(-13.0, 0, 5.0))
+	_put_turned(BatalhaoSet.watch_tower(_b, tower), tower)
+	for k in 2:
+		var bag := lot * Transform3D(Basis(Vector3.UP, 0.35 * (1 - 2 * k)), Vector3(-9.0 + 18.0 * k, 0, 16.0))
+		_put_turned(Props.sandbags(_b, bag, 4.0), bag)
+	var corners := [Vector3(BatalhaoSet.LOT_X.x, 0, 0), Vector3(BatalhaoSet.LOT_X.x, 0, BatalhaoSet.LOT_BACK),
+		Vector3(BatalhaoSet.LOT_X.y, 0, BatalhaoSet.LOT_BACK), Vector3(BatalhaoSet.LOT_X.y, 0, 0)]
+	for i in 3:
+		var a: Vector3 = lot * (corners[i] as Vector3)
+		var b: Vector3 = lot * (corners[i + 1] as Vector3)
+		_wall(Vector2(a.x, a.z), Vector2(b.x, b.z), 3.0, BatalhaoSet.WALL_SHADE, true)
+	# the blocks
+	var front := lot * Transform3D(Basis.IDENTITY, Vector3(0, 0, BatalhaoSet.FRONT_Z))
+	_put_turned(BatalhaoSet.block(_b, _glow, front, BatalhaoSet.FRONT_LEN, BatalhaoSet.DEPTH, BatalhaoSet.PASSAGE, [5, 22, 41, 60]), front)
+	_put_free(BatalhaoSet.lintel(), front)
+	_label(poi.name, front * Vector3(0, 5.9, -BatalhaoSet.DEPTH * 0.5 - 0.06), 40, Color("1f4a2e"), rad_to_deg(BatalhaoSet.YAW) + 180.0)
+	for side in [-1.0, 1.0]:
+		var st := lot * Transform3D(Basis(Vector3.UP, -side * PI * 0.5), Vector3(side * BatalhaoSet.SIDE_X, 0, BatalhaoSet.SIDE_Z))
+		_put_turned(BatalhaoSet.block(_b, _glow, st, BatalhaoSet.SIDE_LEN, BatalhaoSet.DEPTH, 0.0, [7, 30] if side < 0 else [14]), st)
+	var hq := lot * Transform3D(Basis.IDENTITY, Vector3(0, 0, BatalhaoSet.HQ_Z))
+	_put_turned(BatalhaoSet.headquarters(_b, _glow, hq), hq)
+	_label("62ºBI", hq * Vector3(0, BatalhaoSet.EAVE + 2.0, -BatalhaoSet.HQ_DEPTH * 0.5 - 0.36), 110, Color("1c1c1a"), rad_to_deg(BatalhaoSet.YAW) + 180.0)
+	var gym := lot * Transform3D(Basis.IDENTITY, BatalhaoSet.GYM)
+	_put_turned(BatalhaoSet.gym(_b, gym), gym)
+	for x in [-22.0, 22.0]:
+		var stand := lot * Transform3D(Basis.IDENTITY, Vector3(x, 0, gz.x + 2.0))
+		_put_turned(BatalhaoSet.stands(_b, stand, 24.0), stand)
+	for k in 3:
+		BatalhaoSet.flagpole(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-6.0 + k * 6.0, 0, gz.y + 3.5)), k)
+	# the trucks lined up at the head of the ground, one left across it, a humvee by the gym
+	for x in [-34.0, -26.0, 26.0, 34.0]:
+		var tt := lot * Transform3D(Basis.IDENTITY, Vector3(x, 0, gz.y - 8.0))
+		_put_turned(Props.truck(_b, tt), tt)
+	var lost := lot * Transform3D(Basis(Vector3.UP, 1.1), Vector3(30.0, 0, 66.0))
+	_put_turned(Props.truck(_b, lost), lost)
+	var hv := lot * Transform3D(Basis(Vector3.UP, 0.4), Vector3(-72.0, 0, 112.0))
+	_put_turned(Props.humvee(_b, hv, Props.OLIVE), hv)
+	# trees down the sides and along the back, behind the blocks
+	for k in 12:
+		for side in [-1.0, 1.0]:
+			var tz := 30.0 + k * 16.0
+			var tx: float = side * 100.0 + (rng.randf() - 0.5) * 4.0
+			if side < 0.0 and absf(tz - BatalhaoSet.GYM.z) < 26.0:
+				continue
+			var t := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(tx, 0, tz))
+			_put_free(Vegetation.plant(_trees, t, Vegetation.Kind.BROADLEAF if k % 4 != 2 else Vegetation.Kind.IMPERIAL_PALM, rng), t)
+	# what happened: casings by the gate, sandbagged boxes, blood across the ground
+	_put_free(Props.casings(_b, lot * Transform3D(Basis.IDENTITY, Vector3(-9.0, 0, 15.0)), 30, rng), lot)
+	for p: Vector3 in [Vector3(6, 0, 52), Vector3(-30, 0, 100)]:
+		var ct := lot * Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p)
+		_put_free(Props.crate(_b, ct), ct)
+	var ground_at := func(_p: Vector3) -> float: return o.y
+	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, 0.4), Vector3(-6.0, 0, 70.0)), 12.0, rng, ground_at)
+	RoadProps.blood_trail(_b, lot * Transform3D(Basis(Vector3.UP, 2.6), Vector3(12.0, 0, 36.0)), 8.0, rng, ground_at)
+
+
+## A turned prop's colliders: each collides with its own basis, and closes the cells under it along
+## its long axis (a strip as wide as it is, at least a cell and a half), so a long block turned at
+## an angle closes only what it stands on.
+func _put_turned(colliders: Array, t: Transform3D) -> void:
+	for c: Array in colliders:
+		var center: Vector3 = c[0]
+		var size: Vector3 = c[1]
+		var basis: Basis = c[2] if c.size() > 2 else Basis.IDENTITY
+		var b := t.basis * basis
+		_collide(t * center, size, b)
+		var long_x := size.x >= size.z
+		var half_len := (size.x if long_x else size.z) * 0.5
+		var half_w := maxf((size.z if long_x else size.x) * 0.5, cell * 0.75)
+		var axis := (b * (Vector3.RIGHT if long_x else Vector3.BACK)).normalized()
+		var reach := maxf(half_len - half_w, 0.0)
+		var p := t * center
+		var a := p - axis * reach
+		var e := p + axis * reach
+		_stamp(PackedVector2Array([Vector2(a.x, a.z), Vector2(e.x, e.z)]), half_w * 2.0, BUILT, _mask([LOT, PARK, BLOCK, STREET]))
 
 
 ## Mirante: the lookout on the summit of Morro da Boa Vista, where the hill road ends: the

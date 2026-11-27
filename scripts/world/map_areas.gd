@@ -134,6 +134,57 @@ static func terminal(map: CityMap) -> Dictionary:
 		],
 	}
 
+## The 62º Batalhão (DEFEND): in through the gate onto the lawn, hold the parade ground through
+## three waves, then the helicopter comes down on the painted H at its middle.
+static func batalhao(map: CityMap) -> Dictionary:
+	var lot: Transform3D = map.batalhao.frame
+	var pad: Vector3 = map.batalhao.pad
+	var free := func(local: Vector3) -> Vector3:
+		var p := map.nav.nearest_free(lot * local)
+		p.y = map.ground_y(p) + 0.1
+		return p
+	var spawns := []
+	for row in 2: # two rows of four on the drive inside the gate, facing in
+		for i in 4:
+			spawns.append({ "at": free.call(Vector3(-3.6 + i * 2.4, 0, 6.0 + row * 1.6)), "yaw": BatalhaoSet.YAW + PI })
+	var gx := BatalhaoSet.GROUND_X
+	var gz := BatalhaoSet.GROUND_Z
+	var poly := []
+	for k: Vector3 in [Vector3(-gx, 0, gz.x), Vector3(gx, 0, gz.x), Vector3(gx, 0, gz.y), Vector3(-gx, 0, gz.y)]:
+		var w := lot * k
+		poly.append(Vector2(w.x, w.z))
+	var square := func(c: Vector3, r: float) -> Array:
+		var out := []
+		for k: Vector2 in [Vector2(-r, -r), Vector2(r, -r), Vector2(r, r), Vector2(-r, r)]:
+			var w := lot * (c + Vector3(k.x, 0, k.y))
+			out.append(Vector2(w.x, w.z))
+		return out
+	return {
+		"name": "batalhao",
+		"player_spawns": spawns,
+		"zombie_closets": [
+			{ "id": "hq_back", "at": free.call(Vector3(0, 0, 192)), "radius": 3.0 },
+			{ "id": "gym", "at": free.call(Vector3(-92, 0, 196)), "radius": 3.0 },
+			{ "id": "east_yard", "at": free.call(Vector3(90, 0, 110)), "radius": 3.0 },
+			{ "id": "west_yard", "at": free.call(Vector3(-92, 0, 64)), "radius": 3.0 },
+		],
+		"zones": [
+			{ "id": "parade", "kind": "trigger", "polygon": poly, "y": [pad.y - 2.0, pad.y + 8.0] },
+			{ "id": "pad", "kind": "extraction", "polygon": square.call(BatalhaoSet.PAD, 6.0), "y": [pad.y - 2.0, pad.y + 4.0] },
+		],
+		# Coming down on the H, nose to the gate.
+		"heli": { "at": pad + Vector3(0, 0.7, 0), "yaw": BatalhaoSet.YAW, "floor": pad.y },
+		"objectives": [
+			{ "id": "hold", "kind": "survive", "zone": "parade", "text": "Hold the parade ground until the helicopter comes", "heli": 60.0,
+				"waves": [
+					{ "size": 12, "types": { "walker": 0.7, "runner": 0.3 }, "closets": ["hq_back", "gym"] },
+					{ "size": 16, "gap": 12.0, "types": { "walker": 0.55, "runner": 0.35, "leaper": 0.1 }, "closets": ["east_yard", "west_yard"] },
+					{ "size": 20, "gap": 12.0, "types": { "walker": 0.45, "runner": 0.4, "leaper": 0.15 } },
+				] },
+			{ "id": "board", "kind": "extract", "zone": "pad", "seconds": 5.0, "text": "To the H on the ground: board the helicopter" },
+		],
+	}
+
 ## The Hospital Dona Helena (EXTRACTION, up): start under the ambulance bay on Rua Blumenau, get
 ## round the tower to the yard behind (a checkpoint, the triage tent), hold it through three waves
 ## while the helicopter comes, then up the fire stair, ten floors, to board it on the roof.

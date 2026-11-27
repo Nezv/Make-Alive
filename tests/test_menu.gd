@@ -102,4 +102,5 @@ func test_free_play_and_join_are_still_there() -> void:
 func test_a_mission_hosts_the_city_at_its_poi() -> void:
 	var g := await new_game("city", "batalhao")
 	assert_eq(g.mission, "batalhao")
-	assert_lt(g.local_player.global_position.distance_to(g.map.poi_pos("batalhao")), 4.0)
+	assert_lt(g.local_player.global_position.distance_to(g.map.player_spawn()), 4.0, "at the mission's start")
+	assert_lt(g.local_player.global_position.distance_to(g.map.poi_pos("batalhao")), 120.0, "inside the barracks' gate")

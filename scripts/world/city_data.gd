@@ -24,8 +24,11 @@ const POIS := {
 		"lot": [Vector2(1013, 488), Vector2(1057, 488), Vector2(1057, 520), Vector2(1013, 520)] },
 	"prefeitura": { "name": "PREFEITURA DE JOINVILLE", "at": Vector2(1200, 215), "gate": Vector2(1159, 214),
 		"lot": [Vector2(1174, 195), Vector2(1226, 195), Vector2(1226, 235), Vector2(1174, 235)] },
-	"batalhao": { "name": "62º BATALHÃO DE INFANTARIA", "at": Vector2(665, 840), "gate": Vector2(674.5, 753),
-		"lot": [Vector2(578, 795), Vector2(640, 765), Vector2(775, 880), Vector2(745, 900), Vector2(620, 892), Vector2(568, 842)] },
+	# The compound faces rue Jules-Ferry (north-east); its gate is on the street opposite the way
+	# through the front block, `at` the middle of the parade ground (BatalhaoSet's frame).
+	"batalhao": { "name": "62º BATALHÃO DE INFANTARIA", "at": Vector2(699.0, 840.4), "gate": Vector2(730.9, 810.6),
+		"lot": [Vector2(568, 842), Vector2(578, 795), Vector2(640, 765), Vector2(692.9, 773.1), Vector2(764.2, 849.6),
+			Vector2(775, 880), Vector2(745, 900), Vector2(688.3, 920.3), Vector2(620, 892)] },
 	# On the 230 m summit of Morro da Boa Vista, where the road ends. joinville.png shows only the tip
 	# of the hill under its zoom buttons; this and the road up come from joinville_topography.png.
 	"mirante": { "name": "MIRANTE DE JOINVILLE", "at": Vector2(1866, 45), "gate": Vector2(1848, 43),

@@ -118,6 +118,22 @@ $termCams = [ordered]@{
 }
 foreach ($k in $termCams.Keys) { $shots[$k] = $term + "--shot-cam=$($termCams[$k])" }
 
+# The 62º Batalhão (references/batalhao_elements.md): from the street, two air views, the top,
+# across the parade ground to the headquarters, back from its porch, the gym hall, the gate from
+# inside, down the east side.
+$bat = @('--host', '--mission=batalhao', '--no-hordes')
+$batCams = [ordered]@{
+    'bat_street'      = '-667.2,3.0,674.1,132.9,8.0'
+    'bat_air'         = '-604.4,70.0,697.5,111.1,-23.4'
+    'bat_top'         = '-762.4,220.0,762.6,132.9,-89.0'
+    'bat_ground'      = '-722.1,2.0,725.1,132.9,3.0'
+    'bat_hq'          = '-791.7,2.0,789.8,-47.1,2.0'
+    'bat_gym'         = '-817.9,4.0,732.3,86.1,0.0'
+    'bat_gate'        = '-685.8,2.0,718.6,8.0,0.0'
+    'bat_side'        = '-653.3,3.0,777.1,132.9,0.0'
+}
+foreach ($k in $batCams.Keys) { $shots[$k] = $bat + "--shot-cam=$($batCams[$k])" }
+
 $made = @()
 foreach ($name in $shots.Keys) {
     if ($Filter -and $name -notlike "*$Filter*") { continue }
