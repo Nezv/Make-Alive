@@ -29,6 +29,22 @@ const ALL := {
 		"parts": ["leaf_l", "leaf_r", "shutter_l", "shutter_r"],
 		"states": ["clean", "abandoned", "damaged", "burnt"],
 	},
+	"window_ribbon": {
+		"family": "windows",
+		"tris": [1200, 500, 300],
+		"draws": 4,
+		"lod_ends": [15.0, 50.0, 300.0],
+		"parts": ["sash", "vent_l", "vent_r"],
+		"states": ["clean", "abandoned", "damaged", "burnt"],
+	},
+	"window_barracks": {
+		"family": "windows",
+		"tris": [1500, 750, 400],
+		"draws": 4,
+		"lod_ends": [15.0, 50.0, 300.0],
+		"parts": ["leaf_l", "leaf_r", "fanlight"],
+		"states": ["clean", "abandoned", "damaged", "burnt"],
+	},
 	"shopfront": {
 		"family": "shopfronts",
 		"tris": [6000, 1400, 900],
@@ -803,6 +819,14 @@ const ALL := {
 		"draws": 1,
 		"lod_ends": [30.0, 90.0, 300.0],
 		"parts": [],
+		"states": ["clean", "abandoned", "damaged", "burnt"],
+	},
+	"roller_shutter": {
+		"family": "doors",
+		"tris": [4500, 900, 300],
+		"draws": 2,
+		"lod_ends": [20.0, 60.0, 200.0],
+		"parts": ["curtain"],
 		"states": ["clean", "abandoned", "damaged", "burnt"],
 	},
 	"door_double": {

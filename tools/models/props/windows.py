@@ -6,6 +6,18 @@ a raised plaster band round the opening, a stone sill, the persiennes closing in
 wall's face, the reveal going back to the frame, two leaves of panes opening into the room, the
 iron garde-corps across the lower part between the jambs, the dark room behind.
 
+window_ribbon: one 2.40 m bay of the post-war band window (S157; the hospital's tower, the town
+hall's office floors, the bus station's ticket hall): a precast concrete sill with its drip, thin
+concrete reveals that are only the ends of the band, an anodised aluminium frame with a middle
+mullion and a transom, a fixed pane on the viewer's left, a sash on the right that slides behind it
+(part `sash`), a top-hung vent over each half (`vent_l`, `vent_r`), the dark room behind. Bays laid
+side by side make the ribbon: each end post is half a mullion.
+
+window_barracks: the tall timber window of the barracks blocks (S157, S221): a deep opening in a
+thick white wall with a flat painted band round it, a concrete sill, a frame painted green, two
+casement leaves of three panes opening into the room (`leaf_l`, `leaf_r`), a fixed transom and a
+fanlight over it that tilts in from its foot (`fanlight`), the dark room behind.
+
 Coordinates (as every element): metres, Y up, the front is -Z; x = 0 the window's middle, so
 the viewer's left is +X. The wall's face is z = 0, the bottom of the sill y = 0. The house
 (S162) cuts a hole the size of the band's outside (`hole()`) and sets this in it.
@@ -352,7 +364,289 @@ def window_french(lod):
     return parts
 
 
+# --- window_ribbon ---------------------------------------------------------------------------------
+# Measurements (card `window_ribbon.md`): a 2.40 m structural bay; sill to head 1.45 m.
+RB_W = 2.40            # one bay, post centre to post centre
+RB_SILL = 0.06         # the precast sill's top
+RB_HEAD = 1.45         # the head (the slab's soffit above)
+RB_SILL_FRONT = 0.05   # the sill's nose in front of the face
+RB_FRAME_Z = 0.05      # the aluminium frame's front face, a little back in the reveal
+RB_FRAME_D = 0.07
+RB_POST = 0.05         # a mullion (each end is half of one)
+RB_TRANSOM = 1.10      # the transom's middle
+RB_ROOM = 0.50
+
+
+def _ribbon_body(lod):
+    m = Mesh()
+    hw = RB_W / 2
+    c = 0.004 if lod == 0 else 0.0
+    # the sill: a precast slab with a washed top, a drip under the nose
+    if lod == 0:
+        m.merge(_bx(-hw, hw, 0.0, RB_SILL, -RB_SILL_FRONT + 0.03, RB_FRAME_Z + 0.01, "concrete", 0.01, "top"))
+        m.merge(_bx(-hw, hw, 0.015, RB_SILL, -RB_SILL_FRONT, -RB_SILL_FRONT + 0.02, "concrete", 0.008, "top"))
+    else:
+        m.merge(_bx(-hw, hw, 0.0, RB_SILL, -RB_SILL_FRONT, RB_FRAME_Z + 0.01, "concrete"))
+    # the head: the slab edge's soffit from the face back to the frame
+    m.merge(_bx(-hw, hw, RB_HEAD, RB_HEAD + 0.04, 0.0, RB_FRAME_Z + 0.01, "concrete", c, "front"))
+    z0, z1 = RB_FRAME_Z, RB_FRAME_Z + RB_FRAME_D
+    p = RB_POST / 2
+    # the frame: head, sill rail, the two half posts at the ends and the middle mullion
+    m.merge(_bx(-hw, hw, RB_HEAD - 0.045, RB_HEAD, z0, z1, "alu", c))
+    m.merge(_bx(-hw, hw, RB_SILL, RB_SILL + 0.05, z0 - 0.01, z1, "alu", c, "top"))
+    for x0, x1 in ((-hw, -hw + p), (hw - p, hw), (-p, p)):
+        m.merge(_bx(x0, x1, RB_SILL, RB_HEAD, z0 - 0.005, z1, "alu", c))
+    # the transom right across
+    m.merge(_bx(-hw, hw, RB_TRANSOM - 0.025, RB_TRANSOM + 0.025, z0 - 0.005, z1, "alu", c))
+    # the fixed pane on the viewer's left (+X), set in the frame's outer track
+    gz = z0 + 0.018
+    m.merge(_bx(p, hw - p, RB_SILL + 0.05, RB_TRANSOM - 0.025, gz - 0.003, gz + 0.003, "glass"))
+    if lod == 0:  # its glazing bead: a thin rim round the pane
+        bx0, bx1, by0, by1 = p, hw - p, RB_SILL + 0.05, RB_TRANSOM - 0.025
+        for a, b, c0, c1 in ((bx0, bx1, by0, by0 + 0.02), (bx0, bx1, by1 - 0.02, by1), (bx0, bx0 + 0.02, by0, by1), (bx1 - 0.02, bx1, by0, by1)):
+            m.merge(_bx(a, b, c0, c1, gz - 0.009, gz - 0.003, "alu"))
+    if lod == 0:  # weep slots in the sill rail, the slab's drip edge, a gap where the sash slides
+        for x in (-hw * 0.7, -hw * 0.25, hw * 0.25, hw * 0.7):
+            m.merge(_bx(x - 0.02, x + 0.02, RB_SILL + 0.012, RB_SILL + 0.018, z0 - 0.0105, z0 - 0.0095, "dark"))
+        m.merge(_bx(-hw, hw, RB_HEAD - 0.01, RB_HEAD, -0.012, 0.0, "concrete"))
+    # the room
+    back = z1 + RB_ROOM
+    m.merge(_bx(-hw + p, hw - p, RB_SILL, RB_HEAD - 0.045, back, back + 0.02, "room"))
+    m.merge(_bx(-hw + p, hw - p, RB_SILL - 0.02, RB_SILL, z1, back, "room"))
+    m.merge(_bx(-hw + p, hw - p, RB_HEAD - 0.065, RB_HEAD - 0.045, z1, back, "room"))
+    if lod == 0:  # round 1: the end of a venetian blind showing, the ceiling's light
+        m.merge(_bx(-hw + p, hw - p, RB_HEAD - 0.12, RB_HEAD - 0.065, z1 + 0.04, z1 + 0.07, "blind"))
+    return m
+
+
+def _ribbon_sash(lod):
+    """The sliding sash: in the inner track on the viewer's right (-X), slides left behind the fixed pane."""
+    m = Mesh()
+    hw, p = RB_W / 2, RB_POST / 2
+    z0 = RB_FRAME_Z + 0.038
+    z1 = z0 + 0.026
+    c = 0.003 if lod == 0 else 0.0
+    x0, x1 = -hw + p - 0.005, -p + 0.02  # overlaps the mullion so the meeting is closed
+    y0, y1 = RB_SILL + 0.05, RB_TRANSOM - 0.025
+    st = 0.045
+    if lod == 2:  # far off: the glass alone, the frame's look baked round it
+        m.merge(_bx(x0, x1, y0, y1, z0, z1, "glass"))
+        return m, (x0, y0, z0)
+    m.merge(_bx(x0, x0 + st, y0, y1, z0, z1, "alu", c))
+    m.merge(_bx(x1 - st, x1, y0, y1, z0, z1, "alu", c))
+    m.merge(_bx(x0, x1, y0, y0 + st, z0, z1, "alu", c))
+    m.merge(_bx(x0, x1, y1 - st, y1, z0, z1, "alu", c))
+    gz = (z0 + z1) / 2
+    m.merge(_bx(x0 + st, x1 - st, y0 + st, y1 - st, gz - 0.003, gz + 0.003, "glass"))
+    if lod == 0:  # the pull: a recessed grip in the meeting stile, the lock's lever
+        m.merge(_bx(x1 - st * 0.7, x1 - st * 0.3, (y0 + y1) / 2 - 0.07, (y0 + y1) / 2 + 0.07, z0 - 0.004, z0, "dark"))
+        m.merge(_bx(x1 - st * 0.75, x1 - st * 0.25, (y0 + y1) / 2 + 0.10, (y0 + y1) / 2 + 0.13, z1, z1 + 0.012, "alu"))
+    return m, (x0, y0, z0)
+
+
+def _ribbon_vent(side, lod):
+    """A top-hung vent over one half (side +1 the viewer's left), hinged at the head, out at the foot."""
+    m = Mesh()
+    hw, p = RB_W / 2, RB_POST / 2
+    xa, xb = sorted((side * p, side * (hw - p)))
+    y0, y1 = RB_TRANSOM + 0.025, RB_HEAD - 0.045
+    z0, z1 = RB_FRAME_Z + 0.012, RB_FRAME_Z + 0.05
+    st = 0.04
+    c = 0.003 if lod == 0 else 0.0
+    if lod == 2:
+        m.merge(_bx(xa, xb, y0, y1, z0, z1, "glass"))
+        return m, (0.0, y1, z0)
+    m.merge(_bx(xa, xa + st, y0, y1, z0, z1, "alu", c))
+    m.merge(_bx(xb - st, xb, y0, y1, z0, z1, "alu", c))
+    m.merge(_bx(xa, xb, y0, y0 + st, z0, z1, "alu", c))
+    m.merge(_bx(xa, xb, y1 - st, y1, z0, z1, "alu", c))
+    gz = (z0 + z1) / 2
+    m.merge(_bx(xa + st, xb - st, y0 + st, y1 - st, gz - 0.003, gz + 0.003, "glass"))
+    if lod == 0:  # the stay arm on the inside
+        m.merge(_bx((xa + xb) / 2 - 0.008, (xa + xb) / 2 + 0.008, y0 + 0.02, y0 + 0.2, z1, z1 + 0.01, "alu"))
+    return m, (0.0, y1, z0)
+
+
+def window_ribbon(lod):
+    parts = {"body": Part(_ribbon_body(lod))}
+    sash, piv = _ribbon_sash(lod)
+    parts["sash"] = Part(sash, piv, {"move": [RB_W / 2 - RB_POST - 0.06, 0.0, 0.0]})  # behind the fixed pane
+    for side, nm in ((1, "vent_l"), (-1, "vent_r")):
+        mesh, hinge = _ribbon_vent(side, lod)
+        parts[nm] = Part(mesh, hinge, {"rotate": [[1, 0, 0], 28.0]})  # the foot swings out
+    if lod > 0:
+        merged = Mesh()
+        for q in parts.values():
+            merged.merge(q.mesh)
+        return {"body": Part(merged)}
+    return parts
+
+
+# --- window_barracks -------------------------------------------------------------------------------
+# Measurements (card `window_barracks.md`): a 1.10 x 2.30 opening in a 0.35 m wall.
+BK_W = 1.10            # the opening
+BK_TOP = 2.38          # the opening's head above the sill's bottom
+BK_SILL = 0.08         # the sill's top
+BK_SILL_FRONT = 0.06
+BK_BAND = 0.14         # the painted band round the opening, proud of the wall
+BK_BAND_PROUD = 0.015
+BK_WALL = 0.35         # the reveal's depth: the frame stands at the inner face
+BK_FRAME_Z = 0.24      # the frame's front face
+BK_FRAME_D = 0.07
+BK_TRANSOM = 1.86      # the transom's middle: the fanlight above it
+BK_ROOM = 0.60
+BK_PANES = 3
+
+
+def _barracks_body(lod):
+    m = Mesh()
+    hw = BK_W / 2
+    c = 0.005 if lod == 0 else 0.0
+    # the band: two jambs and a head round the opening, a little proud of the wall
+    for s in (1, -1):
+        m.merge(_bx(s * hw, s * (hw + BK_BAND), BK_SILL, BK_TOP + BK_BAND, -BK_BAND_PROUD, 0.0, "band", c))
+    m.merge(_bx(-hw, hw, BK_TOP, BK_TOP + BK_BAND, -BK_BAND_PROUD, 0.0, "band", c))
+    # the reveal back to the frame
+    for s in (1, -1):
+        m.merge(_bx(s * (hw - 0.01), s * hw, BK_SILL, BK_TOP, 0.0, BK_FRAME_Z, "plaster"))
+    m.merge(_bx(-hw, hw, BK_TOP - 0.01, BK_TOP, 0.0, BK_FRAME_Z, "plaster"))
+    # the sill: concrete, washed, its nose with a drip
+    sw = hw + BK_BAND + 0.03
+    if lod == 0:
+        m.merge(_bx(-sw, sw, 0.0, BK_SILL, -BK_SILL_FRONT + 0.03, BK_FRAME_Z, "concrete", 0.012, "top"))
+        m.merge(_bx(-sw, sw, 0.02, BK_SILL, -BK_SILL_FRONT, -BK_SILL_FRONT + 0.022, "concrete", 0.01, "top"))
+    else:
+        m.merge(_bx(-sw, sw, 0.0, BK_SILL, -BK_SILL_FRONT, BK_FRAME_Z, "concrete"))
+    # the frame: jambs, head, sill rail, the transom
+    z0, z1 = BK_FRAME_Z, BK_FRAME_Z + BK_FRAME_D
+    fw = hw - 0.01
+    for s in (1, -1):
+        m.merge(_bx(s * (fw - 0.05), s * fw, BK_SILL, BK_TOP - 0.01, z0, z1, "frame", c))
+    m.merge(_bx(-fw, fw, BK_TOP - 0.06, BK_TOP - 0.01, z0, z1, "frame", c))
+    m.merge(_bx(-fw, fw, BK_SILL, BK_SILL + 0.05, z0 - 0.025, z1, "frame", 0.012 if lod == 0 else 0.0, "top"))
+    m.merge(_bx(-fw, fw, BK_TRANSOM - 0.035, BK_TRANSOM + 0.035, z0 - 0.015, z1, "frame", c, "top"))
+    # the room
+    back = z1 + BK_ROOM
+    fi = fw - 0.05
+    m.merge(_bx(-fi, fi, BK_SILL, BK_TOP - 0.06, back, back + 0.02, "room"))
+    for s in (1, -1):
+        m.merge(_bx(s * fi, s * (fi + 0.02), BK_SILL, BK_TOP - 0.06, z1, back, "room"))
+    m.merge(_bx(-fi, fi, BK_TOP - 0.08, BK_TOP - 0.06, z1, back, "room"))
+    m.merge(_bx(-fi, fi, BK_SILL - 0.02, BK_SILL, z1, back, "room"))
+    if lod == 0:  # round 1: the fixings of the shutters that were taken off, a conduit up the reveal
+        for s in (1, -1):
+            for y in (0.5, BK_TOP - 0.4):
+                m.merge(S.prism((s * (hw + BK_BAND - 0.03), y, -BK_BAND_PROUD - 0.012), 0.008, 0.024, 6, tag="iron", axis=(0, 0, 1)))
+    return m
+
+
+def _barracks_leaf(side, lod):
+    """A casement leaf, hinged on the frame's jamb (side +1 the viewer's left), opening into the room."""
+    fw = BK_W / 2 - 0.06
+    x_out, x_in = side * fw, side * 0.002
+    lo, hi = BK_SILL + 0.05, BK_TRANSOM - 0.035
+    z0, z1 = BK_FRAME_Z + 0.01, BK_FRAME_Z + 0.055
+    c = 0.004 if lod == 0 else 0.0
+    m = Mesh()
+    st, top, bot, meet, bar = 0.055, 0.06, 0.12, 0.06, 0.03
+    if lod == 2:  # far off: the leaf as one board of glass, its bars baked
+        m.merge(_bx(x_out, x_in, lo, hi, z0, z1, "glass"))
+        return m, (x_out, lo, z1)
+    m.merge(_bx(x_out, x_out - side * st, lo, hi, z0, z1, "frame", c))
+    m.merge(_bx(x_in, x_in + side * meet, lo, hi, z0 - 0.006, z1, "frame", c))
+    m.merge(_bx(x_out, x_in, hi - top, hi, z0, z1, "frame", c))
+    m.merge(_bx(x_out, x_in, lo, lo + bot, z0, z1, "frame", c))
+    g0, g1 = x_out - side * st, x_in + side * meet
+    gz = (z0 + z1) / 2
+    y_lo, y_hi = lo + bot, hi - top
+    pane = (y_hi - y_lo - (BK_PANES - 1) * bar) / BK_PANES
+    for k in range(BK_PANES):
+        y0 = y_lo + k * (pane + bar)
+        m.merge(_bx(g0, g1, y0, y0 + pane, gz - 0.002, gz + 0.002, "glass"))
+        if k and lod < 2:
+            m.merge(_bx(g0, g1, y0 - bar, y0, z0 + 0.008, z1 - 0.008, "frame", c))
+    if lod == 0:  # the drip moulding on the bottom rail, the hinges, the turn handle on the right leaf
+        m.merge(_bx(g0, x_in + side * 0.004, lo + 0.03, lo + 0.07, z0 - 0.02, z0, "frame", 0.012, "top"))
+        for y in (lo + 0.2, hi - 0.2):
+            m.merge(S.prism((x_out + side * 0.004, y, z0 - 0.004), 0.007, 0.08, 6, tag="iron"))
+        if side < 0:
+            m.merge(_bx(-0.018, 0.018, lo + bot, hi - top, z0 - 0.016, z0 - 0.006, "frame", 0.004, "front"))
+    return m, (x_out, lo, z1)
+
+
+def _barracks_fanlight(lod):
+    """The fanlight over the transom: one sash of two panes, hinged at its foot, tilting in at the top."""
+    fw = BK_W / 2 - 0.06
+    lo, hi = BK_TRANSOM + 0.035, BK_TOP - 0.06
+    z0, z1 = BK_FRAME_Z + 0.012, BK_FRAME_Z + 0.05
+    c = 0.004 if lod == 0 else 0.0
+    m = Mesh()
+    st = 0.045
+    if lod == 2:
+        m.merge(_bx(-fw, fw, lo, hi, z0, z1, "glass"))
+        return m, (0.0, lo, z1)
+    m.merge(_bx(-fw, -fw + st, lo, hi, z0, z1, "frame", c))
+    m.merge(_bx(fw - st, fw, lo, hi, z0, z1, "frame", c))
+    m.merge(_bx(-fw, fw, lo, lo + st, z0, z1, "frame", c))
+    m.merge(_bx(-fw, fw, hi - st, hi, z0, z1, "frame", c))
+    m.merge(_bx(-0.015, 0.015, lo + st, hi - st, z0 + 0.006, z1 - 0.006, "frame", c))
+    gz = (z0 + z1) / 2
+    m.merge(_bx(-fw + st, fw - st, lo + st, hi - st, gz - 0.002, gz + 0.002, "glass"))
+    return m, (0.0, lo, z1)
+
+
+def window_barracks(lod):
+    parts = {"body": Part(_barracks_body(lod))}
+    for side, nm in ((1, "leaf_l"), (-1, "leaf_r")):
+        mesh, hinge = _barracks_leaf(side, lod)
+        parts[nm] = Part(mesh, hinge, {"rotate": [[0, 1, 0], 100.0 * side]})
+    fan, hinge = _barracks_fanlight(lod)
+    parts["fanlight"] = Part(fan, hinge, {"rotate": [[1, 0, 0], 35.0]})  # the top tips into the room
+    if lod > 0:
+        merged = Mesh()
+        for q in parts.values():
+            merged.merge(q.mesh)
+        return {"body": Part(merged)}
+    return parts
+
+
+def ribbon_materials():
+    out = materials()
+    out.update({
+        "concrete": Material((0.66, 0.65, 0.62), kind="concrete", chip=0.0, rusts=False, grain=0.08),
+        "alu": Material((0.62, 0.62, 0.60), under=(0.55, 0.55, 0.54), bare=(0.58, 0.58, 0.57), chip=0.0, rusts=False, grain=0.03),
+        "dark": Material((0.05, 0.05, 0.05), chip=0.0, rusts=False, grain=0.02, fades=False),
+        "blind": Material((0.78, 0.76, 0.70), kind="plaster", chip=0.0, rusts=False, grain=0.04),
+    })
+    return out
+
+
+def barracks_materials():
+    out = materials()
+    out.update({
+        "concrete": Material((0.70, 0.69, 0.66), kind="concrete", chip=0.0, rusts=False, grain=0.08),
+        "band": Material((0.90, 0.89, 0.85), kind="plaster", chip=0.0, rusts=False, grain=0.05),
+        "frame": Material((0.17, 0.33, 0.22), under=(0.80, 0.80, 0.76), bare=(0.48, 0.42, 0.34), kind="wood", rusts=False, chip=0.7),
+    })
+    out["plaster"] = Material((0.88, 0.87, 0.83), kind="plaster", chip=0.0, rusts=False, grain=0.05)
+    return out
+
+
 ELEMENTS = {
+    "window_ribbon": {
+        "build": window_ribbon,
+        "materials": ribbon_materials(),
+        "states": ["clean", "abandoned", "damaged", "burnt"],
+        "lods": 3,
+        "edge_radius": 0.003,
+    },
+    "window_barracks": {
+        "build": window_barracks,
+        "materials": barracks_materials(),
+        "states": ["clean", "abandoned", "damaged", "burnt"],
+        "lods": 3,
+        "edge_radius": 0.004,
+    },
     "window_french": {
         "build": window_french,
         "materials": materials(),

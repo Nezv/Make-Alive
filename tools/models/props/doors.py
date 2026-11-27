@@ -10,6 +10,11 @@ door_fire: the steel fire door: a pressed steel frame, a flush leaf (part `leaf`
 vision panel, the panic bar and the kick plate inside, the closer, the hinges.
 door_plank: the corridor's service door (`door.gd`): a heavy timber frame, a ledged and braced leaf
 of vertical planks 2.0 x 2.6 (part `leaf`), strap hinges, a thumb latch and a hasp.
+roller_shutter: the steel roller shutter (rideau métallique) of a shop or a service bay, on the
+wall's face: a guide channel down each side, the box (coffre) over the opening that the curtain
+rolls into, the curtain (part `curtain`, gathered up into the box when open) of interlocking
+galvanised slats with a band of perforated ones, the bottom bar with its lifting handles and the
+lock, the key switch of the motor on the wall.
 
 Wall face z = 0, the house +Z, the floor y = 0; the viewer stands at -Z, so their left is +X. Every
 leaf hangs on the viewer's left jamb and opens inward (+Z).
@@ -42,6 +47,8 @@ def materials():
         "dark": Material((0.06, 0.06, 0.06), chip=0.0, rusts=False, grain=0.02, fades=False),
         "rubber": Material((0.10, 0.10, 0.10), kind="rubber", chip=0.0, rusts=False, grain=0.04),
         "stone": Material((0.62, 0.60, 0.56), kind="stone", chip=0.0, rusts=False, grain=0.12),
+        "box": Material((0.50, 0.52, 0.53), under=(0.62, 0.63, 0.64), bare=(0.40, 0.30, 0.22), chip=0.5, grain=0.05),
+        "bolt": Material((0.45, 0.45, 0.44), chip=0.0, grain=0.04, fixing=True),
     }
 
 
@@ -261,6 +268,97 @@ def door_double(lod):
     return parts
 
 
+# --- roller_shutter ---------------------------------------------------------------------------------------
+# Measurements (card `roller_shutter.md`): a 3.00 x 2.80 opening, slats 77 mm, a 0.40 m box.
+RS_W, RS_H = 3.00, 2.80
+RS_GUIDE = (0.065, 0.075)   # the guide channel: across, deep (from the wall's face out)
+RS_BOX = (0.40, 0.40)       # the box: high, deep
+RS_PITCH = 0.077            # one slat
+RS_Z = -0.040               # the curtain's middle, in the guides
+RS_PERF = (1.55, 1.95)      # the band of perforated slats (a shop's: the window seen through it)
+
+
+def _rs_body(lod):
+    m = Mesh()
+    gw, gd = RS_GUIDE
+    hw = RS_W / 2
+    for s in (1, -1):  # the guides: a U channel, its lips toward the curtain
+        x0, x1 = s * (hw - 0.02), s * (hw - 0.02 + gw)
+        lo, hi = sorted((x0, x1))
+        m.merge(_cb(((lo + hi) / 2, RS_H / 2, -0.004), ((hi - lo) / 2, RS_H / 2, 0.004), 0.0, "steel", lod))  # the back on the wall
+        m.merge(S.box((x1 - s * 0.003, RS_H / 2, -gd / 2), (0.003, RS_H / 2, gd / 2), "steel"))  # the outer side
+        for z in (RS_Z - 0.014, RS_Z + 0.014):  # the lips either side of the curtain
+            m.merge(S.box((x0 + s * 0.012, RS_H / 2, z), (0.012, RS_H / 2, 0.002), "steel"))
+        m.merge(S.box((x0 + s * 0.003, RS_H / 2, -gd / 2), (0.003, RS_H / 2, gd / 2), "steel"))
+        if lod == 0:  # the fixings down the back, the guide's flared mouth at the top
+            for y in (0.3, 1.4, 2.5):
+                m.merge(S.prism(((lo + hi) / 2, y, -0.009), 0.007, 0.004, 6, axis=(0, 0, -1), tag="bolt"))
+    bh, bd = RS_BOX
+    bw = hw + gw + 0.02
+    # the box: a folded steel front, rounded at its foot, end plates
+    if lod == 0:
+        m.merge(S.chamfer_box((0, RS_H + bh / 2, -bd / 2), (bw, bh / 2, bd / 2 - 0.002), 0.05, "box", edges="front"))
+        for s in (1, -1):
+            m.merge(S.box((s * (bw + 0.003), RS_H + bh / 2, -bd / 2), (0.003, bh / 2 + 0.004, bd / 2), "box"))
+        m.merge(S.box((0, RS_H + 0.006, -bd / 2 + 0.04), (bw - 0.02, 0.006, bd / 2 - 0.06), "dark"))  # the slot the curtain enters
+        m.merge(S.box((0, RS_H + bh - 0.04, -bd - 0.002), (bw - 0.06, 0.004, 0.002), "box"))  # a fold line on the front
+        # the motor's key switch on the wall beside the opening, its conduit up to the box
+        kx = hw + gw + 0.16
+        m.merge(_cb((kx, 1.35, -0.025), (0.045, 0.06, 0.025), 0.006, "steel", lod))
+        m.merge(S.prism((kx, 1.36, -0.052), 0.012, 0.004, 8, axis=(0, 0, -1), tag="dark"))
+        m.merge(S.pipe([(kx, 1.41, -0.012), (kx, RS_H + 0.1, -0.012), (bw - 0.02, RS_H + 0.1, -0.012)], 0.010, 6, tag="steel"))
+    else:
+        m.merge(S.box((0, RS_H + bh / 2, -bd / 2), (bw, bh / 2, bd / 2), "box"))
+    return m
+
+
+def _rs_curtain(lod):
+    """The curtain, down: slats from the floor to the box, the bottom bar, handles and lock."""
+    m = Mesh()
+    hw = RS_W / 2 - 0.02 + 0.012  # into the guides
+    t = 0.010
+    bar = 0.06
+    n = int(round((RS_H - bar) / RS_PITCH))
+    pitch = (RS_H - bar) / n
+    # the bottom bar: an L of heavier steel with a rubber strip under it
+    m.merge(S.box((0, bar / 2 + 0.006, RS_Z), (hw, bar / 2, 0.014), "steel"))
+    m.merge(S.box((0, 0.003, RS_Z), (hw - 0.01, 0.003, 0.010), "rubber"))
+    if lod == 2:
+        m.merge(S.box((0, bar + (RS_H - bar) / 2, RS_Z), (hw, (RS_H - bar) / 2, t / 2), "steel"))
+        return m
+    for k in range(n):
+        y0 = bar + k * pitch
+        yc = y0 + pitch / 2
+        perf = RS_PERF[0] <= yc <= RS_PERF[1]
+        if lod == 0:  # a slat: a curved face (two planes) with the hook joint at its top
+            m.merge(S.box((0, yc - pitch * 0.22, RS_Z - 0.002), (hw, pitch * 0.26, t / 2), "steel").set_unit(k % 3 + 1))
+            m.merge(S.box((0, yc + pitch * 0.18, RS_Z - 0.004), (hw, pitch * 0.22, t / 2), "steel").set_unit(k % 3 + 1))
+            m.merge(S.box((0, y0 + pitch - 0.004, RS_Z + 0.002), (hw, 0.005, t / 2 + 0.002), "dark"))  # the joint's shadow
+            if perf:  # a row of slots punched along the slat: the dark room shows through
+                for j in range(int(RS_W / 0.12)):
+                    x = -RS_W / 2 + 0.09 + j * 0.12
+                    m.merge(S.box((x, yc, RS_Z - 0.0095), (0.035, 0.009, 0.0008), "dark"))
+        else:
+            m.merge(S.box((0, yc, RS_Z), (hw, pitch / 2 - 0.002, t / 2), "steel").set_unit(k % 3 + 1))
+    if lod == 0:  # two lifting handles, the lock's cylinder and its bolts into the guides
+        for x in (-0.6, 0.6):
+            m.merge(S.sweep([(x - 0.07, 0.04, RS_Z - 0.014), (x - 0.07, 0.04, RS_Z - 0.05), (x + 0.07, 0.04, RS_Z - 0.05), (x + 0.07, 0.04, RS_Z - 0.014)],
+                            S.circle(0.008, 6), "steel"))
+        m.merge(S.prism((0, 0.036, RS_Z - 0.016), 0.013, 0.012, 10, axis=(0, 0, -1), tag="brass"))
+        m.merge(S.box((0, 0.036, RS_Z - 0.029), (0.0015, 0.007, 0.001), "dark"))
+    return m
+
+
+def roller_shutter(lod):
+    body = _rs_body(lod)
+    curtain = _rs_curtain(lod)
+    if lod > 0:
+        body.merge(curtain)
+        return {"body": Part(body)}
+    # open, the curtain gathers into the box: all but the bottom bar's height
+    return {"body": Part(body), "curtain": Part(curtain, (0.0, RS_H, RS_Z), {"roll": 0.975})}
+
+
 _SPEC = dict(states=["clean", "abandoned", "damaged", "burnt"], lods=3)
 
 ELEMENTS = {
@@ -269,4 +367,5 @@ ELEMENTS = {
     "door_fire": dict(build=door_fire, materials=materials(), extra=_paint_fire, edge_radius=0.003, close=(0.0, 1.4, 0.0), **_SPEC),
     "door_double": dict(build=door_double, materials=materials(), edge_radius=0.003, close=(0.0, 1.2, -0.05), **_SPEC),
     "door_plank": dict(build=door_plank, materials=materials(), edge_radius=0.004, close=(-0.8, 1.2, -0.05), **_SPEC),
+    "roller_shutter": dict(build=roller_shutter, materials=materials(), edge_radius=0.003, close=(0.6, 0.3, -0.1), **_SPEC),
 }

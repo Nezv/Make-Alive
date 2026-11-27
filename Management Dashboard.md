@@ -288,7 +288,7 @@ Everything a match needs exists: the zombies move like the dead, the five maps a
 - [ ] 1.2.2.4 · Round 3 · surface: old glass that reflects the sky unevenly, dirt in the frame corners, flaking paint on the frames and shutters, net curtains behind some
 - [ ] 1.2.2.5 · States: open, shut, shutters closed, broken (shards left in the frame), boarded, burnt with soot above; lit warm, TV-blue or dark at night (emission)
 - [ ] 1.2.2.6 · Review: each kind at 1 m and on a test wall at 10 m, by day and night
-- Under way: the tall French casement `window_french` (card `references/elements/window_french.md`, family `tools/models/props/windows.py`) has its references, round 1 and round 2 (the cast garde-corps, pentures and pins, catch and bolt, jet d'eau, battement, the sill's drip; built, sketch close-ups, the rack's sheet not shot); the timber houses' small casement and the post-war ribbon glazing are the family's next elements, each with its own card.
+- Under way: the tall French casement `window_french` (card `references/elements/window_french.md`, family `tools/models/props/windows.py`) has its references, round 1 and round 2 (the cast garde-corps, pentures and pins, catch and bolt, jet d'eau, battement, the sill's drip; built, sketch close-ups, the rack's sheet not shot); `window_ribbon` (a 2.40 m bay of post-war band glazing: sliding sash, two top-hung vents; the hospital, the town hall's offices, the bus station's hall) and `window_barracks` (the barracks' tall green casements under a fanlight, S221) have round 1 from sketches, cards written, waiting for photos and the Blender build; the timber houses' small casement is the family's next element.
 
 ### [ ] 1.2.3 · Shopfront kit
 > id: S158 | needs: S141, S157 | size: L | asset: complex | rounds: 3 | tags: #art | test: `tests/test_elements.gd` | see: `--prop-rack=shopfronts`
@@ -418,7 +418,7 @@ Everything a match needs exists: the zombies move like the dead, the five maps a
 - [ ] 1.3.3.3 · Round 2 · structure: panels, hinges, handles, kick plates, door closers, vision panels, push bars, locks, the shutter's slats and guides
 - [ ] 1.3.3.4 · Round 3 · surface: worn paint round the handles, scuffs at the foot, signs (SORTIE, PRIVÉ), blood handprints #vfx
 - [ ] 1.3.3.5 · States and parts: open, shut, locked (it rattles), splintered and broken in stages by the door's HP
-- Under way: family `tools/models/props/doors.py`: `door_wood` (architrave, lining, four raised panels both faces, butts, levers), `door_glass` (aluminium stiles, push bar, closer), `door_fire` (pressed frame, wired vision panel, panic bar, closer) and `door_plank` (the corridor's 2.0 x 2.6 ledged and braced door) have round 1, built, each leaf a part opening inward. `door_double` (half-glazed, two leaves) too. Left: photos, the roller shutter, swapping `door_plank` into `door.gd`, the broken states, rounds 2 and 3.
+- Under way: family `tools/models/props/doors.py`: `door_wood` (architrave, lining, four raised panels both faces, butts, levers), `door_glass` (aluminium stiles, push bar, closer), `door_fire` (pressed frame, wired vision panel, panic bar, closer) and `door_plank` (the corridor's 2.0 x 2.6 ledged and braced door) have round 1, built, each leaf a part opening inward. `door_double` (half-glazed, two leaves) too. `roller_shutter` (guides, box, slatted curtain with a perforated band, bottom bar and lock, key switch; the curtain gathers into the box by a new `roll` motion) has round 1 from sketches, waiting for its build. Left: photos, swapping `door_plank` into `door.gd`, the broken states, rounds 2 and 3.
 - [ ] 1.3.3.6 · Review: each on the rack at 1 m, and the corridor's door in its four states
 
 ### [ ] 1.3.4 · Stairs, railings, ceilings and floors
@@ -839,12 +839,13 @@ Everything a match needs exists: the zombies move like the dead, the five maps a
 - [ ] 1.6.1.4 · Budget: draws and triangles of a placed set counted by `Budget`, `tests/test_placement.gd` holds a full area under `Config.BUDGET` #perf
 - [ ] 1.6.1.5 · `--place-rack` lays a sample of every family on a street to look at
 
-### [ ] 1.6.2 · Library triage
-> id: S248 | needs: S140 | size: S | tags: #map #art | test: `python tools/models/props.py --list` | see: `references/elements/library.md`
+### [x] 1.6.2 · Library triage
+> id: S248 | needs: S140 | size: S | tags: #map #art | test: `python tools/models/library.py --check` | see: `references/elements/library.md`
 
-- [ ] 1.6.2.1 · `references/elements/library.md`: every element by family, its round, whether its card has photos, its states, and which area uses it
-- [ ] 1.6.2.2 · Each marked ready to place, or the round it still needs (a draft at round 1 is placed and improved in place)
-- [ ] 1.6.2.3 · The elements each area needs and nobody has made yet, listed per area, so element steps are picked from that list first
+- [x] 1.6.2.1 · `references/elements/library.md`: every element by family, its round, whether its card has photos, its states, and which area uses it ✅
+- [x] 1.6.2.2 · Each marked ready to place, or the round it still needs (a draft at round 1 is placed and improved in place) ✅
+- [x] 1.6.2.3 · The elements each area needs and nobody has made yet, listed per area, so element steps are picked from that list first ✅
+- Done: `python tools/models/library.py` writes `references/elements/library.md` (`--check` fails on an element without a card, an area or a registry entry). The areas each element serves are its `AREAS` table, the missing elements per area its `MISSING` table: keep both in step.
 
 ### [ ] 1.6.3 · Area dressing from the library
 > id: S249 | needs: S051, S247, S248 | size: L | rounds: 2 | tags: #map #art | test: `tests/test_area_dressing.gd` | see: `--mission=<each> --shot-cam`

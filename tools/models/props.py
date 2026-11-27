@@ -19,7 +19,7 @@ A family file says `ELEMENTS = {"name": spec}`, a spec being a dict:
     extra(maps, state, col) -> col     optional: lettering and anything else painted by position
     emit_where(P, N, tag, tags) -> bool optional: which texels of the lit tags glow (default all)
 
-The first part is the fixed body; the others move (`Part.motion`): {"rotate": [axis, degrees]}
+The first part is the fixed body; the others move (`Part.motion`): {"roll": fraction} gathers the part up into its pivot (a roller shutter's curtain into its box), {"rotate": [axis, degrees]}
 about the part's pivot, or {"move": [x, y, z]}. Game coordinates: metres, Y up, facing -Z,
 standing on y = 0.
 """
@@ -379,6 +379,10 @@ def _opened(part, amount=1.0):
         R = np.eye(3) + np.sin(t) * K + (1 - np.cos(t)) * K @ K
         m = part.mesh.copy()
         m.verts = [R @ (v - piv) + piv for v in m.verts]
+    elif "roll" in part.motion:  # gathered up into the pivot: a roller shutter into its box
+        k = 1.0 - float(part.motion["roll"]) * amount
+        m = part.mesh.copy()
+        m.verts = [np.array([v[0], piv[1] + (v[1] - piv[1]) * k, v[2]]) for v in m.verts]
     else:
         m = part.mesh.copy()
         m.verts = [v + np.asarray(part.motion["move"], np.float64) * amount for v in m.verts]
